@@ -4736,7 +4736,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text('Model: openai/gpt-oss-120b', style: TextStyle(fontSize: 11, color: textSecondary)),
+                    Text('Model: qwen/qwen3.8-27b', style: TextStyle(fontSize: 11, color: textSecondary)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: grokController,
@@ -4891,7 +4891,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Grok runs as primary model (openai/gpt-oss-120b). Gemini serves as automatic fallback.',
+                              'Grok runs as primary model (qwen/qwen3.8-27b). Gemini serves as automatic fallback.',
                               style: TextStyle(fontSize: 11, color: textSecondary),
                             ),
                           ),

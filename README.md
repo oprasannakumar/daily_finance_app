@@ -25,7 +25,7 @@ You can download and install the pre-compiled Android release APK directly witho
 
 ### 1. ⚡ Smart Entry Form
 - **Natural Language Voice Input**: Tap the microphone button to dictate expenses (e.g., *"Paid 450 rupees for dinner from HDFC credit card"*).
-- **Dual AI Narration Parsing**: Backed by **Gemini** and **Grok** API engines with a zero-latency local fallback rule engine to instantly auto-fill Amount, Purpose, Spent For, and Account.
+- **Dual AI Narration Parsing**: Backed by **Gemini (gemini-3.6-flash)** and **Groq (qwen/qwen3.8-27b)** API engines with a zero-latency local fallback rule engine to instantly auto-fill Amount, Purpose, Spent For, and Account.
 - **Smart Clipboard Auto-Fill**: Automatically parses banking SMS, Google Pay, PhonePe, and Paytm transaction notifications copied to clipboard.
 - **Dual-Flow Accounting**: Toggle between **Withdraw** (Expense) and **Deposit** (Income) flows.
 - **Self Transfer Mode**: Dedicated account-to-account transfer system (e.g. ATM cash withdrawal, moving funds from Bank to Wallet) formatted cleanly as balanced double-entry rows.
@@ -52,12 +52,14 @@ You can download and install the pre-compiled Android release APK directly witho
 - **View / Edit Mode**: Toggle edit mode to add new accounts, remove duplicate accounts/cards, or manually adjust baseline balances.
 - **Real-Time Auditing**: Automatically deducts expenses and credits deposits across active balances.
 
-### 5. 📱 Home Screen Widget & Android App Shortcuts
-- **App Shortcuts (Long-press app icon)**:
-  - `➕ Quick Add`: Immediately opens Smart Entry ready to log.
-  - `📷 Scan Receipt (AI)`: Directly launches the camera OCR bill scanner.
-  - `👥 Borrowers Ledger`: Opens debt balances and borrower statements.
-- **Native Android Home Screen Widget**: A resizable home screen launcher widget (`SmartLedgerWidgetProvider`) with 1-tap quick buttons.
+### 5. 📱 Home Screen Live Balances & Credit Limits Widget
+- **No-App-Open Balance Overview**: View your net liquid funds (Bank + Cash) and available credit across all cards directly on your Android home screen without launching the app.
+- **Two-Column Glancable Dashboard**:
+  - **Bank Accounts & Cash**: Real-time balances for all active bank accounts (e.g. HDFC, SBI, ICICI) and physical cash in hand.
+  - **Credit Cards & Limits**: Available credit limit and total credit limit for each individual credit card.
+- **Instant Background Sync**: Updates automatically whenever a transaction is saved, edited, or deleted, and whenever account configurations change.
+- **One-Tap Refresh**: Dedicated 🔄 **SYNC** button on the widget triggers instant synchronization.
+- **Direct Navigation**: Tapping anywhere on the widget instantly opens the **Account Balances** screen for full ledger details and monthly statement breakdowns.
 
 ### 6. ☁️ Google Sheets Dual-Database Sync
 - **Primary Finance Spreadsheet**: Syncs main transaction logs, loan splits, account balances, and recurring templates.

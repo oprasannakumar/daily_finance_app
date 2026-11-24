@@ -1,9 +1,21 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:daily_finance_app/models/invoice_model.dart';
+import 'package:daily_finance_app/services/ai_transaction_service.dart';
 import 'package:daily_finance_app/services/receipt_scanner_service.dart';
 
 void main() {
+  group('AI Model Configuration Tests', () {
+    test('ReceiptScannerService uses gemini-3.6-flash', () {
+      expect(ReceiptScannerService.geminiModel, 'gemini-3.6-flash');
+    });
+
+    test('AiTransactionService uses qwen/qwen3.8-27b for Groq and gemini-3.6-flash for Gemini', () {
+      expect(AiTransactionService.grokModelName, 'qwen/qwen3.8-27b');
+      expect(AiTransactionService.geminiModelName, 'gemini-3.6-flash');
+    });
+  });
+
   group('ReceiptScannerService Result & Parser Tests', () {
     test('ScannedReceiptResult error state holds correct error message', () {
       final res = ScannedReceiptResult.error('API key missing');

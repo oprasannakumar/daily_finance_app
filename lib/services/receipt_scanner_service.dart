@@ -38,7 +38,7 @@ class ReceiptScannerService {
   static final ReceiptScannerService instance = ReceiptScannerService._internal();
   ReceiptScannerService._internal();
 
-  static const String geminiModel = 'gemini-2.5-flash';
+  static const String geminiModel = 'gemini-3.6-flash';
 
   /// Scans receipt image bytes using Gemini Vision and extracts structured invoice data.
   Future<ScannedReceiptResult> scanReceipt({

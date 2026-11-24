@@ -10,6 +10,7 @@ void main() async {
   // Warm up local cache so app renders instantly with zero loading delay
   await StorageService.instance.getTransactions();
   QuickActionsService.instance.initialize();
+  StorageService.instance.syncWidgetBalances();
   runApp(const DailyFinanceApp());
 }
 

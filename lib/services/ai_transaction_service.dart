@@ -112,7 +112,7 @@ class AiTransactionService {
     final hasGrok = grokKey != null && grokKey.trim().isNotEmpty;
     final hasGemini = geminiKey != null && geminiKey.trim().isNotEmpty;
 
-    // 1. Try Grok FIRST (openai/gpt-oss-120b or grok-beta) if key provided
+    // 1. Try Grok FIRST (qwen/qwen3.8-27b) if key provided
     if (hasGrok) {
       try {
         final result = await _callGrok(
@@ -192,10 +192,10 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
 }''';
   }
 
-  static const String grokModelName = 'openai/gpt-oss-120b';
+  static const String grokModelName = 'qwen/qwen3.8-27b';
   static const String geminiModelName = 'gemini-3.6-flash';
 
-  // --- 1. Grok API Caller (openai/gpt-oss-120b) ---
+  // --- 1. Grok API Caller (qwen/qwen3.8-27b) ---
   Future<AiParsedTransaction?> _callGrok({
     required String apiKey,
     required String userInput,

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:quick_actions/quick_actions.dart';
-import '../screens/borrowers_ledger_screen.dart';
-import '../screens/invoice_manager_screen.dart';
+import '../screens/account_balances_screen.dart';
+import 'storage_service.dart';
 
 class QuickActionsService {
   static final QuickActionsService instance = QuickActionsService._internal();
@@ -16,29 +16,14 @@ class QuickActionsService {
 
   void initialize() {
     try {
+      // Clear app icon shortcuts as requested
+      _quickActions.setShortcutItems(<ShortcutItem>[]);
+
       _quickActions.initialize((String shortcutType) {
         debugPrint('QuickAction triggered: $shortcutType');
         _pendingShortcut = shortcutType;
         handleShortcut(shortcutType);
       });
-
-      _quickActions.setShortcutItems(<ShortcutItem>[
-        const ShortcutItem(
-          type: 'action_quick_add',
-          localizedTitle: '➕ Quick Add',
-          icon: 'ic_launcher',
-        ),
-        const ShortcutItem(
-          type: 'action_scan_receipt',
-          localizedTitle: '📷 Scan Receipt (AI)',
-          icon: 'ic_launcher',
-        ),
-        const ShortcutItem(
-          type: 'action_borrowers',
-          localizedTitle: '👥 Borrowers Ledger',
-          icon: 'ic_launcher',
-        ),
-      ]);
 
       _widgetChannel.setMethodCallHandler((call) async {
         if (call.method == 'onWidgetAction') {
@@ -81,22 +66,16 @@ class QuickActionsService {
     _pendingShortcut = null;
 
     switch (shortcutType) {
-      case 'action_quick_add':
-        nav.popUntil((route) => route.isFirst);
+      case 'action_refresh_widget':
+        StorageService.instance.syncWidgetBalances();
         break;
 
-      case 'action_scan_receipt':
+      case 'action_view_balances':
+      default:
+        // Tap on widget opens Account Balances screen directly
         nav.push(
           MaterialPageRoute(
-            builder: (_) => const InvoiceManagerScreen(autoStartScan: true),
-          ),
-        );
-        break;
-
-      case 'action_borrowers':
-        nav.push(
-          MaterialPageRoute(
-            builder: (_) => const BorrowersLedgerScreen(),
+            builder: (_) => const AccountBalancesScreen(),
           ),
         );
         break;
