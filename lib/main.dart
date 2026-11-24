@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/transaction_form_screen.dart';
+import 'services/quick_actions_service.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme_colors.dart';
 
@@ -8,6 +9,7 @@ void main() async {
   await StorageService.instance.initTheme();
   // Warm up local cache so app renders instantly with zero loading delay
   await StorageService.instance.getTransactions();
+  QuickActionsService.instance.initialize();
   runApp(const DailyFinanceApp());
 }
 
@@ -20,6 +22,7 @@ class DailyFinanceApp extends StatelessWidget {
       valueListenable: StorageService.instance.isDarkModeNotifier,
       builder: (context, isDark, child) {
         return MaterialApp(
+          navigatorKey: QuickActionsService.instance.navigatorKey,
           title: 'Smart Entry Finance',
           debugShowCheckedModeBanner: false,
           themeMode: isDark ? ThemeMode.dark : ThemeMode.light,

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import '../services/receipt_scanner_service.dart';
 import 'package:intl/intl.dart';
 import '../models/invoice_model.dart';
 import '../services/google_sheets_service.dart';
@@ -7,11 +10,13 @@ import '../services/storage_service.dart';
 class InvoiceManagerScreen extends StatefulWidget {
   final DateTime? initialDate;
   final Function(InvoiceSummary selectedInvoice)? onInvoiceSelected;
+  final bool autoStartScan;
 
   const InvoiceManagerScreen({
     super.key,
     this.initialDate,
     this.onInvoiceSelected,
+    this.autoStartScan = false,
   });
 
   @override
@@ -359,6 +364,12 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     ));
 
     _loadData();
+
+    if (widget.autoStartScan) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showScanReceiptOptions();
+      });
+    }
   }
 
   void _generateDefaultBillNo() {
@@ -864,6 +875,13 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
           '🧾 Invoice Manager',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.document_scanner_rounded),
+            tooltip: 'Scan Receipt with AI',
+            onPressed: _showScanReceiptOptions,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: primaryColor,
@@ -885,6 +903,237 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
               ],
             ),
     );
+  }
+
+
+  void _applyScannedReceipt(ScannedReceiptResult result) {
+    setState(() {
+      if (result.shopName.isNotEmpty) {
+        _dealerController.text = result.shopName;
+      }
+      if (result.billNo.isNotEmpty) {
+        _billNoController.text = result.billNo;
+      }
+      _selectedDate = result.billDate;
+
+      final map = <String, List<_InvoiceItemDraft>>{};
+      for (final it in result.items) {
+        final r = it.recipient.trim().isEmpty ? 'Self' : it.recipient.trim();
+        map.putIfAbsent(r, () => []).add(_InvoiceItemDraft(
+          name: it.itemName,
+          qty: it.quantity,
+          price: it.price,
+          total: it.total,
+        ));
+      }
+
+      _draftRecipients.clear();
+      for (final entry in map.entries) {
+        _draftRecipients.add(_InvoiceRecipientDraft(
+          recipient: entry.key,
+          items: entry.value,
+        ));
+      }
+
+      if (_draftRecipients.isEmpty) {
+        _draftRecipients.add(_InvoiceRecipientDraft(
+          recipient: 'Self',
+          items: [_InvoiceItemDraft()],
+        ));
+      }
+    });
+  }
+
+  Future<void> _showScanReceiptOptions() async {
+    HapticFeedback.lightImpact();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF7A5C).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text('📷', style: TextStyle(fontSize: 20)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Scan Bill / Receipt',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF1E293B),
+                          ),
+                        ),
+                        Text(
+                          'AI OCR automatically extracts shop, items & prices',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4ECDC4).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: Color(0xFF4ECDC4)),
+                ),
+                title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Capture physical supermarket bill'),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFA78BFA).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFFA78BFA)),
+                ),
+                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Upload bill photo or screenshot'),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 1600,
+      maxHeight: 2000,
+      imageQuality: 85,
+    );
+
+    if (picked == null) return;
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF7A5C).withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF7A5C)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Scanning Receipt with AI...',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Extracting store name, items, quantities & unit prices...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final bytes = await picked.readAsBytes();
+      final mime = picked.mimeType ?? 'image/jpeg';
+
+      final result = await ReceiptScannerService.instance.scanReceipt(
+        imageBytes: bytes,
+        mimeType: mime,
+        knownDealers: _knownDealers,
+        knownRecipients: _knownRecipients,
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Close scanning dialog
+      }
+
+      if (!mounted) return;
+
+      if (result.isSuccess && result.items.isNotEmpty) {
+        _applyScannedReceipt(result);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF10B981),
+            content: Text('✨ Scanned ${result.items.length} items from ${result.shopName.isNotEmpty ? result.shopName : "bill"} (₹${result.totalAmount.toStringAsFixed(2)})!'),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFEF4444),
+            content: Text(result.errorMessage ?? 'Could not detect bill items. Please try again or enter manually.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Error scanning receipt: $e')),
+        );
+      }
+    }
   }
 
   Widget _buildCreateMode(Color primary, Color secondary, Color purple, bool isDark) {
@@ -942,6 +1191,88 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                   child: const Text('🌙', style: TextStyle(fontSize: 16)),
                 ),
               ],
+            ),
+          ),
+
+          // AI Receipt OCR Scan Action Card
+          Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                onTap: _showScanReceiptOptions,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? [const Color(0xFF4F46E5), const Color(0xFF7C3AED)]
+                          : [const Color(0xFFFF7A5C), const Color(0xFFFF9A7A)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isDark ? const Color(0xFF4F46E5) : const Color(0xFFFF7A5C)).withValues(alpha: 0.25),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.document_scanner_rounded, size: 18, color: Colors.white),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Scan Bill / Receipt with AI',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                            Text(
+                              'Auto-extracts items, prices & totals via Camera/Gallery',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          '📷 Scan',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
 
