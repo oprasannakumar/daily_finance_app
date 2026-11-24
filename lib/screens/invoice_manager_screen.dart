@@ -2180,128 +2180,172 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     final isSelected = _selectedReorderItems.contains(key);
     final currentQty = _reorderQuantities[key] ?? item.typicalQuantity;
     final itemTotal = currentQty * item.latestPrice;
+    final daysAgo = item.daysSinceLastPurchase;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isSelected ? primary.withValues(alpha: 0.08) : cardBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isSelected ? primary : borderColor,
           width: isSelected ? 1.5 : 1.0,
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Checkbox(
-            value: isSelected,
-            activeColor: primary,
-            onChanged: (val) {
-              setState(() {
-                if (val == true) {
-                  _selectedReorderItems.add(key);
-                  _reorderQuantities[key] ??= item.typicalQuantity;
-                } else {
-                  _selectedReorderItems.remove(key);
-                }
-              });
-            },
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          // Top Row: Checkbox + Name + Due Badge + Dealer & Unit Price
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: isSelected,
+                  activeColor: primary,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                  onChanged: (val) {
+                    setState(() {
+                      if (val == true) {
+                        _selectedReorderItems.add(key);
+                        _reorderQuantities[key] ??= item.typicalQuantity;
+                      } else {
+                        _selectedReorderItems.remove(key);
+                      }
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        item.itemName,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: textMain,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.itemName,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: textMain,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
+                        if (item.isDueForReorder)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              '⚠️ Due',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B)),
+                            ),
+                          ),
+                      ],
                     ),
-                    if (item.isDueForReorder)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text('⚠️ Due', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
-                      ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${item.latestDealer} • ${_currencyFormat.format(item.latestPrice)} / unit',
+                      style: TextStyle(fontSize: 11.5, color: textMuted),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${item.latestDealer} • ${_currencyFormat.format(item.latestPrice)} / unit',
-                  style: TextStyle(fontSize: 11, color: textMuted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Quantity Stepper
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.remove_circle_outline, size: 20),
-                color: isSelected ? primary : Colors.grey,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                onPressed: () {
-                  setState(() {
-                    final curr = _reorderQuantities[key] ?? item.typicalQuantity;
-                    final next = (curr - 1.0).clamp(0.5, 99.0);
-                    _reorderQuantities[key] = next;
-                    _selectedReorderItems.add(key);
-                  });
-                },
-              ),
-              Container(
-                constraints: const BoxConstraints(minWidth: 26),
-                alignment: Alignment.center,
-                child: Text(
-                  currentQty == currentQty.toInt() ? currentQty.toInt().toString() : currentQty.toString(),
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textMain),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline, size: 20),
-                color: isSelected ? primary : Colors.grey,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                onPressed: () {
-                  setState(() {
-                    final curr = _reorderQuantities[key] ?? item.typicalQuantity;
-                    final next = (curr + 1.0).clamp(0.5, 99.0);
-                    _reorderQuantities[key] = next;
-                    _selectedReorderItems.add(key);
-                  });
-                },
               ),
             ],
           ),
-          const SizedBox(width: 8),
 
-          // Calculated Subtotal
-          Container(
-            constraints: const BoxConstraints(minWidth: 65),
-            alignment: Alignment.centerRight,
-            child: Text(
-              _currencyFormat.format(itemTotal),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? primary : textMain,
+          const SizedBox(height: 10),
+          Container(height: 1, color: borderColor.withValues(alpha: 0.5)),
+          const SizedBox(height: 8),
+
+          // Bottom Row: Purchase frequency on left, Stepper & Subtotal on right
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  daysAgo == 0 ? 'Bought today' : 'Last bought ${daysAgo}d ago (cycle ~${item.averageIntervalDays}d)',
+                  style: TextStyle(fontSize: 10.5, color: textMuted),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: textMuted.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.remove_rounded, size: 16),
+                          color: isSelected ? primary : Colors.grey,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          onPressed: () {
+                            setState(() {
+                              final curr = _reorderQuantities[key] ?? item.typicalQuantity;
+                              final next = (curr - 1.0).clamp(0.5, 99.0);
+                              _reorderQuantities[key] = next;
+                              _selectedReorderItems.add(key);
+                            });
+                          },
+                        ),
+                        Container(
+                          constraints: const BoxConstraints(minWidth: 24),
+                          alignment: Alignment.center,
+                          child: Text(
+                            currentQty == currentQty.toInt() ? currentQty.toInt().toString() : currentQty.toString(),
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: textMain),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add_rounded, size: 16),
+                          color: isSelected ? primary : Colors.grey,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          onPressed: () {
+                            setState(() {
+                              final curr = _reorderQuantities[key] ?? item.typicalQuantity;
+                              final next = (curr + 1.0).clamp(0.5, 99.0);
+                              _reorderQuantities[key] = next;
+                              _selectedReorderItems.add(key);
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    _currencyFormat.format(itemTotal),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? primary : textMain,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
