@@ -7,7 +7,7 @@
 [![Gemini Vision AI](https://img.shields.io/badge/Gemini%20AI-Vision%20OCR-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
-An intelligent, privacy-first personal finance tracking, debt ledger, grocery price intelligence, and invoice management mobile application built with Flutter. Deeply integrated with **Google Sheets** (dual-spreadsheet synchronization), **Gemini Vision AI** (receipt and bill OCR), and **Android App Shortcuts**.
+An intelligent, privacy-first personal finance tracking, debt ledger, grocery price intelligence, and invoice management mobile application built with Flutter. Deeply integrated with **Google Sheets** (dual-spreadsheet synchronization), **AI Voice & Narration Parsing** (Gemini & Groq), and **Android App Shortcuts**.
 
 ---
 
@@ -32,9 +32,8 @@ You can download and install the pre-compiled Android release APK directly witho
 - **Multi-Account Split Payments**: Pay a single bill using multiple sources (e.g., ₹500 Cash + ₹478 HDFC UPI).
 - **Fast Date Navigation**: Swipeable horizontal date picker with calendar picker dialog.
 
-### 2. 🧾 Invoice Manager, AI Receipt OCR & Price Tracker
-- **Camera-to-Invoice OCR**: Snap a physical supermarket receipt with your phone camera or select an invoice photo from your gallery.
-- **Automated Gemini Vision Extraction**: Reads Store Name, Invoice/Bill Number, Date, Line Items, Quantities, and Unit Prices in seconds.
+### 2. 🧾 Invoice Manager, Price Trends & Re-order Tracker
+- **Itemized Invoice Creator**: Add and manage invoices with store/dealer name, bill number, bill date, line items, quantities, and prices.
 - **Multi-Recipient Bill Splitting**: Assign individual items on a grocery bill to different people (e.g. `Self`, `Grand Father`, `Mother`).
 - **Dealer Price Catalog Sync**: Tracks historical prices by dealer in the `"Dealer_Prices"` sheet of `"Grocery_DB"`; automatically updates unit prices if they change.
 - **📈 Grocery Price History & Intelligence**: Real-time cross-store price comparison across all historical purchases and dealer catalog.
@@ -79,17 +78,11 @@ You can download and install the pre-compiled Android release APK directly witho
 
 ---
 
-### Walkthrough 2: Scanning a Grocery Bill with AI
+### Walkthrough 2: Creating an Invoice & Managing Grocery Bills
 1. Tap **🧾 INVOICE (OPT)** on the main form, then tap **Invoice Manager** at the bottom.
-2. Tap the **📷 Scan Bill / Receipt with AI** banner (or the scanner icon `[回]` in the top right).
-3. Select **Take Photo with Camera** and take a picture of your physical grocery receipt (or choose an image from your gallery).
-4. The Gemini Vision AI scans the bill and automatically extracts:
-   - Dealer Name (e.g., `Babu oil mill`)
-   - Bill Number (e.g., `INV-1795506205151`)
-   - Bill Date (e.g., `24-Nov-2026`)
-   - All line items, quantities, and prices.
-5. Review the extracted items. To assign an item to family or friends (e.g. Grand Father), tap **+ Add Recipient Group (Borrower)** and move the item.
-6. Tap **Save Invoice** — items are appended to `"Invoice"` in `"Grocery_DB"`, and new item prices are updated in `"Dealer_Prices"`.
+2. In the **Create Invoice** tab, enter the Dealer/Shop Name (e.g. `Babu oil mill`), Date, and items with quantities and unit prices.
+3. To assign specific items to family members or friends (e.g. `Grand Father`), tap **+ Add Recipient Group (Borrower)** and add items under their section.
+4. Tap **Save Invoice** — items are appended to `"Invoice"` in `"Grocery_DB"`, and new item prices are cataloged in `"Dealer_Prices"`.
 
 ---
 
