@@ -501,10 +501,13 @@ class StorageService {
   }
 
   static const MethodChannel _widgetChannel = MethodChannel('com.example.finance/widget_channel');
+  bool _isSyncingWidget = false;
 
   Future<void> syncWidgetBalances() async {
     final isTesting = WidgetsBinding.instance.runtimeType.toString().contains('Test');
     if (isTesting) return;
+    if (_isSyncingWidget) return;
+    _isSyncingWidget = true;
 
     try {
       final summary = await getLiveAccountBalances();
@@ -546,6 +549,8 @@ class StorageService {
       await _widgetChannel.invokeMethod('updateWidgetBalances', jsonEncode(payload));
     } catch (e) {
       debugPrint('Error syncing widget balances: $e');
+    } finally {
+      _isSyncingWidget = false;
     }
   }
 
@@ -629,8 +634,7 @@ class StorageService {
   Future<List<FinanceTransaction>> getTransactions({bool forceRefresh = false}) async {
     // 1. In-memory cache hit: zero lag
     if (!forceRefresh && _cachedTransactions != null) {
-      unawaited(syncWidgetBalances());
-    return List<FinanceTransaction>.from(_cachedTransactions!);
+      return List<FinanceTransaction>.from(_cachedTransactions!);
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -649,8 +653,7 @@ class StorageService {
           // Resume any pending background sync operations or silent refresh
           _triggerBackgroundSyncIfNeeded();
 
-          unawaited(syncWidgetBalances());
-    return List<FinanceTransaction>.from(_cachedTransactions!);
+          return List<FinanceTransaction>.from(_cachedTransactions!);
         } catch (e) {
           debugPrint('Error parsing cached transactions: $e');
         }
@@ -684,7 +687,6 @@ class StorageService {
       _cachedTransactions ??= [];
     }
 
-    unawaited(syncWidgetBalances());
     return List<FinanceTransaction>.from(_cachedTransactions!);
   }
 

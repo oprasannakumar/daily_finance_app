@@ -9,9 +9,9 @@ void main() async {
   await StorageService.instance.initTheme();
   // Warm up local cache so app renders instantly with zero loading delay
   await StorageService.instance.getTransactions();
+  runApp(const DailyFinanceApp());
   QuickActionsService.instance.initialize();
   StorageService.instance.syncWidgetBalances();
-  runApp(const DailyFinanceApp());
 }
 
 class DailyFinanceApp extends StatelessWidget {

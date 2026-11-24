@@ -71,13 +71,15 @@ class QuickActionsService {
         break;
 
       case 'action_view_balances':
-      default:
-        // Tap on widget opens Account Balances screen directly
         nav.push(
           MaterialPageRoute(
             builder: (_) => const AccountBalancesScreen(),
           ),
         );
+        break;
+
+      default:
+        // Unknown or standard launch action; do nothing
         break;
     }
   }
