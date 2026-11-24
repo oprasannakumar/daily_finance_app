@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/account_balance_model.dart';
 import '../models/invoice_model.dart';
@@ -439,7 +437,6 @@ class StorageService {
       _syncAccountBalancesToSheet(config);
       triggerConfigBackup();
     }
-    unawaited(syncWidgetBalances());
   }
 
   bool isBalanceConfigured() {
@@ -498,60 +495,6 @@ class StorageService {
       transactions: transactions,
       categories: categories,
     );
-  }
-
-  static const MethodChannel _widgetChannel = MethodChannel('com.example.finance/widget_channel');
-  bool _isSyncingWidget = false;
-
-  Future<void> syncWidgetBalances() async {
-    final isTesting = WidgetsBinding.instance.runtimeType.toString().contains('Test');
-    if (isTesting) return;
-    if (_isSyncingWidget) return;
-    _isSyncingWidget = true;
-
-    try {
-      final summary = await getLiveAccountBalances();
-      final totalAvailCredit = (summary.totalCreditCardLimit - summary.totalCreditCardUsed).clamp(0.0, double.infinity);
-
-      final banksList = summary.bankBalances.entries.map((e) => {
-        'name': e.key,
-        'balance': e.value,
-      }).toList();
-
-      final cardsList = summary.creditCardSummaries.entries.map((e) => {
-        'name': e.key,
-        'avail': e.value.availableLimit,
-        'limit': e.value.totalLimit,
-        'used': e.value.usedLimit,
-      }).toList();
-
-      final walletsList = summary.walletBalances.entries.map((e) => {
-        'name': e.key,
-        'balance': e.value,
-      }).toList();
-
-      final nowFormatted = DateFormat('hh:mm a').format(DateTime.now());
-
-      final payload = {
-        'totalBankCash': summary.totalBankBalance + summary.totalCashBalance,
-        'totalBank': summary.totalBankBalance,
-        'totalCash': summary.totalCashBalance,
-        'totalCreditLimit': summary.totalCreditCardLimit,
-        'totalCreditUsed': summary.totalCreditCardUsed,
-        'totalCreditAvail': totalAvailCredit,
-        'totalWallets': summary.totalWalletBalance,
-        'lastUpdated': nowFormatted,
-        'banks': banksList,
-        'cards': cardsList,
-        'wallets': walletsList,
-      };
-
-      await _widgetChannel.invokeMethod('updateWidgetBalances', jsonEncode(payload));
-    } catch (e) {
-      debugPrint('Error syncing widget balances: $e');
-    } finally {
-      _isSyncingWidget = false;
-    }
   }
 
   Timer? _backupDebounceTimer;
@@ -696,7 +639,6 @@ class StorageService {
     await _persistTransactions(prefs, _cachedTransactions!);
     GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
     transactionsNotifier.value++;
-    unawaited(syncWidgetBalances());
   }
 
   Future<void> clearCachedTransactions() async {
@@ -704,7 +646,6 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyTransactions);
     transactionsNotifier.value++;
-    unawaited(syncWidgetBalances());
   }
 
   Future<FinanceTransaction?> getLatestTransaction() async {
@@ -939,7 +880,6 @@ class StorageService {
     if (isBalanceConfigured() && _cachedBalanceConfig != null) {
       _syncAccountBalancesToSheet(_cachedBalanceConfig!);
     }
-    unawaited(syncWidgetBalances());
   }
 
   /// Instantly deletes the transaction from the mobile device and immediately
@@ -997,7 +937,6 @@ class StorageService {
     if (isBalanceConfigured() && _cachedBalanceConfig != null) {
       _syncAccountBalancesToSheet(_cachedBalanceConfig!);
     }
-    unawaited(syncWidgetBalances());
   }
 
   // --- Internal Helpers for Local Persistence & Background Queue ---

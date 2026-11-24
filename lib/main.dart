@@ -11,7 +11,6 @@ void main() async {
   await StorageService.instance.getTransactions();
   runApp(const DailyFinanceApp());
   QuickActionsService.instance.initialize();
-  StorageService.instance.syncWidgetBalances();
 }
 
 class DailyFinanceApp extends StatelessWidget {

@@ -52,16 +52,7 @@ You can download and install the pre-compiled Android release APK directly witho
 - **View / Edit Mode**: Toggle edit mode to add new accounts, remove duplicate accounts/cards, or manually adjust baseline balances.
 - **Real-Time Auditing**: Automatically deducts expenses and credits deposits across active balances.
 
-### 5. 📱 Home Screen Live Balances & Credit Limits Widget
-- **No-App-Open Balance Overview**: View your net liquid funds (Bank + Cash) and available credit across all cards directly on your Android home screen without launching the app.
-- **Two-Column Glancable Dashboard**:
-  - **Bank Accounts & Cash**: Real-time balances for all active bank accounts (e.g. HDFC, SBI, ICICI) and physical cash in hand.
-  - **Credit Cards & Limits**: Available credit limit and total credit limit for each individual credit card.
-- **Instant Background Sync**: Updates automatically whenever a transaction is saved, edited, or deleted, and whenever account configurations change.
-- **One-Tap Refresh**: Dedicated 🔄 **SYNC** button on the widget triggers instant synchronization.
-- **Direct Navigation**: Tapping anywhere on the widget instantly opens the **Account Balances** screen for full ledger details and monthly statement breakdowns.
-
-### 6. ☁️ Google Sheets Dual-Database Sync
+### 5. ☁️ Google Sheets Dual-Database Sync
 - **Primary Finance Spreadsheet**: Syncs main transaction logs, loan splits, account balances, and recurring templates.
 - **`Grocery_DB` Spreadsheet**: Syncs `"Invoice"` records (itemized lines) and `"Dealer_Prices"` catalog.
 - **Offline-First Resilience**: Local-first caching via `SharedPreferences`; background sync with pending delete queue ensures zero data loss offline.
