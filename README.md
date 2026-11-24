@@ -7,7 +7,7 @@
 [![Gemini Vision AI](https://img.shields.io/badge/Gemini%20AI-Vision%20OCR-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
-An intelligent, privacy-first personal finance tracking, debt ledger, and invoice management mobile application built with Flutter. Deeply integrated with **Google Sheets** (dual-spreadsheet synchronization), **Gemini Vision AI** (receipt and bill OCR), and **Android Home Screen Widgets & Shortcuts**.
+An intelligent, privacy-first personal finance tracking, debt ledger, grocery price intelligence, and invoice management mobile application built with Flutter. Deeply integrated with **Google Sheets** (dual-spreadsheet synchronization), **Gemini Vision AI** (receipt and bill OCR), and **Android App Shortcuts**.
 
 ---
 
@@ -32,11 +32,20 @@ You can download and install the pre-compiled Android release APK directly witho
 - **Multi-Account Split Payments**: Pay a single bill using multiple sources (e.g., ₹500 Cash + ₹478 HDFC UPI).
 - **Fast Date Navigation**: Swipeable horizontal date picker with calendar picker dialog.
 
-### 2. 🧾 Invoice Manager & AI Receipt OCR Scanner
+### 2. 🧾 Invoice Manager, AI Receipt OCR & Price Tracker
 - **Camera-to-Invoice OCR**: Snap a physical supermarket receipt with your phone camera or select an invoice photo from your gallery.
 - **Automated Gemini Vision Extraction**: Reads Store Name, Invoice/Bill Number, Date, Line Items, Quantities, and Unit Prices in seconds.
 - **Multi-Recipient Bill Splitting**: Assign individual items on a grocery bill to different people (e.g. `Self`, `Grand Father`, `Mother`).
 - **Dealer Price Catalog Sync**: Tracks historical prices by dealer in the `"Dealer_Prices"` sheet of `"Grocery_DB"`; automatically updates unit prices if they change.
+- **📈 Grocery Price History & Intelligence**: Real-time cross-store price comparison across all historical purchases and dealer catalog.
+  - Automatically identifies **Price Hikes** (🔺) and **Price Drops** (🔻) compared to prior purchases.
+  - Highlights the **Best Historical Deal** and which merchant or store offered it.
+  - Calculates total quantity purchased and total expenditure per grocery item.
+- **🛒 Smart Re-order Tracker & Auto-Checklist**:
+  - Automatically learns your household purchase frequency and predicts when items are **DUE** for replenishment based on historical purchase rhythm (e.g. every 7, 14, or 30 days).
+  - Interactive Smart Checklist: dynamically select items, adjust quantities with `+` / `-` buttons, and view estimated budget totals in real time.
+  - **1-Tap Share**: Format and copy shopping lists to clipboard and share via WhatsApp or SMS.
+  - **Draft Invoice Conversion**: Turn any replenishment list into a structured draft invoice with one tap.
 - **Swipe-to-Delete**: Clean swipe gestures with confirmation to remove individual line items or entire borrower groups.
 - **Interactive Search & Date-Filtered Picker**: Main form features a date-matched dropdown modal with live search to attach any invoice directly to a transaction.
 - **Automated "Loan Given" Switch**: When an invoice with borrower splits is selected in the main form, the Purpose is automatically switched to **`Loan Given`**, and exact shares are populated in split mode.
@@ -107,15 +116,22 @@ You can download and install the pre-compiled Android release APK directly witho
 
 ---
 
-### Walkthrough 5: Using App Shortcuts & the Home Screen Widget
-- **App Shortcuts**:
-  - Touch and hold the **Daily Finance** app icon on your phone's home screen.
-  - A menu pops up with: `➕ Quick Add`, `📷 Scan Receipt (AI)`, and `👥 Borrowers Ledger`.
-  - Drag any shortcut onto your home screen to create a dedicated 1-tap launcher icon.
-- **Home Screen Widget**:
-  - Long-press any empty space on your phone's home screen and choose **Widgets**.
-  - Search for **Daily Finance** and drag the **Smart Ledger** widget onto your screen.
-  - Tap **Quick Add**, **Scan Bill**, or **Borrowers** for instant access without launching the app first.
+### Walkthrough 5: Tracking Price Trends & Smart Re-orders
+1. Open the **Invoice Manager** from the main form or drawer.
+2. Tap the **Price & Re-order** tab (third tab alongside Invoices and Catalog).
+3. The dashboard displays:
+   - **Due Re-orders**: Items whose typical purchase frequency interval has elapsed.
+   - **Price Hikes & Drops**: Quick badges showing which grocery items have inflated or gotten cheaper.
+   - **Best Deals**: Historical best rates across different stores and markets.
+4. Check the items you need to restock, adjust desired quantities using `+` and `-`.
+5. Tap **Share List** to copy a formatted grocery list to your clipboard and open WhatsApp, or tap **Create Draft Invoice** to generate an active invoice ready for checkout!
+
+---
+
+### Walkthrough 6: Using Android App Shortcuts
+- Touch and hold the **Daily Finance** app icon on your phone's home screen.
+- A menu pops up with: `➕ Quick Add`, `📷 Scan Receipt (AI)`, and `👥 Borrowers Ledger`.
+- Drag any shortcut onto your home screen to create a dedicated 1-tap launcher icon.
 
 ---
 
@@ -147,8 +163,8 @@ You can download and install the pre-compiled Android release APK directly witho
 - **Hardware Integrations**:
   - `image_picker`: Camera & gallery capture.
   - `speech_to_text`: Real-time voice dictation.
-  - `quick_actions`: Android App Shortcuts.
-  - `AppWidgetProvider`: Kotlin-backed Android native home screen widget.
+  - `quick_actions`: Android App Shortcuts (Quick Add, Scan Receipt, Borrowers Ledger).
+  - `share_plus`: Native shopping list and report sharing sheet.
   - `pdf` & `printing`: Vector-based PDF generation and printing.
 
 ---

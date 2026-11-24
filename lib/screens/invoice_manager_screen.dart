@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/receipt_scanner_service.dart';
 import 'package:intl/intl.dart';
 import '../models/invoice_model.dart';
@@ -338,6 +339,15 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
   final _viewSearchController = TextEditingController();
   String _viewSearchQuery = '';
 
+  // Grocery Price History & Re-order state
+  List<InvoiceItemRecord> _rawInvoiceItems = [];
+  final _priceSearchController = TextEditingController();
+  String _priceSearchQuery = '';
+  bool _showOnlyReorder = false;
+  final Set<String> _selectedReorderItems = {};
+  final Map<String, double> _reorderQuantities = {};
+  final Set<String> _expandedHistoryItems = {};
+
   final List<_InvoiceRecipientDraft> _draftRecipients = [];
   List<DealerPriceItem> _dealerPrices = [];
   List<InvoiceSummary> _existingInvoices = [];
@@ -351,7 +361,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _selectedDate = widget.initialDate ?? DateTime.now();
 
     // Generate initial Bill No suggestion
@@ -437,6 +447,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
       if (mounted) {
         setState(() {
+          _rawInvoiceItems = invoices;
           _dealerPrices = prices;
           _existingInvoices = grouped;
           _knownDealers = dealers.toList()..sort();
@@ -457,6 +468,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     _billNoController.dispose();
     _dealerController.dispose();
     _viewSearchController.dispose();
+    _priceSearchController.dispose();
     for (var r in _draftRecipients) {
       for (var it in r.items) {
         it.dispose();
@@ -890,6 +902,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
           tabs: const [
             Tab(icon: Icon(Icons.note_add_outlined), text: 'Create Invoice'),
             Tab(icon: Icon(Icons.receipt_long_outlined), text: 'View Invoices'),
+            Tab(icon: Icon(Icons.insights_outlined), text: 'Price & Re-order'),
           ],
         ),
       ),
@@ -900,6 +913,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
               children: [
                 _buildCreateMode(primaryColor, secondaryColor, purpleColor, isDark),
                 _buildViewMode(primaryColor, secondaryColor, purpleColor, isDark),
+                _buildPriceAndReorderView(primaryColor, secondaryColor, purpleColor, isDark),
               ],
             ),
     );
@@ -1900,6 +1914,967 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                 ),
         ),
       ],
+    );
+  }
+
+  // =========================================================================
+  // TAB 3: GROCERY PRICE HISTORY & RE-ORDER TRACKER
+  // =========================================================================
+
+  Widget _buildPriceAndReorderView(Color primary, Color secondary, Color purple, bool isDark) {
+    final cardBg = isDark ? const Color(0xFF16213E) : Colors.white;
+    final textMain = isDark ? const Color(0xFFF0E8F0) : const Color(0xFF2D2A3E);
+    final textMuted = isDark ? const Color(0xFFA89BB8) : const Color(0xFF756F86);
+    final borderColor = isDark ? const Color(0xFF2C3360) : const Color(0xFFE2E8F0);
+    final surfaceBg = isDark ? const Color(0xFF11172A) : const Color(0xFFFBF8F5);
+
+    final allHistory = GroceryItemPriceHistory.computeFrom(
+      _rawInvoiceItems,
+      catalog: _dealerPrices,
+    );
+
+    final query = _priceSearchQuery.trim().toLowerCase();
+    final filtered = allHistory.where((h) {
+      if (_showOnlyReorder && !h.isDueForReorder && !_selectedReorderItems.contains(h.itemName.toLowerCase())) {
+        return false;
+      }
+      if (query.isEmpty) return true;
+      return h.itemName.toLowerCase().contains(query) ||
+          h.latestDealer.toLowerCase().contains(query) ||
+          h.bestDealer.toLowerCase().contains(query);
+    }).toList();
+
+    final totalTracked = allHistory.length;
+    final totalHikes = allHistory.where((h) => h.hasPriceHike).length;
+    final totalDrops = allHistory.where((h) => h.hasPriceDrop).length;
+    final totalDue = allHistory.where((h) => h.isDueForReorder).length;
+
+    // Calculate budget for selected reorder items
+    double selectedBudget = 0.0;
+    for (final it in allHistory) {
+      final key = it.itemName.toLowerCase();
+      if (_selectedReorderItems.contains(key)) {
+        final q = _reorderQuantities[key] ?? it.typicalQuantity;
+        selectedBudget += q * it.latestPrice;
+      }
+    }
+
+    return Column(
+      children: [
+        // Mode Selector: Price Trends vs Re-Order Checklist
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: surfaceBg,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => setState(() => _showOnlyReorder = false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: !_showOnlyReorder ? primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: !_showOnlyReorder ? primary : borderColor,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.trending_up_rounded,
+                              size: 16,
+                              color: !_showOnlyReorder ? Colors.white : textMuted,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Price Trends',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: !_showOnlyReorder ? Colors.white : textMain,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => setState(() => _showOnlyReorder = true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _showOnlyReorder ? const Color(0xFF00D2B4) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _showOnlyReorder ? const Color(0xFF00D2B4) : borderColor,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.shopping_cart_checkout_rounded,
+                              size: 16,
+                              color: _showOnlyReorder ? Colors.white : textMuted,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Re-order List',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: _showOnlyReorder ? Colors.white : textMain,
+                              ),
+                            ),
+                            if (totalDue > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _showOnlyReorder ? Colors.white.withValues(alpha: 0.25) : const Color(0xFFEF4444),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$totalDue',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Search input
+              TextField(
+                controller: _priceSearchController,
+                onChanged: (val) => setState(() => _priceSearchQuery = val),
+                style: TextStyle(fontSize: 13, color: textMain),
+                decoration: InputDecoration(
+                  hintText: 'Search grocery items or shops...',
+                  hintStyle: TextStyle(fontSize: 12, color: textMuted),
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  suffixIcon: _priceSearchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 16),
+                          onPressed: () {
+                            _priceSearchController.clear();
+                            setState(() => _priceSearchQuery = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: cardBg,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: borderColor),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: borderColor),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // KPI Summary Ribbon
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildKpiCard(
+                  title: 'Tracked Items',
+                  value: '$totalTracked',
+                  color: primary,
+                  icon: Icons.inventory_2_outlined,
+                  cardBg: cardBg,
+                  textMain: textMain,
+                  borderColor: borderColor,
+                ),
+                const SizedBox(width: 8),
+                _buildKpiCard(
+                  title: 'Price Hikes',
+                  value: '$totalHikes',
+                  color: const Color(0xFFEF4444),
+                  icon: Icons.arrow_upward_rounded,
+                  cardBg: cardBg,
+                  textMain: textMain,
+                  borderColor: borderColor,
+                ),
+                const SizedBox(width: 8),
+                _buildKpiCard(
+                  title: 'Price Drops',
+                  value: '$totalDrops',
+                  color: const Color(0xFF10B981),
+                  icon: Icons.arrow_downward_rounded,
+                  cardBg: cardBg,
+                  textMain: textMain,
+                  borderColor: borderColor,
+                ),
+                const SizedBox(width: 8),
+                _buildKpiCard(
+                  title: 'Due Re-orders',
+                  value: '$totalDue',
+                  color: const Color(0xFFF59E0B),
+                  icon: Icons.alarm_on_rounded,
+                  cardBg: cardBg,
+                  textMain: textMain,
+                  borderColor: borderColor,
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Quick Selection Action Bar (when in Re-order mode)
+        if (_showOnlyReorder)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      for (var it in allHistory) {
+                        if (it.isDueForReorder) {
+                          final key = it.itemName.toLowerCase();
+                          _selectedReorderItems.add(key);
+                          _reorderQuantities[key] ??= it.typicalQuantity;
+                        }
+                      }
+                    });
+                  },
+                  icon: const Icon(Icons.playlist_add_check_rounded, size: 16, color: Color(0xFFF59E0B)),
+                  label: const Text('Select Due Items', style: TextStyle(fontSize: 12, color: Color(0xFFF59E0B))),
+                ),
+                const Spacer(),
+                if (_selectedReorderItems.isNotEmpty)
+                  TextButton(
+                    onPressed: () => setState(() => _selectedReorderItems.clear()),
+                    child: const Text('Clear All', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ),
+              ],
+            ),
+          ),
+
+        // Item List
+        Expanded(
+          child: filtered.isEmpty
+              ? _buildEmptyPriceHistoryState(isDark)
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final item = filtered[index];
+                    return _showOnlyReorder
+                        ? _buildReorderChecklistCard(item, cardBg, textMain, textMuted, borderColor, primary)
+                        : _buildPriceTrendCard(item, cardBg, textMain, textMuted, borderColor, primary, secondary);
+                  },
+                ),
+        ),
+
+        // Sticky Bottom Re-Order Cart Bar
+        if (_showOnlyReorder && _selectedReorderItems.isNotEmpty)
+          _buildReorderBottomBar(selectedBudget, allHistory, cardBg, textMain, borderColor, primary),
+      ],
+    );
+  }
+
+  Widget _buildKpiCard({
+    required String title,
+    required String value,
+    required Color color,
+    required IconData icon,
+    required Color cardBg,
+    required Color textMain,
+    required Color borderColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: textMain,
+                ),
+              ),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceTrendCard(
+    GroceryItemPriceHistory item,
+    Color cardBg,
+    Color textMain,
+    Color textMuted,
+    Color borderColor,
+    Color primary,
+    Color secondary,
+  ) {
+    final key = item.itemName.toLowerCase();
+    final isExpanded = _expandedHistoryItems.contains(key);
+    final daysAgo = item.daysSinceLastPurchase;
+
+    Color badgeColor;
+    String badgeText;
+    IconData badgeIcon;
+
+    if (item.hasPriceHike) {
+      badgeColor = const Color(0xFFEF4444);
+      badgeText = '+₹${item.priceDelta.toStringAsFixed(1)} (+${item.percentChange.toStringAsFixed(1)}%)';
+      badgeIcon = Icons.arrow_upward_rounded;
+    } else if (item.hasPriceDrop) {
+      badgeColor = const Color(0xFF10B981);
+      badgeText = '-₹${item.priceDelta.abs().toStringAsFixed(1)} (${item.percentChange.toStringAsFixed(1)}%)';
+      badgeIcon = Icons.arrow_downward_rounded;
+    } else {
+      badgeColor = const Color(0xFF64748B);
+      badgeText = 'Stable';
+      badgeIcon = Icons.remove_rounded;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: item.isDueForReorder ? const Color(0xFFF59E0B).withValues(alpha: 0.5) : borderColor,
+          width: item.isDueForReorder ? 1.5 : 1.0,
+        ),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title and Trend Badge
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text('🛍️', style: TextStyle(fontSize: 16)),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.itemName,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: textMain,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Latest: ${item.latestDealer} • ${DateFormat('dd MMM yyyy').format(item.latestDate)}',
+                            style: TextStyle(fontSize: 11, color: textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: badgeColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(badgeIcon, size: 12, color: badgeColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            badgeText,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: badgeColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Metrics row: Current Price vs Best Historical Deal
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: textMuted.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('CURRENT PRICE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey)),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Text(
+                                  _currencyFormat.format(item.latestPrice),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: textMain,
+                                  ),
+                                ),
+                                if (item.previousPrice != null) ...[
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _currencyFormat.format(item.previousPrice),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                      decoration: TextDecoration.lineThrough,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(width: 1, height: 28, color: borderColor),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('BEST HISTORICAL DEAL', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${_currencyFormat.format(item.bestPrice)} @ ${item.bestDealer}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: textMain,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Purchase rhythm & status
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_rounded, size: 12, color: textMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      daysAgo == 0 ? 'Bought today' : 'Last bought ${daysAgo}d ago',
+                      style: TextStyle(fontSize: 11, color: textMuted),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('•', style: TextStyle(color: textMuted)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Avg cycle: ~${item.averageIntervalDays}d',
+                      style: TextStyle(fontSize: 11, color: textMuted),
+                    ),
+                    const Spacer(),
+                    if (item.isDueForReorder)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          '⚠️ Due to Re-order',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFF59E0B),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Expansion Toggle: Past Purchases Ledger
+          InkWell(
+            onTap: () {
+              setState(() {
+                if (isExpanded) {
+                  _expandedHistoryItems.remove(key);
+                } else {
+                  _expandedHistoryItems.add(key);
+                }
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: borderColor)),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    'Purchase History (${item.history.length} records • Total: ${_currencyFormat.format(item.totalAmountSpent)})',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: primary),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    isExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 16,
+                    color: primary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Expanded Purchase Timeline
+          if (isExpanded)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              color: textMuted.withValues(alpha: 0.03),
+              child: Column(
+                children: item.history.map((record) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Text(
+                          DateFormat('dd/MM/yy').format(record.billDate),
+                          style: TextStyle(fontSize: 11, color: textMuted),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            record.shopName,
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textMain),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '${record.quantity} x ${_currencyFormat.format(record.price)}',
+                          style: TextStyle(fontSize: 11, color: textMuted),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _currencyFormat.format(record.total),
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textMain),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReorderChecklistCard(
+    GroceryItemPriceHistory item,
+    Color cardBg,
+    Color textMain,
+    Color textMuted,
+    Color borderColor,
+    Color primary,
+  ) {
+    final key = item.itemName.toLowerCase();
+    final isSelected = _selectedReorderItems.contains(key);
+    final currentQty = _reorderQuantities[key] ?? item.typicalQuantity;
+    final itemTotal = currentQty * item.latestPrice;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isSelected ? primary.withValues(alpha: 0.08) : cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? primary : borderColor,
+          width: isSelected ? 1.5 : 1.0,
+        ),
+      ),
+      child: Row(
+        children: [
+          Checkbox(
+            value: isSelected,
+            activeColor: primary,
+            onChanged: (val) {
+              setState(() {
+                if (val == true) {
+                  _selectedReorderItems.add(key);
+                  _reorderQuantities[key] ??= item.typicalQuantity;
+                } else {
+                  _selectedReorderItems.remove(key);
+                }
+              });
+            },
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.itemName,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: textMain,
+                        ),
+                      ),
+                    ),
+                    if (item.isDueForReorder)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('⚠️ Due', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${item.latestDealer} • ${_currencyFormat.format(item.latestPrice)} / unit',
+                  style: TextStyle(fontSize: 11, color: textMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Quantity Stepper
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline, size: 20),
+                color: isSelected ? primary : Colors.grey,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                onPressed: () {
+                  setState(() {
+                    final curr = _reorderQuantities[key] ?? item.typicalQuantity;
+                    final next = (curr - 1.0).clamp(0.5, 99.0);
+                    _reorderQuantities[key] = next;
+                    _selectedReorderItems.add(key);
+                  });
+                },
+              ),
+              Container(
+                constraints: const BoxConstraints(minWidth: 26),
+                alignment: Alignment.center,
+                child: Text(
+                  currentQty == currentQty.toInt() ? currentQty.toInt().toString() : currentQty.toString(),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textMain),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline, size: 20),
+                color: isSelected ? primary : Colors.grey,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                onPressed: () {
+                  setState(() {
+                    final curr = _reorderQuantities[key] ?? item.typicalQuantity;
+                    final next = (curr + 1.0).clamp(0.5, 99.0);
+                    _reorderQuantities[key] = next;
+                    _selectedReorderItems.add(key);
+                  });
+                },
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+
+          // Calculated Subtotal
+          Container(
+            constraints: const BoxConstraints(minWidth: 65),
+            alignment: Alignment.centerRight,
+            child: Text(
+              _currencyFormat.format(itemTotal),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? primary : textMain,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReorderBottomBar(
+    double totalBudget,
+    List<GroceryItemPriceHistory> allHistory,
+    Color cardBg,
+    Color textMain,
+    Color borderColor,
+    Color primary,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cardBg,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
+          ),
+        ],
+        border: Border(top: BorderSide(color: borderColor)),
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${_selectedReorderItems.length} items selected',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+                Text(
+                  _currencyFormat.format(totalBudget),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: primary,
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+
+            // Share / Copy button
+            IconButton.filledTonal(
+              onPressed: () => _shareShoppingList(allHistory, totalBudget),
+              tooltip: 'Share Shopping List',
+              icon: const Icon(Icons.share_rounded, size: 18),
+            ),
+            const SizedBox(width: 8),
+
+            // Create Invoice Draft Button
+            ElevatedButton.icon(
+              onPressed: () => _createInvoiceFromReorder(allHistory),
+              icon: const Icon(Icons.post_add_rounded, size: 18),
+              label: const Text('Draft Invoice', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _shareShoppingList(List<GroceryItemPriceHistory> allHistory, double totalBudget) async {
+    final buffer = StringBuffer();
+    buffer.writeln('🛒 Grocery Shopping List');
+    buffer.writeln('Date: ${DateFormat('dd MMM yyyy').format(DateTime.now())}');
+    buffer.writeln('-----------------------------');
+
+    for (var it in allHistory) {
+      final key = it.itemName.toLowerCase();
+      if (_selectedReorderItems.contains(key)) {
+        final q = _reorderQuantities[key] ?? it.typicalQuantity;
+        final tot = q * it.latestPrice;
+        buffer.writeln('• ${it.itemName}: $q x ${_currencyFormat.format(it.latestPrice)} = ${_currencyFormat.format(tot)} (${it.latestDealer})');
+      }
+    }
+
+    buffer.writeln('-----------------------------');
+    buffer.writeln('Estimated Budget: ${_currencyFormat.format(totalBudget)}');
+
+    final text = buffer.toString();
+    await Clipboard.setData(ClipboardData(text: text));
+
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: text,
+          subject: 'Grocery Shopping List',
+        ),
+      );
+    } catch (_) {}
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Shopping list copied to clipboard and ready to share!')),
+      );
+    }
+  }
+
+  void _createInvoiceFromReorder(List<GroceryItemPriceHistory> allHistory) {
+    final selectedItems = allHistory.where((h) => _selectedReorderItems.contains(h.itemName.toLowerCase())).toList();
+    if (selectedItems.isEmpty) return;
+
+    // Determine common dealer if any
+    final dealerCounts = <String, int>{};
+    for (var it in selectedItems) {
+      if (it.latestDealer.isNotEmpty && it.latestDealer != 'Direct') {
+        dealerCounts[it.latestDealer] = (dealerCounts[it.latestDealer] ?? 0) + 1;
+      }
+    }
+    String bestDealer = '';
+    int maxCount = 0;
+    for (var e in dealerCounts.entries) {
+      if (e.value > maxCount) {
+        maxCount = e.value;
+        bestDealer = e.key;
+      }
+    }
+
+    setState(() {
+      if (bestDealer.isNotEmpty) {
+        _dealerController.text = bestDealer;
+      }
+      _generateDefaultBillNo();
+
+      final drafts = selectedItems.map((it) {
+        final key = it.itemName.toLowerCase();
+        final q = _reorderQuantities[key] ?? it.typicalQuantity;
+        return _InvoiceItemDraft(
+          name: it.itemName,
+          qty: q,
+          price: it.latestPrice,
+          total: q * it.latestPrice,
+        );
+      }).toList();
+
+      _draftRecipients.clear();
+      _draftRecipients.add(_InvoiceRecipientDraft(
+        recipient: 'Self',
+        items: drafts,
+      ));
+
+      _selectedReorderItems.clear();
+      _tabController.animateTo(0);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${selectedItems.length} items added to Invoice Draft! Review and tap Save.'),
+        backgroundColor: const Color(0xFF10B981),
+      ),
+    );
+  }
+
+  Widget _buildEmptyPriceHistoryState(bool isDark) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.storefront_outlined, size: 54, color: Colors.grey),
+            const SizedBox(height: 12),
+            const Text(
+              'No Grocery Items Found',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'As you save invoices or scan bills with AI, price trends and smart re-order intervals will automatically appear here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => _tabController.animateTo(0),
+              icon: const Icon(Icons.add),
+              label: const Text('Create or Scan an Invoice'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

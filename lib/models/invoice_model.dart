@@ -323,3 +323,154 @@ class InvoiceSummary {
     return list;
   }
 }
+
+class GroceryItemPriceHistory {
+  final String itemName;
+  final List<InvoiceItemRecord> history; // sorted by billDate desc
+  final double latestPrice;
+  final double? previousPrice;
+  final String latestDealer;
+  final DateTime latestDate;
+  final String bestDealer;
+  final double bestPrice;
+  final double typicalQuantity;
+  final int averageIntervalDays;
+  final bool isDueForReorder;
+  final double totalQuantityPurchased;
+  final double totalAmountSpent;
+
+  GroceryItemPriceHistory({
+    required this.itemName,
+    required this.history,
+    required this.latestPrice,
+    this.previousPrice,
+    required this.latestDealer,
+    required this.latestDate,
+    required this.bestDealer,
+    required this.bestPrice,
+    this.typicalQuantity = 1.0,
+    this.averageIntervalDays = 14,
+    this.isDueForReorder = false,
+    this.totalQuantityPurchased = 0.0,
+    this.totalAmountSpent = 0.0,
+  });
+
+  double get priceDelta => previousPrice != null ? latestPrice - previousPrice! : 0.0;
+  double get percentChange => previousPrice != null && previousPrice! > 0
+      ? ((latestPrice - previousPrice!) / previousPrice!) * 100
+      : 0.0;
+  bool get hasPriceHike => priceDelta > 0.05;
+  bool get hasPriceDrop => priceDelta < -0.05;
+
+  int get daysSinceLastPurchase => DateTime.now().difference(latestDate).inDays;
+
+  static List<GroceryItemPriceHistory> computeFrom(
+    List<InvoiceItemRecord> records, {
+    List<DealerPriceItem> catalog = const [],
+    DateTime? now,
+  }) {
+    final refNow = now ?? DateTime.now();
+    // Group records by clean itemName (case-insensitive)
+    final grouped = <String, List<InvoiceItemRecord>>{};
+    for (final r in records) {
+      final name = r.itemName.trim();
+      if (name.isEmpty) continue;
+      grouped.putIfAbsent(name.toLowerCase(), () => []).add(r);
+    }
+
+    final result = <GroceryItemPriceHistory>[];
+
+    for (final entry in grouped.entries) {
+      final list = entry.value;
+      list.sort((a, b) => b.billDate.compareTo(a.billDate));
+
+      final first = list.first;
+      final displayName = first.itemName.trim();
+      final latestPrice = first.price;
+      final latestDealer = first.shopName.trim().isEmpty ? 'Direct' : first.shopName.trim();
+      final latestDate = first.billDate;
+
+      // Previous price from distinct previous entry
+      double? prevPrice;
+      for (int i = 1; i < list.length; i++) {
+        if (list[i].price != latestPrice || list[i].billDate != latestDate) {
+          prevPrice = list[i].price;
+          break;
+        }
+      }
+
+      // Best price and dealer across history and catalog
+      double bestP = latestPrice;
+      String bestD = latestDealer;
+
+      for (final it in list) {
+        if (it.price > 0 && (bestP == 0 || it.price < bestP)) {
+          bestP = it.price;
+          bestD = it.shopName.trim().isNotEmpty ? it.shopName.trim() : bestD;
+        }
+      }
+
+      for (final cp in catalog) {
+        if (cp.item.trim().toLowerCase() == entry.key && cp.price > 0) {
+          if (bestP == 0 || cp.price < bestP) {
+            bestP = cp.price;
+            bestD = cp.dealer.trim().isNotEmpty ? cp.dealer.trim() : bestD;
+          }
+        }
+      }
+
+      // Totals & intervals
+      double totalQty = 0.0;
+      double totalAmt = 0.0;
+      final dates = <DateTime>[];
+
+      for (final it in list) {
+        totalQty += it.quantity;
+        totalAmt += it.total;
+        if (!dates.any((d) => d.year == it.billDate.year && d.month == it.billDate.month && d.day == it.billDate.day)) {
+          dates.add(DateTime(it.billDate.year, it.billDate.month, it.billDate.day));
+        }
+      }
+
+      dates.sort((a, b) => a.compareTo(b));
+
+      int avgInterval = 14;
+      if (dates.length >= 2) {
+        int totalDays = dates.last.difference(dates.first).inDays;
+        int intervals = dates.length - 1;
+        if (intervals > 0 && totalDays > 0) {
+          avgInterval = (totalDays / intervals).round().clamp(3, 90);
+        }
+      }
+
+      final daysSince = refNow.difference(latestDate).inDays;
+      final isDue = daysSince >= avgInterval && daysSince >= 5;
+      final typicalQty = (totalQty / list.length).clamp(0.5, 100.0);
+
+      result.add(GroceryItemPriceHistory(
+        itemName: displayName,
+        history: list,
+        latestPrice: latestPrice,
+        previousPrice: prevPrice,
+        latestDealer: latestDealer,
+        latestDate: latestDate,
+        bestDealer: bestD,
+        bestPrice: bestP,
+        typicalQuantity: typicalQty,
+        averageIntervalDays: avgInterval,
+        isDueForReorder: isDue,
+        totalQuantityPurchased: totalQty,
+        totalAmountSpent: totalAmt,
+      ));
+    }
+
+    result.sort((a, b) {
+      if (a.isDueForReorder != b.isDueForReorder) {
+        return a.isDueForReorder ? -1 : 1;
+      }
+      return b.latestDate.compareTo(a.latestDate);
+    });
+
+    return result;
+  }
+}
