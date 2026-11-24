@@ -1,58 +1,194 @@
-# 📊 Smart Ledger & Daily Finance App
+# 🧾 Smart Ledger & Daily Finance App
 
 [![Download APK](https://img.shields.io/badge/Download-Release%20APK%20(v1.0.0)-FF5C38?style=for-the-badge&logo=android)](https://github.com/oprasannakumar/daily_finance_app/releases/download/v1.0.0/SmartLedger-v1.0.0.apk)
-[![Release](https://img.shields.io/github/v/release/oprasannakumar/daily_finance_app?style=for-the-badge&color=00D2B4)](https://github.com/oprasannakumar/daily_finance_app/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/oprasannakumar/daily_finance_app?style=for-the-badge&color=00D2B4)](https://github.com/oprasannakumar/daily_finance_app/releases/latest)
+[![Flutter](https://img.shields.io/badge/Flutter-3.29.0-02569B?style=for-the-badge&logo=flutter)](https://flutter.dev)
+[![Google Sheets API](https://img.shields.io/badge/Google%20Sheets-API%20v4-34A853?style=for-the-badge&logo=googlesheets)](https://developers.google.com/sheets/api)
+[![Gemini Vision AI](https://img.shields.io/badge/Gemini%20AI-Vision%20OCR-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
-An intelligent, privacy-first personal finance tracking and debt management app built with Flutter and integrated with Google Sheets, Gemini AI Vision OCR, and Android Home Screen Widgets.
+An intelligent, privacy-first personal finance tracking, debt ledger, and invoice management mobile application built with Flutter. Deeply integrated with **Google Sheets** (dual-spreadsheet synchronization), **Gemini Vision AI** (receipt and bill OCR), and **Android Home Screen Widgets & Shortcuts**.
 
 ---
 
-### 📥 Direct Download
-Download the pre-compiled, ready-to-install Android APK:
-👉 **[Download SmartLedger-v1.0.0.apk](https://github.com/oprasannakumar/daily_finance_app/releases/download/v1.0.0/SmartLedger-v1.0.0.apk)** (or visit [Releases](https://github.com/oprasannakumar/daily_finance_app/releases)).
+## 📥 Direct Download & Installation
+
+You can download and install the pre-compiled Android release APK directly without cloning the code:
+
+👉 **[Download SmartLedger-v1.0.0.apk](https://github.com/oprasannakumar/daily_finance_app/releases/download/v1.0.0/SmartLedger-v1.0.0.apk)**
+
+*(You can also find all versions under the [GitHub Releases](https://github.com/oprasannakumar/daily_finance_app/releases) tab).*
 
 ---
 
-### ✨ Key Features
+## 🌟 Comprehensive Feature Set
 
-1. **🧾 AI Receipt & Bill OCR Scanner (Camera-to-Invoice)**
-   - Snap a physical supermarket receipt with your camera or select an invoice photo from gallery.
-   - Multimodal Gemini AI OCR automatically extracts store name, bill number, bill date, line items, quantities, and unit prices into editable form tables.
+### 1. ⚡ Smart Entry Form
+- **Natural Language Voice Input**: Tap the microphone button to dictate expenses (e.g., *"Paid 450 rupees for dinner from HDFC credit card"*).
+- **Dual AI Narration Parsing**: Backed by **Gemini** and **Grok** API engines with a zero-latency local fallback rule engine to instantly auto-fill Amount, Purpose, Spent For, and Account.
+- **Smart Clipboard Auto-Fill**: Automatically parses banking SMS, Google Pay, PhonePe, and Paytm transaction notifications copied to clipboard.
+- **Dual-Flow Accounting**: Toggle between **Withdraw** (Expense) and **Deposit** (Income) flows.
+- **Self Transfer Mode**: Dedicated account-to-account transfer system (e.g. ATM cash withdrawal, moving funds from Bank to Wallet) formatted cleanly as balanced double-entry rows.
+- **Multi-Account Split Payments**: Pay a single bill using multiple sources (e.g., ₹500 Cash + ₹478 HDFC UPI).
+- **Fast Date Navigation**: Swipeable horizontal date picker with calendar picker dialog.
 
-2. **⚡ Dynamic App Shortcuts & Home Screen Widget**
-   - **App Shortcuts**: Long-press app icon to access `➕ Quick Add`, `📷 Scan Receipt (AI)`, and `👥 Borrowers Ledger`.
-   - **Android Widget**: Native resizable home screen launcher widget for 1-tap entry.
+### 2. 🧾 Invoice Manager & AI Receipt OCR Scanner
+- **Camera-to-Invoice OCR**: Snap a physical supermarket receipt with your phone camera or select an invoice photo from your gallery.
+- **Automated Gemini Vision Extraction**: Reads Store Name, Invoice/Bill Number, Date, Line Items, Quantities, and Unit Prices in seconds.
+- **Multi-Recipient Bill Splitting**: Assign individual items on a grocery bill to different people (e.g. `Self`, `Grand Father`, `Mother`).
+- **Dealer Price Catalog Sync**: Tracks historical prices by dealer in the `"Dealer_Prices"` sheet of `"Grocery_DB"`; automatically updates unit prices if they change.
+- **Swipe-to-Delete**: Clean swipe gestures with confirmation to remove individual line items or entire borrower groups.
+- **Interactive Search & Date-Filtered Picker**: Main form features a date-matched dropdown modal with live search to attach any invoice directly to a transaction.
+- **Automated "Loan Given" Switch**: When an invoice with borrower splits is selected in the main form, the Purpose is automatically switched to **`Loan Given`**, and exact shares are populated in split mode.
 
-3. **🤝 Borrowers Ledger & Automatic Loan Splits**
-   - Track shared purchases and loans (e.g. Personal Share vs Grand Father, Mother, Friends).
-   - Selecting an invoice with borrowers automatically switches the purpose to `Loan Given` and pre-fills exact split shares.
-   - Filter, audit, and export customized PDF loan statements with 1 tap.
+### 3. 🤝 Borrowers Ledger & Debt Statement Generator
+- **Detailed Loan Tracking**: Separate tracking for loans given and repayments received by borrower.
+- **Faceted Multi-Filter Sheet**: Filter by date range, individual borrower, transaction type, or reference ID.
+- **Borrower PDF Export**: Generate dedicated PDF statements for individual borrowers showing their net outstanding balance, itemized breakdown, and date-wise ledger.
+- **Share & Print**: Native Android sharing sheet and PDF printing.
 
-4. **☁️ Direct Google Sheets Synchronization**
-   - Multi-sheet ledger synchronization (`Transactions`, `Account Balances`, `Invoice`, `Dealer_Prices`).
-   - Local-first architecture with instant offline writes and background sync.
+### 4. 💳 Multi-Account Balances & Asset Management
+- **Complete Asset Coverage**: Tracks **Cash**, **Bank Accounts**, **Credit Cards**, **Wallets**, and **Rewards**.
+- **View / Edit Mode**: Toggle edit mode to add new accounts, remove duplicate accounts/cards, or manually adjust baseline balances.
+- **Real-Time Auditing**: Automatically deducts expenses and credits deposits across active balances.
 
-5. **💳 Multi-Account & Payment Breakdown**
-   - Split single transactions across Cash, Bank, Credit Cards, Wallets, and Rewards.
-   - Real-time balance auditing and auto-deductions.
+### 5. 📱 Home Screen Widget & Android App Shortcuts
+- **App Shortcuts (Long-press app icon)**:
+  - `➕ Quick Add`: Immediately opens Smart Entry ready to log.
+  - `📷 Scan Receipt (AI)`: Directly launches the camera OCR bill scanner.
+  - `👥 Borrowers Ledger`: Opens debt balances and borrower statements.
+- **Native Android Home Screen Widget**: A resizable home screen launcher widget (`SmartLedgerWidgetProvider`) with 1-tap quick buttons.
+
+### 6. ☁️ Google Sheets Dual-Database Sync
+- **Primary Finance Spreadsheet**: Syncs main transaction logs, loan splits, account balances, and recurring templates.
+- **`Grocery_DB` Spreadsheet**: Syncs `"Invoice"` records (itemized lines) and `"Dealer_Prices"` catalog.
+- **Offline-First Resilience**: Local-first caching via `SharedPreferences`; background sync with pending delete queue ensures zero data loss offline.
 
 ---
 
-### 🛠️ Building From Source
+## 📖 How to Use the Application
 
+### Walkthrough 1: Logging a Quick Expense
+1. Open the app — the **Smart Entry** form loads with today's date pre-selected.
+2. In the **Narration** box, type or tap the **✨ Auto-Fill** button.
+   - *Example*: `"Grocery 978 Babu oil mill HDFC"`
+3. The app auto-populates **Flow** (`Withdraw`), **Purpose** (`Grocery`), **Spent For** (`Self`), and the **Payment Breakdown** (`HDFC: ₹978`).
+4. Tap **Save** — the transaction is recorded locally and synced to Google Sheets.
+
+---
+
+### Walkthrough 2: Scanning a Grocery Bill with AI
+1. Tap **🧾 INVOICE (OPT)** on the main form, then tap **Invoice Manager** at the bottom.
+2. Tap the **📷 Scan Bill / Receipt with AI** banner (or the scanner icon `[回]` in the top right).
+3. Select **Take Photo with Camera** and take a picture of your physical grocery receipt (or choose an image from your gallery).
+4. The Gemini Vision AI scans the bill and automatically extracts:
+   - Dealer Name (e.g., `Babu oil mill`)
+   - Bill Number (e.g., `INV-1795506205151`)
+   - Bill Date (e.g., `24-Nov-2026`)
+   - All line items, quantities, and prices.
+5. Review the extracted items. To assign an item to family or friends (e.g. Grand Father), tap **+ Add Recipient Group (Borrower)** and move the item.
+6. Tap **Save Invoice** — items are appended to `"Invoice"` in `"Grocery_DB"`, and new item prices are updated in `"Dealer_Prices"`.
+
+---
+
+### Walkthrough 3: Linking an Invoice with Borrower Splits in the Main Form
+1. On the main form, tap **🧾 INVOICE (OPT)**.
+2. The picker displays invoices matching the selected form date (e.g. `24-Nov-2026: Babu oil mill - ₹978.00 | Grand Father: ₹895.50`).
+3. Tap the invoice:
+   - **Narration** updates to `Babu oil mill`.
+   - **Total Amount** updates to `₹978.00`.
+   - **Purpose** automatically changes to **`Loan Given`**.
+   - **Spent For** automatically changes to **`Split`**.
+   - **Split Breakdown** automatically allocates `My Share (Self): ₹82.50` and `Grand Father: ₹895.50`.
+4. Select your payment account (e.g. `HDFC New`) and tap **Save**.
+5. The transaction is logged in the main statement and Grand Father's loan ledger is updated!
+
+---
+
+### Walkthrough 4: Exporting a PDF Report for a Borrower
+1. Tap the ledger icon in the header or use the **Borrowers Ledger** shortcut.
+2. Tap on any borrower (e.g., `Grand Father`).
+3. View their total loan balance, itemized grocery items, and payment dates.
+4. Tap **📄 Export PDF Statement**.
+5. Select the date range and tap **Generate PDF** — preview, print, or share via WhatsApp!
+
+---
+
+### Walkthrough 5: Using App Shortcuts & the Home Screen Widget
+- **App Shortcuts**:
+  - Touch and hold the **Daily Finance** app icon on your phone's home screen.
+  - A menu pops up with: `➕ Quick Add`, `📷 Scan Receipt (AI)`, and `👥 Borrowers Ledger`.
+  - Drag any shortcut onto your home screen to create a dedicated 1-tap launcher icon.
+- **Home Screen Widget**:
+  - Long-press any empty space on your phone's home screen and choose **Widgets**.
+  - Search for **Daily Finance** and drag the **Smart Ledger** widget onto your screen.
+  - Tap **Quick Add**, **Scan Bill**, or **Borrowers** for instant access without launching the app first.
+
+---
+
+## 🗄️ Google Sheets Architecture
+
+### 1. Primary Finance Spreadsheet
+| Sheet Name | Columns / Headers | Purpose |
+| :--- | :--- | :--- |
+| **`Transactions`** | `Date` \| `Narration` \| `Invoice No.` \| `Purpose` \| `Spent for/Earned by` \| `Transaction Type` \| `From/ To` \| `Withdrawn Amount` \| `Deposit Amount` \| `Balance` \| `Reference` | Main statement and master journal |
+| **`Account Balances`** | `Category` \| `Account Name` \| `Current Balance` \| `Updated Date` | Real-time balance of Cash, Banks, Cards, Wallets, Rewards |
+| **`Borrowers` / Loans** | `Date` \| `Borrower` \| `Narration` \| `Invoice No.` \| `Transaction Type` \| `Account` \| `Given Amount` \| `Received Amount` \| `Reference` | Itemized debt ledger per person |
+
+### 2. `Grocery_DB` Spreadsheet
+| Sheet Name | Columns / Headers | Purpose |
+| :--- | :--- | :--- |
+| **`Invoice`** | `Bill Date` \| `Shop Name` \| `Bill No` \| `Item Name` \| `Quantity` \| `Price` \| `Total` \| `Recipient` | Itemized invoice lines with borrower attribution |
+| **`Dealer_Prices`** | `Item` \| `Dealer` \| `Price` \| `LastUpdated` | Historical pricing catalog per store/dealer |
+
+---
+
+## 🏗️ Technical Architecture & Stack
+
+- **Framework**: [Flutter 3.29.0](https://flutter.dev) / [Dart 3.7.0](https://dart.dev)
+- **UI Design System**: Illustrative Warm Playful Theme (`#FF7A5C` Coral, `#4ECDC4` Mint Teal, `#FFD93D` Gold, `#A78BFA` Lavender) with full Dark Mode support.
+- **State Management & Caching**: Local-first architecture with `SharedPreferences`, `ValueNotifier` reactives, and zero-latency UI updates.
+- **AI & Cloud Services**:
+  - **Gemini API**: `gemini-2.5-flash` for multimodal receipt OCR and text parsing.
+  - **Google Sheets API v4**: REST client using OAuth2 Bearer tokens from `google_sign_in`.
+- **Hardware Integrations**:
+  - `image_picker`: Camera & gallery capture.
+  - `speech_to_text`: Real-time voice dictation.
+  - `quick_actions`: Android App Shortcuts.
+  - `AppWidgetProvider`: Kotlin-backed Android native home screen widget.
+  - `pdf` & `printing`: Vector-based PDF generation and printing.
+
+---
+
+## 💻 Building from Source
+
+### Prerequisites
+- Flutter SDK `^3.29.0`
+- Android SDK with API Level 34+
+- Java JDK 17
+
+### Steps
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/oprasannakumar/daily_finance_app.git
 cd daily_finance_app
 
-# Install dependencies
+# 2. Install dependencies
 flutter pub get
 
-# Run test suite
+# 3. Run unit tests
 flutter test
 
-# Build Release APK
+# 4. Run static analysis
+flutter analyze
+
+# 5. Build Release APK (ARM64)
 flutter build apk --release --target-platform android-arm64
 ```
-Output APK location: `build/app/outputs/flutter-apk/app-release.apk`
+The output APK will be generated at:
+`build/app/outputs/flutter-apk/app-release.apk`
+
+---
+
+## 📄 License
+This project is open source under the [MIT License](LICENSE).
