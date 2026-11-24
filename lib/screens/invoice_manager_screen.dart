@@ -913,53 +913,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header matching reference image
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF4ECDC4),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFD93D).withValues(alpha: 0.25),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Text('✨', style: TextStyle(fontSize: 16)),
-                    ),
-                  ],
-                ),
-                Text(
-                  '🧾 Invoice Manager',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? const Color(0xFFA78BFA) : const Color(0xFFFF7A5C),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFD93D).withValues(alpha: 0.25),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text('🌙', style: TextStyle(fontSize: 16)),
-                ),
-              ],
-            ),
-          ),
-
           // Row 1: Date & Invoice No
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
