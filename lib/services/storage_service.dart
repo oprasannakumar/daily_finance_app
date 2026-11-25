@@ -581,6 +581,26 @@ class StorageService {
 
   /// Loads transactions immediately from in-memory cache (< 1ms) or local SharedPreferences (< 5ms).
   /// If forceRefresh is requested or if local storage is completely empty, it fetches from Google Sheets.
+  List<FinanceTransaction>? _loadTransactionsFromPrefs(SharedPreferences prefs) {
+    final raw = prefs.getStringList(_keyTransactions);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final list = raw
+          .map((item) => FinanceTransaction.fromJson(jsonDecode(item)))
+          .toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+      // Clean up any legacy EMI reversal transactions to restore card balances
+      if (list.any((t) => t.purpose == 'Credit Card EMI Reversal' || t.referenceId.startsWith('EMI-REV-'))) {
+        list.removeWhere((t) => t.purpose == 'Credit Card EMI Reversal' || t.referenceId.startsWith('EMI-REV-'));
+        unawaited(_persistTransactions(prefs, list));
+      }
+      return list;
+    } catch (e) {
+      debugPrint('Error parsing cached transactions: $e');
+      return null;
+    }
+  }
+
   Future<List<FinanceTransaction>> getTransactions({bool forceRefresh = false}) async {
     // 1. In-memory cache hit: zero lag
     if (!forceRefresh && _cachedTransactions != null) {
@@ -591,28 +611,15 @@ class StorageService {
 
     // 2. Local mobile storage (SharedPreferences) hit: instantaneous
     if (!forceRefresh && _cachedTransactions == null) {
-      final raw = prefs.getStringList(_keyTransactions);
-      if (raw != null && raw.isNotEmpty) {
-        try {
-          _cachedTransactions = raw
-              .map((item) => FinanceTransaction.fromJson(jsonDecode(item)))
-              .toList()
-            ..sort((a, b) => b.date.compareTo(a.date));
-          // Clean up any legacy EMI reversal transactions to restore card balances
-          if (_cachedTransactions!.any((t) => t.purpose == 'Credit Card EMI Reversal' || t.referenceId.startsWith('EMI-REV-'))) {
-            _cachedTransactions!.removeWhere((t) => t.purpose == 'Credit Card EMI Reversal' || t.referenceId.startsWith('EMI-REV-'));
-            unawaited(_persistTransactions(prefs, _cachedTransactions!));
-          }
+      final cached = _loadTransactionsFromPrefs(prefs);
+      if (cached != null && cached.isNotEmpty) {
+        _cachedTransactions = cached;
+        GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
 
-          GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
+        // Resume any pending background sync operations or silent refresh
+        _triggerBackgroundSyncIfNeeded();
 
-          // Resume any pending background sync operations or silent refresh
-          _triggerBackgroundSyncIfNeeded();
-
-          return List<FinanceTransaction>.from(_cachedTransactions!);
-        } catch (e) {
-          debugPrint('Error parsing cached transactions: $e');
-        }
+        return List<FinanceTransaction>.from(_cachedTransactions!);
       }
     }
 
@@ -636,11 +643,18 @@ class StorageService {
         GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
         transactionsNotifier.value++;
       } else {
-        _cachedTransactions ??= [];
+        // Offline or empty remote response: preserve or restore from local cache
+        if (_cachedTransactions == null || _cachedTransactions!.isEmpty) {
+          _cachedTransactions = _loadTransactionsFromPrefs(prefs) ?? [];
+          GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
+        }
       }
     } catch (e) {
       debugPrint('Error fetching transactions from remote: $e');
-      _cachedTransactions ??= [];
+      if (_cachedTransactions == null || _cachedTransactions!.isEmpty) {
+        _cachedTransactions = _loadTransactionsFromPrefs(prefs) ?? [];
+        GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
+      }
     }
 
     return List<FinanceTransaction>.from(_cachedTransactions!);

@@ -1759,11 +1759,20 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       }
     }
 
-    // Fallback if clipboard doesn't contain matching transaction format
-    if (_allTemplates.isNotEmpty) {
-      _applyTemplate(_allTemplates.first);
-    } else {
-      _showQuickTemplatesSheet();
+    // Nothing structured found in clipboard: inform user without modifying the form
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Nothing found in clipboard',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF475569),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -1950,10 +1959,41 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   }
 
   Future<void> _showSaveAsTemplateDialog() async {
+    final isEditing = _editingTemplateId != null;
+    final hasAnyBreakdown = _breakdowns.any((b) =>
+            b.amount > 0 ||
+            (b.paymentType != null && b.paymentType!.isNotEmpty && b.paymentType != 'Select') ||
+            (b.account != null && b.account!.isNotEmpty && b.account != 'Select')) ||
+        (_isSelfTransferMode &&
+            _toBreakdowns.any((b) =>
+                b.amount > 0 ||
+                (b.paymentType != null && b.paymentType!.isNotEmpty && b.paymentType != 'Select') ||
+                (b.account != null && b.account!.isNotEmpty && b.account != 'Select')));
+    final hasTextOrSelection = _narrationController.text.trim().isNotEmpty ||
+        _invoiceController.text.trim().isNotEmpty ||
+        (_selectedPurpose != null && _selectedPurpose != 'Select') ||
+        (_selectedSpentFor != null && _selectedSpentFor != 'Select') ||
+        _splitRecipients.isNotEmpty;
+
+    if (!isEditing && !hasAnyBreakdown && !hasTextOrSelection) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'No data is filled in the form',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     if (_selectedSpentFor == 'Split') {
       if (!_validateSplitAmounts()) return;
     }
-    final isEditing = _editingTemplateId != null;
     final nameCtrl = TextEditingController(
       text: isEditing
           ? (_editingTemplateName ?? _narrationController.text.trim())
@@ -2735,185 +2775,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       _refreshFloatingStats();
       widget.onTransactionSaved?.call();
     }
-  }
-
-  void _showQuickTemplatesSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFF151932)
-          : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            final isDark = Theme.of(ctx).brightness == Brightness.dark;
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Text('✨', style: TextStyle(fontSize: 20)),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Saved Templates',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : const Color(0xFF1E293B),
-                            ),
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 20),
-                        onPressed: () => Navigator.of(ctx).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  if (_allTemplates.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: Text(
-                          'No templates saved yet.\nTap "⭐ Save as Template" below to create one.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Flexible(
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: _allTemplates.length,
-                        separatorBuilder: (_, index) => Divider(
-                          color: isDark ? const Color(0xFF262C54) : const Color(0xFFF1E5DC),
-                        ),
-                        itemBuilder: (_, idx) {
-                          final t = _allTemplates[idx];
-                          return Dismissible(
-                            key: ValueKey('quick_template_${t.id}'),
-                            direction: DismissDirection.horizontal,
-                            background: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 2),
-                              padding: const EdgeInsets.only(left: 16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0F766E),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              alignment: Alignment.centerLeft,
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.edit_note_rounded, color: Colors.white, size: 22),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'Load & Edit',
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            secondaryBackground: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 2),
-                              padding: const EdgeInsets.only(right: 16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEF4444),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              alignment: Alignment.centerRight,
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'Delete',
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                                  ),
-                                  SizedBox(width: 6),
-                                  Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 22),
-                                ],
-                              ),
-                            ),
-                            confirmDismiss: (direction) async {
-                              if (direction == DismissDirection.startToEnd) {
-                                Navigator.of(ctx).pop();
-                                _applyTemplate(t, isForEdit: true);
-                                return false;
-                              }
-                              return true;
-                            },
-                            onDismissed: (direction) async {
-                              if (direction == DismissDirection.endToStart) {
-                                await _storage.deleteTemplate(t.id);
-                                setState(() {
-                                  _allTemplates.removeWhere((item) => item.id == t.id);
-                                });
-                                setSheetState(() {});
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Deleted template: "${t.name}"'),
-                                      backgroundColor: const Color(0xFFEF4444),
-                                      behavior: SnackBarBehavior.floating,
-                                      duration: const Duration(seconds: 1),
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            child: ListTile(
-                              leading: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFA78BFA).withValues(alpha: 0.15),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Text('⭐', style: TextStyle(fontSize: 16)),
-                              ),
-                              title: Text(
-                                t.name,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: isDark ? Colors.white : const Color(0xFF1E293B),
-                                ),
-                              ),
-                              subtitle: Text(
-                                '${t.flow} • ${t.purpose} • ${t.spentFor} • ₹${IndianCurrency.formatSmart(t.totalAmount)}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                ),
-                              ),
-                              trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                              onTap: () {
-                                Navigator.of(ctx).pop();
-                                _applyTemplate(t, isForEdit: false);
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 
   Future<void> _showCustomRecurrenceDialog() async {

@@ -20,10 +20,6 @@ class QuickSwitchOverlay extends StatelessWidget {
       {'emoji': '🤝', 'label': 'Borrowers'},
     ],
     [
-      {'emoji': '📋', 'label': 'Templates'},
-      {'emoji': '⌛', 'label': 'Recurring'},
-    ],
-    [
       {'emoji': '💳', 'label': 'EMIs'},
       {'emoji': '⚙️', 'label': 'Masters'},
     ],
@@ -64,8 +60,11 @@ class QuickSwitchOverlay extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               onTap: () {
-                Navigator.of(sheetCtx).pop();
-                controller.navigateTo(label);
+                if (label == controller.currentScreen) {
+                  Navigator.of(sheetCtx).pop();
+                } else {
+                  controller.navigateTo(label);
+                }
               },
               borderRadius: BorderRadius.circular(12),
               child: Container(
@@ -154,8 +153,11 @@ class QuickSwitchOverlay extends StatelessWidget {
                     color: Colors.transparent,
                     child: InkWell(
                       onTap: () {
-                        Navigator.of(sheetCtx).pop();
-                        controller.navigateTo('Entry');
+                        if (isEntryActive) {
+                          Navigator.of(sheetCtx).pop();
+                        } else {
+                          controller.navigateTo('Entry');
+                        }
                       },
                       borderRadius: BorderRadius.circular(20),
                       child: Container(

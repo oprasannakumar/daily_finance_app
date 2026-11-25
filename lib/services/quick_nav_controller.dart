@@ -16,6 +16,8 @@ class QuickNavController extends ChangeNotifier {
     'EMIs',
     'Borrowers',
     'Dashboard',
+    'Invoices',
+    'Masters',
   ];
 
   static const Map<String, String> routeEmojis = {
@@ -24,8 +26,6 @@ class QuickNavController extends ChangeNotifier {
     'API Keys': '🔑',
     'History': '📜',
     'Borrowers': '🤝',
-    'Templates': '📋',
-    'Recurring': '⌛',
     'EMIs': '💳',
     'Masters': '⚙️',
     'Balances': '💰',
