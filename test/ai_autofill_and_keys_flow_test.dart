@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:daily_finance_app/main.dart';
 import 'package:daily_finance_app/screens/transaction_form_screen.dart';
 import 'package:daily_finance_app/services/storage_service.dart';
 
@@ -14,17 +15,11 @@ void main() {
   });
 
   testWidgets('API Keys dialog saves Grok and Gemini keys', (tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: TransactionFormScreen(),
-        ),
-      ),
-    );
+    await tester.pumpWidget(const DailyFinanceApp());
     await tester.pumpAndSettle();
 
-    // Tap 3-dots top menu
-    final menuBtn = find.byIcon(Icons.more_vert_rounded);
+    // Tap bottom Quick-Switch pill
+    final menuBtn = find.byIcon(Icons.keyboard_arrow_up_rounded);
     expect(menuBtn, findsOneWidget);
     await tester.tap(menuBtn);
     await tester.pumpAndSettle();

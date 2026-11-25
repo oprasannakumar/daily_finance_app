@@ -4120,170 +4120,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     );
   }
 
-  void _showTopMenu() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1B2042) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF2C3360) : const Color(0xFFE2E8F0);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF1E293B);
-
-    final row1 = [
-      {'emoji': '📊', 'label': 'Dashboard'},
-      {'emoji': '🔑', 'label': 'API Keys'},
-    ];
-    final row2 = [
-      {'emoji': '📜', 'label': 'History'},
-      {'emoji': '🤝', 'label': 'Borrowers'},
-    ];
-    final row3 = [
-      {'emoji': '📋', 'label': 'Templates'},
-      {'emoji': '⌛', 'label': 'Recurring'},
-    ];
-    final row4 = [
-      {'emoji': '💳', 'label': 'EMIs'},
-      {'emoji': '⚙️', 'label': 'Masters'},
-    ];
-    final row5 = [
-      {'emoji': '💰', 'label': 'Balances'},
-      {'emoji': '🧾', 'label': 'Invoices'},
-    ];
-
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'TopMenu',
-      barrierColor: Colors.black.withValues(alpha: 0.35),
-      transitionDuration: const Duration(milliseconds: 180),
-      pageBuilder: (ctx, anim1, anim2) {
-        Widget buildMenuItem(Map<String, String> item, {bool fullWidth = false}) {
-          return InkWell(
-            onTap: () {
-              Navigator.of(ctx).pop();
-              _handleMenuItemClick(item['label']!);
-            },
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              height: 38,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF222852) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF2E376E) : const Color(0xFFE2E8F0),
-                  width: 0.8,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: fullWidth ? MainAxisAlignment.center : MainAxisAlignment.start,
-                children: [
-                  Text(item['emoji']!, style: const TextStyle(fontSize: 14)),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      item['label']!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        return SafeArea(
-          child: Stack(
-            children: [
-              Positioned(
-                top: 55,
-                right: 14,
-                child: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    width: 236,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: borderColor, width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.12),
-                          blurRadius: 18,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(child: buildMenuItem(row1[0])),
-                            const SizedBox(width: 6),
-                            Expanded(child: buildMenuItem(row1[1])),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(child: buildMenuItem(row2[0])),
-                            const SizedBox(width: 6),
-                            Expanded(child: buildMenuItem(row2[1])),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(child: buildMenuItem(row3[0])),
-                            const SizedBox(width: 6),
-                            Expanded(child: buildMenuItem(row3[1])),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(child: buildMenuItem(row4[0])),
-                            const SizedBox(width: 6),
-                            Expanded(child: buildMenuItem(row4[1])),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(child: buildMenuItem(row5[0])),
-                            const SizedBox(width: 6),
-                            Expanded(child: buildMenuItem(row5[1])),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-      transitionBuilder: (ctx, anim, secondaryAnim, child) {
-        return FadeTransition(
-          opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.9, end: 1.0).animate(
-              CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            ),
-            alignment: Alignment.topRight,
-            child: child,
-          ),
-        );
-      },
-    );
-  }
-
   void _handleMenuItemClick(String label) {
     switch (label) {
       case 'Dashboard':
@@ -5184,7 +5020,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // 1. Top Bar: Profile | ✨ Smart Entry | 🌙/☀️ ⋮
+                            // 1. Top Bar: Profile | ✨ Smart Entry | 🌙/☀️
                             Row(
                               children: [
                                 ValueListenableBuilder<GoogleUserProfile?>(
@@ -5257,28 +5093,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                 ThemeToggleRotatingButton(
                                   isDark: isDark,
                                   onToggle: () => StorageService.instance.toggleDarkMode(),
-                                ),
-                                const SizedBox(width: 8),
-                                InkWell(
-                                  onTap: _showTopMenu,
-                                  borderRadius: BorderRadius.circular(18),
-                                  child: Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF1B2042) : const Color(0xFFF8FAFC),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: isDark ? const Color(0xFF2C3360) : const Color(0xFFE2E8F0),
-                                        width: 1.2,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      Icons.more_vert_rounded,
-                                      size: 20,
-                                      color: isDark ? Colors.white : const Color(0xFF1E293B),
-                                    ),
-                                  ),
                                 ),
                               ],
                             ),

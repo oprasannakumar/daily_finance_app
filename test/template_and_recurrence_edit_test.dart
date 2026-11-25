@@ -36,7 +36,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Open top right menu -> Templates
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Templates'));
     await tester.pumpAndSettle();
@@ -94,7 +94,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Open top right menu -> Templates
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Templates'));
     await tester.pumpAndSettle();
@@ -213,7 +213,7 @@ void main() {
     expect(find.text('2'), findsNothing);
 
     // Open Menu -> Recurring to verify both exist in Manage Masters
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Recurring'));
     await tester.pumpAndSettle();
@@ -260,7 +260,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 1. Open Menu -> Recurring
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Recurring'));
     await tester.pumpAndSettle();
@@ -287,7 +287,7 @@ void main() {
     expect(txs.any((t) => t.narration == 'WiFi Fiber Internet'), isTrue);
 
     // 3. Open Menu -> Recurring again
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Recurring'));
     await tester.pumpAndSettle();
