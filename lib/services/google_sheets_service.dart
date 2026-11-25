@@ -3888,11 +3888,46 @@ class GoogleSheetsService {
     }
   }
 
+  Future<bool> syncAllEmiPlans(List<EmiPlan> allPlans) async {
+    final token = await GoogleAuthService.instance.getAccessToken();
+    if (token == null) return true;
+
+    final sheetId = await getSpreadsheetId();
+    if (sheetId == null) return true;
+
+    try {
+      await _ensureAllSheetsAndHeaders(token, sheetId);
+      final rows = allPlans.map((p) => p.toSheetRow()).toList();
+
+      final clearUrl = Uri.parse(
+        'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:R")}:clear',
+      );
+      await http.post(clearUrl, headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'});
+
+      if (rows.isNotEmpty) {
+        final putUrl = Uri.parse(
+          'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:R${rows.length + 1}")}?valueInputOption=USER_ENTERED',
+        );
+        await http.put(
+          putUrl,
+          headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+          body: jsonEncode({'values': rows}),
+        );
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error syncing all EMI plans to sheet: $e');
+      return false;
+    }
+  }
+
   Future<bool> updateEmiInstallmentPaid(
     String planId,
     int installmentNumber,
     bool isPaid, {
     DateTime? paidDate,
+    String? paymentReference,
+    bool clearPaymentReference = false,
   }) async {
     // 1. Local update
     await StorageService.instance.updateEmiInstallmentLocal(
@@ -3900,6 +3935,8 @@ class GoogleSheetsService {
       installmentNumber,
       isPaid,
       paidDate: paidDate,
+      paymentReference: paymentReference,
+      clearPaymentReference: clearPaymentReference,
     );
 
     // 2. Sync full EMI table to sheet

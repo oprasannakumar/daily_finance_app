@@ -130,7 +130,60 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     StorageService.instance.transactionsNotifier.addListener(_refreshFloatingStats);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _handleStartupFlow();
+      _checkDueEmiInstallmentsOnStartup();
     });
+  }
+
+  Future<void> _checkDueEmiInstallmentsOnStartup() async {
+    final isTesting = WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    if (isTesting) return;
+
+    try {
+      final posted = await _storage.processDueEmiInstallments();
+      if (posted.isNotEmpty && mounted) {
+        final totalPostedAmt = posted.fold(0.0, (sum, p) => sum + p.installment.totalDueWithTax);
+        final firstItem = posted.first;
+        final msg = posted.length == 1
+            ? 'Auto-posted Installment #${firstItem.installment.installmentNumber} for "${firstItem.plan.title}" (₹${IndianCurrency.format(firstItem.installment.totalDueWithTax)}) to ${firstItem.plan.account}'
+            : 'Auto-posted ${posted.length} due EMI installments (₹${IndianCurrency.format(totalPostedAmt)}) to credit cards';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF1E293B),
+            duration: const Duration(seconds: 6),
+            content: Row(
+              children: [
+                const Icon(Icons.credit_card_rounded, color: Color(0xFFFF5C38), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    msg,
+                    style: const TextStyle(fontSize: 12.5, color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            action: SnackBarAction(
+              label: 'Undo',
+              textColor: const Color(0xFFFF5C38),
+              onPressed: () async {
+                await _storage.undoAutoPostedEmiInstallments(posted);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Auto-posted EMI installment(s) undone.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error processing due EMI installments on startup: $e');
+    }
   }
 
   Future<void> _handleStartupFlow() async {

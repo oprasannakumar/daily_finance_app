@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:daily_finance_app/models/account_balance_model.dart';
 import 'package:daily_finance_app/models/emi_plan_model.dart';
 import 'package:daily_finance_app/models/transaction_model.dart';
+import 'package:daily_finance_app/services/storage_service.dart';
 
 void main() {
   group('Credit Card EMI Model & Calculation Tests', () {
@@ -312,6 +314,60 @@ void main() {
       expect(ccSummary.unbilledEmiPrincipal, equals(10236.49));
       expect(ccSummary.nextEmiDueDate, equals(DateTime(2026, 10, 24)));
       expect(summary.totalUnbilledEmiPrincipal, equals(10236.49));
+    });
+
+    test('Automatic billing date processing creates single combined installment transaction and undo works', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+
+      final storage = StorageService.instance;
+
+      final schedule = EmiPlan.calculateSchedule(
+        principal: 10236.49,
+        annualInterestRate: 17.0,
+        tenureMonths: 6,
+        firstEmiDate: DateTime(2026, 10, 24),
+      );
+
+      final plan = EmiPlan(
+        id: 'EMI-HP-VICTUS-AUTO',
+        title: 'HP Victus Laptop',
+        account: 'HDFC Credit Card',
+        transactionDate: DateTime(2026, 10, 11),
+        totalTransactionAmount: 72272.47,
+        bookingPrincipal: 10236.49,
+        annualInterestRate: 17.0,
+        tenureMonths: 6,
+        firstEmiDate: DateTime(2026, 10, 24),
+        installments: schedule,
+      );
+
+      await storage.saveCachedEmiPlans([plan]);
+
+      // Simulate app opening on 25/10/2026 (day after Month 1 billing date 24/10/2026)
+      final posted = await storage.processDueEmiInstallments(referenceDate: DateTime(2026, 10, 25));
+
+      expect(posted.length, equals(1));
+      expect(posted[0].installment.installmentNumber, equals(1));
+      expect(posted[0].installment.isPaid, isTrue);
+      expect(posted[0].installment.paymentReference, isNotNull);
+
+      // Verify transaction was posted in local storage
+      final txs = await storage.getTransactions();
+      expect(txs.any((t) => t.referenceId == posted[0].transactionRef), isTrue);
+      final postedTx = txs.firstWhere((t) => t.referenceId == posted[0].transactionRef);
+      expect(postedTx.purpose, equals('Credit Card EMI Installment'));
+      expect(postedTx.totalAmount, equals(posted[0].installment.totalDueWithTax));
+      expect(postedTx.flow, equals('Withdraw'));
+
+      // Test Undo
+      await storage.undoAutoPostedEmiInstallments(posted);
+      final txsAfterUndo = await storage.getTransactions();
+      expect(txsAfterUndo.any((t) => t.referenceId == posted[0].transactionRef), isFalse);
+
+      final plansAfterUndo = await storage.getCachedEmiPlans();
+      expect(plansAfterUndo.first.installments[0].isPaid, isFalse);
+      expect(plansAfterUndo.first.installments[0].paymentReference, isNull);
     });
   });
 }

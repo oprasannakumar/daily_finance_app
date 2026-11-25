@@ -40,6 +40,8 @@ class EmiInstallment {
     bool? isPaid,
     DateTime? paidDate,
     String? paymentReference,
+    bool clearPaidDate = false,
+    bool clearPaymentReference = false,
   }) {
     return EmiInstallment(
       installmentNumber: installmentNumber ?? this.installmentNumber,
@@ -50,8 +52,8 @@ class EmiInstallment {
       balancePrincipal: balancePrincipal ?? this.balancePrincipal,
       applicableTaxes: applicableTaxes ?? this.applicableTaxes,
       isPaid: isPaid ?? this.isPaid,
-      paidDate: paidDate ?? this.paidDate,
-      paymentReference: paymentReference ?? this.paymentReference,
+      paidDate: clearPaidDate ? null : (paidDate ?? this.paidDate),
+      paymentReference: clearPaymentReference ? null : (paymentReference ?? this.paymentReference),
     );
   }
 

@@ -6,6 +6,7 @@ import '../models/account_balance_model.dart';
 import '../models/emi_plan_model.dart';
 import '../models/invoice_model.dart';
 import '../models/transaction_model.dart';
+import '../utils/currency_formatter.dart';
 import 'google_auth_service.dart';
 import 'google_sheets_service.dart';
 
@@ -842,6 +843,8 @@ class StorageService {
     int installmentNumber,
     bool isPaid, {
     DateTime? paidDate,
+    String? paymentReference,
+    bool clearPaymentReference = false,
   }) async {
     final list = await getCachedEmiPlans();
     final pIdx = list.indexWhere((p) => p.id == planId);
@@ -852,6 +855,9 @@ class StorageService {
           return it.copyWith(
             isPaid: isPaid,
             paidDate: isPaid ? (paidDate ?? DateTime.now()) : null,
+            paymentReference: clearPaymentReference ? null : (paymentReference ?? it.paymentReference),
+            clearPaidDate: !isPaid,
+            clearPaymentReference: clearPaymentReference,
           );
         }
         return it;
@@ -865,6 +871,123 @@ class StorageService {
         status: newStatus,
       );
       await saveCachedEmiPlans(list);
+    }
+  }
+
+  /// Checks all active EMI plans and automatically posts single combined installment
+  /// transactions to the credit card in the ledger for any installment whose billing
+  /// date has arrived (billingDate <= today) and has not yet been paid/posted.
+  Future<List<AutoPostedEmiInstallment>> processDueEmiInstallments({DateTime? referenceDate}) async {
+    final now = referenceDate ?? DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final plans = await getCachedEmiPlans();
+    final postedList = <AutoPostedEmiInstallment>[];
+
+    bool anyPlanUpdated = false;
+
+    for (int pIdx = 0; pIdx < plans.length; pIdx++) {
+      final plan = plans[pIdx];
+      if (plan.status.toUpperCase() != 'ACTIVE') continue;
+
+      bool planChanged = false;
+      final updatedInstallments = List<EmiInstallment>.from(plan.installments);
+
+      for (int iIdx = 0; iIdx < updatedInstallments.length; iIdx++) {
+        final inst = updatedInstallments[iIdx];
+        final instDate = DateTime(inst.billingDate.year, inst.billingDate.month, inst.billingDate.day);
+
+        // Check if billing date has arrived or passed and installment is not yet paid/posted
+        if (!inst.isPaid && (inst.paymentReference == null || inst.paymentReference!.isEmpty)) {
+          if (today.isAfter(instDate) || today.isAtSameMomentAs(instDate)) {
+            final refId = FinanceTransaction.generateReferenceId(inst.billingDate);
+
+            // Construct single combined installment transaction
+            final narration = 'EMI Installment #${inst.installmentNumber}: ${plan.title} (Prin: ₹${IndianCurrency.format(inst.principal)} + Int: ₹${IndianCurrency.format(inst.interest)} + GST: ₹${IndianCurrency.format(inst.applicableTaxes)})';
+            final instTx = FinanceTransaction(
+              date: inst.billingDate,
+              referenceId: refId,
+              narration: narration,
+              flow: 'Withdraw',
+              invoice: '',
+              purpose: 'Credit Card EMI Installment',
+              spentFor: 'Self',
+              breakdowns: [
+                PaymentBreakdown(
+                  paymentType: 'Credit',
+                  account: plan.account,
+                  amount: inst.totalDueWithTax,
+                ),
+              ],
+              totalAmount: inst.totalDueWithTax,
+            );
+
+            await saveTransaction(instTx);
+
+            final updatedInst = inst.copyWith(
+              isPaid: true,
+              paidDate: inst.billingDate,
+              paymentReference: refId,
+            );
+            updatedInstallments[iIdx] = updatedInst;
+            planChanged = true;
+
+            postedList.add(AutoPostedEmiInstallment(
+              plan: plan,
+              installment: updatedInst,
+              transactionRef: refId,
+            ));
+          }
+        }
+      }
+
+      if (planChanged) {
+        final allPaid = updatedInstallments.every((it) => it.isPaid);
+        final newStatus = allPaid ? 'COMPLETED' : 'ACTIVE';
+        plans[pIdx] = plan.copyWith(
+          installments: updatedInstallments,
+          status: newStatus,
+        );
+        anyPlanUpdated = true;
+      }
+    }
+
+    if (anyPlanUpdated) {
+      await saveCachedEmiPlans(plans);
+      unawaited(GoogleSheetsService.instance.syncAllEmiPlans(plans));
+    }
+
+    return postedList;
+  }
+
+  /// Reverts and deletes auto-posted installments when the user taps Undo.
+  Future<void> undoAutoPostedEmiInstallments(List<AutoPostedEmiInstallment> postedList) async {
+    for (final item in postedList) {
+      // 1. Delete posted transaction from ledger
+      await deleteTransaction(item.transactionRef, referenceId: item.transactionRef);
+
+      // 2. Mark installment unpaid and clear payment reference
+      final plans = await getCachedEmiPlans();
+      final pIdx = plans.indexWhere((p) => p.id == item.plan.id);
+      if (pIdx != -1) {
+        final plan = plans[pIdx];
+        final updatedInst = plan.installments.map((it) {
+          if (it.installmentNumber == item.installment.installmentNumber) {
+            return it.copyWith(
+              isPaid: false,
+              clearPaidDate: true,
+              clearPaymentReference: true,
+            );
+          }
+          return it;
+        }).toList();
+
+        plans[pIdx] = plan.copyWith(
+          installments: updatedInst,
+          status: 'ACTIVE',
+        );
+        await saveCachedEmiPlans(plans);
+        unawaited(GoogleSheetsService.instance.syncAllEmiPlans(plans));
+      }
     }
   }
 
@@ -1354,4 +1477,16 @@ class _SyncQueueItem {
   final String? idOrReference;
   _SyncQueueItem.save(this.transaction) : isSave = true, idOrReference = null;
   _SyncQueueItem.delete(this.idOrReference) : isSave = false, transaction = null;
+}
+
+class AutoPostedEmiInstallment {
+  final EmiPlan plan;
+  final EmiInstallment installment;
+  final String transactionRef;
+
+  AutoPostedEmiInstallment({
+    required this.plan,
+    required this.installment,
+    required this.transactionRef,
+  });
 }

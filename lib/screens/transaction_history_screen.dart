@@ -1410,6 +1410,33 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                                             ),
                                             const SizedBox(width: 4),
                                           ],
+                                          // EMI installment debit indicator
+                                          if (tx.purpose == 'Credit Card EMI Installment') ...[
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.4), width: 0.8),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.calendar_month_rounded, size: 10, color: Color(0xFF4F46E5)),
+                                                  SizedBox(width: 3),
+                                                  Text(
+                                                    'EMI Due',
+                                                    style: TextStyle(
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFF4F46E5),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                          ],
                                           // Sync status indicator: ONLY SHOWN IF NOT YET SYNCED!
                                           if (isPending) ...[
                                             Container(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/emi_plan_model.dart';
+import '../models/transaction_model.dart';
 import '../services/google_sheets_service.dart';
 import '../services/storage_service.dart';
 import '../utils/currency_formatter.dart';
@@ -86,11 +87,75 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
 
   Future<void> _toggleInstallmentPaid(EmiPlan plan, int installmentNumber, bool currentStatus) async {
     final newStatus = !currentStatus;
+    final inst = plan.installments.firstWhere(
+      (it) => it.installmentNumber == installmentNumber,
+      orElse: () => plan.installments.first,
+    );
+
+    String? newPaymentRef = inst.paymentReference;
+    bool clearRef = false;
+
+    if (newStatus == true) {
+      final shouldPost = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Post Installment to Card?'),
+          content: Text(
+            'Mark Installment #$installmentNumber as paid and post ₹${IndianCurrency.format(inst.totalDueWithTax)} debit to ${plan.account} in Transaction History / Ledger?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Mark Paid Only'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF5C38)),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Post to Card & Ledger'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldPost == true) {
+        final refId = FinanceTransaction.generateReferenceId(inst.billingDate);
+        final narration = 'EMI Installment #$installmentNumber: ${plan.title} (Prin: ₹${IndianCurrency.format(inst.principal)} + Int: ₹${IndianCurrency.format(inst.interest)} + GST: ₹${IndianCurrency.format(inst.applicableTaxes)})';
+        final instTx = FinanceTransaction(
+          date: inst.billingDate,
+          referenceId: refId,
+          narration: narration,
+          flow: 'Withdraw',
+          invoice: '',
+          purpose: 'Credit Card EMI Installment',
+          spentFor: 'Self',
+          breakdowns: [
+            PaymentBreakdown(
+              paymentType: 'Credit',
+              account: plan.account,
+              amount: inst.totalDueWithTax,
+            ),
+          ],
+          totalAmount: inst.totalDueWithTax,
+        );
+        await _storage.saveTransaction(instTx);
+        newPaymentRef = refId;
+      }
+    } else {
+      if (inst.paymentReference != null && inst.paymentReference!.isNotEmpty) {
+        await _storage.deleteTransaction(inst.paymentReference!, referenceId: inst.paymentReference!);
+        clearRef = true;
+        newPaymentRef = null;
+      }
+    }
+
     await _sheets.updateEmiInstallmentPaid(
       plan.id,
       installmentNumber,
       newStatus,
       paidDate: newStatus ? DateTime.now() : null,
+      paymentReference: newPaymentRef,
+      clearPaymentReference: clearRef,
     );
     _loadPlans(fromLocalOnly: true);
   }
@@ -628,8 +693,19 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
                           ),
                           Expanded(
                             flex: 3,
-                            child: Text(DateFormat('dd/MM/yy').format(it.billingDate),
-                                style: TextStyle(fontSize: 11.5, color: textPrimary)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(DateFormat('dd/MM/yy').format(it.billingDate),
+                                    style: TextStyle(fontSize: 11.5, color: textPrimary)),
+                                if (it.paymentReference != null && it.paymentReference!.isNotEmpty)
+                                  Text(
+                                    'Billed',
+                                    style: TextStyle(fontSize: 9, color: teal, fontWeight: FontWeight.bold),
+                                  ),
+                              ],
+                            ),
                           ),
                           Expanded(
                             flex: 3,
