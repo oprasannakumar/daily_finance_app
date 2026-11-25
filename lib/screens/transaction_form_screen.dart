@@ -4137,7 +4137,10 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       {'emoji': '💳', 'label': 'EMIs'},
       {'emoji': '⚙️', 'label': 'Masters'},
     ];
-    final balanceItem = {'emoji': '💰', 'label': 'Balances'};
+    final row5 = [
+      {'emoji': '💰', 'label': 'Balances'},
+      {'emoji': '🧾', 'label': 'Invoices'},
+    ];
 
     showGeneralDialog(
       context: context,
@@ -4245,7 +4248,13 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                           ],
                         ),
                         const SizedBox(height: 6),
-                        buildMenuItem(balanceItem, fullWidth: true),
+                        Row(
+                          children: [
+                            Expanded(child: buildMenuItem(row5[0])),
+                            const SizedBox(width: 6),
+                            Expanded(child: buildMenuItem(row5[1])),
+                          ],
+                        ),
                       ],
                     ),
                   ),
