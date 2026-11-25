@@ -1,3 +1,4 @@
+import 'emi_plan_model.dart';
 import 'transaction_model.dart';
 
 class CreditCardLimit {
@@ -248,6 +249,10 @@ class LiveCreditCardSummary {
   final DateTime? nextBillDate;
   final DateTime? nextDueDate;
   final CreditCardDueBill? dueBill;
+  final double unbilledEmiPrincipal;
+  final int activeEmiPlansCount;
+  final DateTime? nextEmiDueDate;
+  final double? nextEmiAmount;
 
   LiveCreditCardSummary({
     this.cardName = '',
@@ -263,6 +268,10 @@ class LiveCreditCardSummary {
     this.nextBillDate,
     this.nextDueDate,
     this.dueBill,
+    this.unbilledEmiPrincipal = 0.0,
+    this.activeEmiPlansCount = 0,
+    this.nextEmiDueDate,
+    this.nextEmiAmount,
   });
 }
 
@@ -296,11 +305,14 @@ class LiveAccountBalanceSummary {
   double get totalCreditCardUsed => creditCardSummaries.values.fold(0.0, (sum, c) => sum + c.usedLimit);
   double get totalCreditCardLimit => creditCardSummaries.values.fold(0.0, (sum, c) => sum + c.totalLimit);
   double get totalDueBills => dueBills.fold(0.0, (sum, b) => sum + b.remainingDue);
+  double get totalUnbilledEmiPrincipal =>
+      creditCardSummaries.values.fold(0.0, (sum, c) => sum + c.unbilledEmiPrincipal);
 
   static LiveAccountBalanceSummary calculate({
     required AccountBalanceConfig config,
     required List<FinanceTransaction> transactions,
     required Map<String, List<String>> categories,
+    List<EmiPlan>? emiPlans,
     DateTime? referenceDate,
   }) {
     final now = referenceDate ?? DateTime.now();
@@ -619,6 +631,29 @@ class LiveAccountBalanceSummary {
         }
       }
 
+      // Active EMI calculation for this card
+      final cardActiveEmis = (emiPlans ?? []).where((p) {
+        if (p.status.toUpperCase() != 'ACTIVE') return false;
+        final planAcc = p.account.trim().toLowerCase();
+        final cName = cardName.trim().toLowerCase();
+        return planAcc == cName || planAcc.contains(cName) || cName.contains(planAcc);
+      }).toList();
+
+      final unbilledEmiPrincipal = cardActiveEmis.fold(0.0, (sum, p) => sum + p.remainingPrincipal);
+      final activeEmiPlansCount = cardActiveEmis.length;
+
+      DateTime? nextEmiDueDate;
+      double? nextEmiAmount;
+      for (final plan in cardActiveEmis) {
+        final nextInst = plan.nextDueInstallment;
+        if (nextInst != null) {
+          if (nextEmiDueDate == null || nextInst.billingDate.isBefore(nextEmiDueDate)) {
+            nextEmiDueDate = nextInst.billingDate;
+            nextEmiAmount = nextInst.totalDueWithTax;
+          }
+        }
+      }
+
       ccSummaries[cardName] = LiveCreditCardSummary(
         cardName: cardName,
         totalLimit: cardTotal,
@@ -633,6 +668,10 @@ class LiveAccountBalanceSummary {
         nextBillDate: nextBillDate,
         nextDueDate: nextDueDate,
         dueBill: cardDueBill,
+        unbilledEmiPrincipal: unbilledEmiPrincipal,
+        activeEmiPlansCount: activeEmiPlansCount,
+        nextEmiDueDate: nextEmiDueDate,
+        nextEmiAmount: nextEmiAmount,
       );
     }
 

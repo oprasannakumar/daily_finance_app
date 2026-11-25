@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:daily_finance_app/models/account_balance_model.dart';
 import 'package:daily_finance_app/models/emi_plan_model.dart';
+import 'package:daily_finance_app/models/transaction_model.dart';
 
 void main() {
   group('Credit Card EMI Model & Calculation Tests', () {
@@ -102,7 +104,7 @@ void main() {
 
       // Serialize to sheet row and back
       final sheetRow = plan.toSheetRow();
-      expect(sheetRow.length, equals(16));
+      expect(sheetRow.length, equals(18));
       expect(sheetRow[0], equals('EMI-HP-VICTUS-OVERRIDE'));
       expect(sheetRow[5], equals(10236.49));
 
@@ -153,7 +155,7 @@ void main() {
 
       // Sheet row round-trip
       final row = plan.toSheetRow();
-      expect(row.length, equals(16));
+      expect(row.length, equals(18));
       expect(row[14], equals('tx_12345678'));
       expect(row[15], equals('REF-10112026-ABCD'));
 
@@ -210,6 +212,106 @@ void main() {
       expect(mar.year, equals(2027));
       expect(mar.month, equals(3));
       expect(mar.day, equals(31));
+    });
+
+    test('Credit Card balance live calculation integrates active unbilled EMI principal and reversal transactions', () {
+      final config = AccountBalanceConfig(
+        setupDate: DateTime(2026, 1, 1),
+        bankOpeningBalances: {'HDFC Bank': 50000.0},
+        creditCardLimits: {
+          'HDFC Credit Card': const CreditCardLimit(
+            totalLimit: 150000.0,
+            initialUsedAmount: 0.0,
+          ),
+        },
+      );
+
+      final swipeTx = FinanceTransaction(
+        date: DateTime(2026, 10, 11),
+        referenceId: 'REF-11102026-LAPTOP',
+        narration: 'HP Victus Laptop',
+        flow: 'Withdraw',
+        invoice: '',
+        purpose: 'Electronics',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(paymentType: 'Credit', account: 'HDFC Credit Card', amount: 72272.47),
+        ],
+        totalAmount: 72272.47,
+      );
+
+      // Reversal transaction created by EMI conversion (+10,236.49 to card)
+      final reversalTx = FinanceTransaction(
+        date: DateTime(2026, 10, 11),
+        referenceId: 'REF-11102026-REV1',
+        narration: 'EMI Conversion Credit: HP Victus Laptop',
+        flow: 'Deposit',
+        invoice: '',
+        purpose: 'Credit Card EMI Reversal',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(paymentType: 'Credit', account: 'HDFC Credit Card', amount: 10236.49),
+        ],
+        totalAmount: 10236.49,
+      );
+
+      // Processing fee transaction (-53.10)
+      final feeTx = FinanceTransaction(
+        date: DateTime(2026, 10, 11),
+        referenceId: 'REF-11102026-FEE1',
+        narration: 'EMI Processing Fee & GST: HP Victus Laptop',
+        flow: 'Withdraw',
+        invoice: '',
+        purpose: 'Bank Charges / Processing Fee',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(paymentType: 'Credit', account: 'HDFC Credit Card', amount: 53.10),
+        ],
+        totalAmount: 53.10,
+      );
+
+      final schedule = EmiPlan.calculateSchedule(
+        principal: 10236.49,
+        annualInterestRate: 17.0,
+        tenureMonths: 6,
+        firstEmiDate: DateTime(2026, 10, 24),
+      );
+
+      final emiPlan = EmiPlan(
+        id: 'EMI-HP-VICTUS-001',
+        title: 'HP Victus Laptop',
+        account: 'HDFC Credit Card',
+        transactionDate: DateTime(2026, 10, 11),
+        totalTransactionAmount: 72272.47,
+        bookingPrincipal: 10236.49,
+        annualInterestRate: 17.0,
+        tenureMonths: 6,
+        processingFee: 45.0,
+        processingFeeGst: 8.10,
+        firstEmiDate: DateTime(2026, 10, 24),
+        installments: schedule,
+        linkedTransactionRef: 'REF-11102026-LAPTOP',
+        reversalTransactionRef: 'REF-11102026-REV1',
+        feeTransactionRef: 'REF-11102026-FEE1',
+      );
+
+      final summary = LiveAccountBalanceSummary.calculate(
+        config: config,
+        transactions: [swipeTx, reversalTx, feeTx],
+        categories: {'Credit Cards': ['HDFC Credit Card']},
+        emiPlans: [emiPlan],
+      );
+
+      final ccSummary = summary.creditCardSummaries['HDFC Credit Card']!;
+      // Card used balance: 72272.47 - 10236.49 + 53.10 = 62089.08
+      expect(ccSummary.usedLimit, closeTo(62089.08, 0.01));
+      // Available limit: 150000 - 62089.08 = 87910.92
+      expect(ccSummary.availableLimit, closeTo(87910.92, 0.01));
+      // Active EMI metrics
+      expect(ccSummary.activeEmiPlansCount, equals(1));
+      expect(ccSummary.unbilledEmiPrincipal, equals(10236.49));
+      expect(ccSummary.nextEmiDueDate, equals(DateTime(2026, 10, 24)));
+      expect(summary.totalUnbilledEmiPrincipal, equals(10236.49));
     });
   });
 }

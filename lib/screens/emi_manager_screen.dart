@@ -118,10 +118,19 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
     );
 
     if (confirm == true) {
+      // 1. Delete linked reversal and fee transactions from history / ledger to restore CC balance
+      if (plan.reversalTransactionRef != null && plan.reversalTransactionRef!.isNotEmpty) {
+        await _storage.deleteTransaction(plan.reversalTransactionRef!, referenceId: plan.reversalTransactionRef!);
+      }
+      if (plan.feeTransactionRef != null && plan.feeTransactionRef!.isNotEmpty) {
+        await _storage.deleteTransaction(plan.feeTransactionRef!, referenceId: plan.feeTransactionRef!);
+      }
+
+      // 2. Delete EMI plan from local storage & Google Sheets
       await _sheets.deleteEmiPlan(plan.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('EMI Plan "${plan.title}" deleted')),
+          SnackBar(content: Text('EMI Plan "${plan.title}" deleted (Ledger reversal removed)')),
         );
       }
       _loadPlans(fromLocalOnly: true);

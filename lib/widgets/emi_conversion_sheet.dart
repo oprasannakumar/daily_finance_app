@@ -578,11 +578,72 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
     setState(() => _isSaving = true);
 
     try {
+      final cardAccount = _selectedCreditCard ?? 'Credit Card';
+      final planTitle = _titleController.text.trim();
+      final totalFee = _processingFee + _processingFeeGst;
+
+      // 1. Generate or reuse reference IDs for linked ledger transactions
+      final reversalRef = widget.existingPlan?.reversalTransactionRef ??
+          FinanceTransaction.generateReferenceId(_transactionDate);
+      final feeRef = totalFee > 0
+          ? (widget.existingPlan?.feeTransactionRef ??
+              FinanceTransaction.generateReferenceId(_transactionDate))
+          : null;
+
+      // 2. Post EMI Credit Reversal to Credit Card in Transaction History / Ledger
+      // Flow = 'Deposit' into Credit Card account immediately reduces the card's used balance
+      final reversalTx = FinanceTransaction(
+        date: _transactionDate,
+        referenceId: reversalRef,
+        narration: 'EMI Conversion Credit: $planTitle${_linkedTransactionRef != null ? " (Ref: $_linkedTransactionRef)" : ""}',
+        flow: 'Deposit',
+        invoice: '',
+        purpose: 'Credit Card EMI Reversal',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(
+            paymentType: 'Credit',
+            account: cardAccount,
+            amount: _bookingPrincipal,
+          ),
+        ],
+        totalAmount: _bookingPrincipal,
+      );
+      await StorageService.instance.saveTransaction(reversalTx);
+
+      // 3. Post Processing Fee transaction if applicable (Flow = 'Withdraw' / Expense)
+      if (totalFee > 0 && feeRef != null) {
+        final feeTx = FinanceTransaction(
+          date: _transactionDate,
+          referenceId: feeRef,
+          narration: 'EMI Processing Fee & GST: $planTitle',
+          flow: 'Withdraw',
+          invoice: '',
+          purpose: 'Bank Charges / Processing Fee',
+          spentFor: 'Self',
+          breakdowns: [
+            PaymentBreakdown(
+              paymentType: 'Credit',
+              account: cardAccount,
+              amount: totalFee,
+            ),
+          ],
+          totalAmount: totalFee,
+        );
+        await StorageService.instance.saveTransaction(feeTx);
+      } else if (widget.existingPlan?.feeTransactionRef != null && totalFee <= 0) {
+        // If fee was removed on edit, clean up the previous fee transaction
+        await StorageService.instance.deleteTransaction(
+          widget.existingPlan!.feeTransactionRef!,
+          referenceId: widget.existingPlan!.feeTransactionRef!,
+        );
+      }
+
       final planId = widget.existingPlan?.id ?? 'EMI-${DateTime.now().millisecondsSinceEpoch}';
       final plan = EmiPlan(
         id: planId,
-        title: _titleController.text.trim(),
-        account: _selectedCreditCard ?? 'Credit Card',
+        title: planTitle,
+        account: cardAccount,
         transactionDate: _transactionDate,
         totalTransactionAmount: _totalTxAmount,
         bookingPrincipal: _bookingPrincipal,
@@ -596,6 +657,8 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
         linkedTransactionId: _linkedTransactionId,
         linkedTransactionRef: _linkedTransactionRef,
+        reversalTransactionRef: reversalRef,
+        feeTransactionRef: feeRef,
       );
 
       await GoogleSheetsService.instance.saveEmiPlan(plan);
@@ -604,7 +667,11 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF00B074),
-            content: Text('EMI plan "${plan.title}" saved successfully!'),
+            content: Text(
+              'EMI plan "$planTitle" saved!\n'
+              '₹${IndianCurrency.format(_bookingPrincipal)} credited to $cardAccount (Card balance updated).',
+            ),
+            duration: const Duration(seconds: 4),
           ),
         );
         Navigator.of(context).pop(plan);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/account_balance_model.dart';
+import '../models/emi_plan_model.dart';
 import '../models/transaction_model.dart';
 import '../services/storage_service.dart';
 import '../utils/currency_formatter.dart';
@@ -25,6 +26,8 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   bool _isLoading = true;
   Set<String> _emiLinkedIds = {};
   Set<String> _emiLinkedRefs = {};
+  Map<String, EmiPlan> _emiPlanById = {};
+  Map<String, EmiPlan> _emiPlanByRef = {};
 
   // Modern Flipkart / Amazon Faceted Filter Criteria
   TransactionFilterCriteria _filterCriteria = TransactionFilterCriteria();
@@ -84,12 +87,16 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     final emiPlans = await _storage.getCachedEmiPlans();
     final linkedRefs = <String>{};
     final linkedIds = <String>{};
+    final planById = <String, EmiPlan>{};
+    final planByRef = <String, EmiPlan>{};
     for (final p in emiPlans) {
       if (p.linkedTransactionRef != null && p.linkedTransactionRef!.isNotEmpty) {
         linkedRefs.add(p.linkedTransactionRef!);
+        planByRef[p.linkedTransactionRef!] = p;
       }
       if (p.linkedTransactionId != null && p.linkedTransactionId!.isNotEmpty) {
         linkedIds.add(p.linkedTransactionId!);
+        planById[p.linkedTransactionId!] = p;
       }
     }
     if (mounted) {
@@ -98,6 +105,8 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         _liveSummary = live;
         _emiLinkedRefs = linkedRefs;
         _emiLinkedIds = linkedIds;
+        _emiPlanById = planById;
+        _emiPlanByRef = planByRef;
         _isLoading = false;
         // Clean up selected IDs that no longer exist
         _selectedIds.removeWhere((id) => !_transactions.any((t) => t.id == id));
@@ -481,24 +490,104 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             ],
 
             const SizedBox(height: 16),
-            // Convert to Credit Card EMI Button
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF5C38),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            // Convert to Credit Card EMI / EMI Details
+            () {
+              final linkedPlan = _emiPlanById[tx.id] ?? _emiPlanByRef[tx.referenceId];
+              if (linkedPlan != null) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF5C38).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFF5C38).withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.credit_card_rounded, size: 16, color: Color(0xFFFF5C38)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'EMI Plan: ${linkedPlan.title}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFFF5C38)),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF5C38).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              linkedPlan.status,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFFF5C38)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Converted Principal: ₹${IndianCurrency.format(linkedPlan.bookingPrincipal)} (${linkedPlan.tenureMonths} Mo @ ${linkedPlan.annualInterestRate}%)',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      if (linkedPlan.isPartialConversion) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Remaining Immediate Due: ₹${IndianCurrency.format(linkedPlan.nonEmiBalance)}',
+                          style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                        ),
+                      ],
+                      if (linkedPlan.reversalTransactionRef != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Credit Reversal: ${linkedPlan.reversalTransactionRef}',
+                          style: const TextStyle(fontSize: 10.5, color: Color(0xFF00B074), fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFFF5C38),
+                            side: const BorderSide(color: Color(0xFFFF5C38)),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.edit_note_rounded, size: 18),
+                          label: const Text('Edit EMI Plan / Schedule', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            EmiConversionSheet.show(context, existingPlan: linkedPlan);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF5C38),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.credit_card_outlined, size: 20),
+                  label: const Text('Convert to Credit Card EMI',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    EmiConversionSheet.show(context, transaction: tx);
+                  },
                 ),
-                icon: const Icon(Icons.credit_card_outlined, size: 20),
-                label: const Text('Convert to Credit Card EMI',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  EmiConversionSheet.show(context, transaction: tx);
-                },
-              ),
-            ),
+              );
+            }(),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -1260,6 +1349,60 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                                                       fontSize: 9.5,
                                                       fontWeight: FontWeight.bold,
                                                       color: Color(0xFFFF5C38),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                          ],
+                                          // EMI reversal credit indicator
+                                          if (tx.purpose == 'Credit Card EMI Reversal') ...[
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF00B074).withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: const Color(0xFF00B074).withValues(alpha: 0.4), width: 0.8),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.undo_rounded, size: 10, color: Color(0xFF00B074)),
+                                                  SizedBox(width: 3),
+                                                  Text(
+                                                    'EMI Credit',
+                                                    style: TextStyle(
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFF00B074),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                          ],
+                                          // EMI processing fee indicator
+                                          if (tx.purpose == 'Bank Charges / Processing Fee' && tx.narration.toLowerCase().contains('emi')) ...[
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4), width: 0.8),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.receipt_long_rounded, size: 10, color: Color(0xFFD97706)),
+                                                  SizedBox(width: 3),
+                                                  Text(
+                                                    'EMI Fee',
+                                                    style: TextStyle(
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFFD97706),
                                                     ),
                                                   ),
                                                 ],

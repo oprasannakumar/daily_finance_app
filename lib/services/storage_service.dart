@@ -494,10 +494,12 @@ class StorageService {
     final config = await getAccountBalanceConfig();
     final transactions = await getTransactions();
     final categories = await getCategoryAccounts();
+    final emiPlans = await getCachedEmiPlans();
     return LiveAccountBalanceSummary.calculate(
       config: config,
       transactions: transactions,
       categories: categories,
+      emiPlans: emiPlans,
     );
   }
 

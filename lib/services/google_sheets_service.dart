@@ -214,6 +214,8 @@ class GoogleSheetsService {
     'Schedule JSON',
     'Linked Tx ID',
     'Linked Tx Ref',
+    'Reversal Tx Ref',
+    'Fee Tx Ref',
   ];
 
   // Resolved titles and GIDs cached during session
@@ -2537,7 +2539,7 @@ class GoogleSheetsService {
       await _writeHeaderIfEmpty(token, sheetId, _billingTitle, 'A1:G1', requiredBillingHeaders);
       await _writeHeaderIfEmpty(token, sheetId, _balancesTitle, 'A1:J1', requiredBalancesHeaders);
       await _writeHeaderIfEmpty(token, sheetId, _configTitle, 'A1:E1', requiredConfigHeaders);
-      await _writeHeaderIfEmpty(token, sheetId, _emiTitle, 'A1:P1', requiredEmiHeaders);
+      await _writeHeaderIfEmpty(token, sheetId, _emiTitle, 'A1:R1', requiredEmiHeaders);
       _sheetsEnsured = true;
     } catch (e) {
       debugPrint('Error ensuring all sheets and headers: $e');
@@ -2750,7 +2752,7 @@ class GoogleSheetsService {
           await _writeHeaderIfEmpty(token, id, _billingTitle, 'A1:G1', requiredBillingHeaders);
           await _writeHeaderIfEmpty(token, id, _balancesTitle, 'A1:J1', requiredBalancesHeaders);
           await _writeHeaderIfEmpty(token, id, _configTitle, 'A1:E1', requiredConfigHeaders);
-          await _writeHeaderIfEmpty(token, id, _emiTitle, 'A1:P1', requiredEmiHeaders);
+          await _writeHeaderIfEmpty(token, id, _emiTitle, 'A1:R1', requiredEmiHeaders);
           return id;
         }
       } else {
@@ -3819,7 +3821,7 @@ class GoogleSheetsService {
 
     try {
       await _ensureAllSheetsAndHeaders(token, sheetId);
-      final range = Uri.encodeComponent("'$_emiTitle'!A2:P");
+      final range = Uri.encodeComponent("'$_emiTitle'!A2:R");
       final url = Uri.parse('https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/$range');
       final res = await http.get(url, headers: {'Authorization': 'Bearer $token'});
 
@@ -3865,13 +3867,13 @@ class GoogleSheetsService {
       final rows = allPlans.map((p) => p.toSheetRow()).toList();
 
       final clearUrl = Uri.parse(
-        'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:P")}:clear',
+        'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:R")}:clear',
       );
       await http.post(clearUrl, headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'});
 
       if (rows.isNotEmpty) {
         final putUrl = Uri.parse(
-          'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:P${rows.length + 1}")}?valueInputOption=USER_ENTERED',
+          'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:R${rows.length + 1}")}?valueInputOption=USER_ENTERED',
         );
         await http.put(
           putUrl,
@@ -3913,13 +3915,13 @@ class GoogleSheetsService {
       final rows = allPlans.map((p) => p.toSheetRow()).toList();
 
       final clearUrl = Uri.parse(
-        'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:P")}:clear',
+        'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:R")}:clear',
       );
       await http.post(clearUrl, headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'});
 
       if (rows.isNotEmpty) {
         final putUrl = Uri.parse(
-          'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:P${rows.length + 1}")}?valueInputOption=USER_ENTERED',
+          'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:R${rows.length + 1}")}?valueInputOption=USER_ENTERED',
         );
         await http.put(
           putUrl,
@@ -3951,13 +3953,13 @@ class GoogleSheetsService {
       final rows = allPlans.map((p) => p.toSheetRow()).toList();
 
       final clearUrl = Uri.parse(
-        'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:P")}:clear',
+        'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:R")}:clear',
       );
       await http.post(clearUrl, headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'});
 
       if (rows.isNotEmpty) {
         final putUrl = Uri.parse(
-          'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:P${rows.length + 1}")}?valueInputOption=USER_ENTERED',
+          'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:R${rows.length + 1}")}?valueInputOption=USER_ENTERED',
         );
         await http.put(
           putUrl,

@@ -5,6 +5,7 @@ import '../models/account_balance_model.dart';
 import '../models/transaction_model.dart';
 import '../services/storage_service.dart';
 import '../utils/currency_formatter.dart';
+import 'emi_manager_screen.dart';
 import 'financial_health_dashboard_screen.dart';
 
 class AccountBalancesScreen extends StatefulWidget {
@@ -47,11 +48,19 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+    _storage.emiPlansNotifier.addListener(_onEmiPlansChanged);
     _loadInitialData();
+  }
+
+  void _onEmiPlansChanged() {
+    if (mounted) {
+      _loadInitialData();
+    }
   }
 
   @override
   void dispose() {
+    _storage.emiPlansNotifier.removeListener(_onEmiPlansChanged);
     _tabController.dispose();
     for (final c in _bankControllers.values) {
       c.dispose();
@@ -1121,6 +1130,36 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                     ),
                   ],
                 ),
+                if ((_liveSummary?.totalUnbilledEmiPrincipal ?? 0.0) > 0) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF5C38).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFF5C38).withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.pie_chart_outline_rounded, size: 15, color: Color(0xFFFF5C38)),
+                            SizedBox(width: 7),
+                            Text(
+                              'Unbilled Active EMIs',
+                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFFFF5C38)),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '₹${IndianCurrency.format(_liveSummary!.totalUnbilledEmiPrincipal)}',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFFFF5C38)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1423,6 +1462,84 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                                     style: TextStyle(fontSize: 11, color: textSecondary),
                                   ),
                                 ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    // Active EMIs Info Banner on Individual Card
+                    if (liveSummary != null && liveSummary.unbilledEmiPrincipal > 0) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF5C38).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFFFF5C38).withValues(alpha: 0.3),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFF5C38).withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.pie_chart_rounded, size: 14, color: Color(0xFFFF5C38)),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'ACTIVE EMIs (${liveSummary.activeEmiPlansCount})',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFFFF5C38),
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        'Unbilled: ₹${IndianCurrency.format(liveSummary.unbilledEmiPrincipal)}',
+                                        style: const TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFFF5C38),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (liveSummary.nextEmiDueDate != null && liveSummary.nextEmiAmount != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Next EMI: ₹${IndianCurrency.format(liveSummary.nextEmiAmount!)} due ${DateFormat('dd MMM').format(liveSummary.nextEmiDueDate!)}',
+                                      style: TextStyle(fontSize: 11, color: textSecondary),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const EmiManagerScreen()),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(6),
+                              child: const Padding(
+                                padding: EdgeInsets.all(4),
+                                child: Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFFF5C38)),
                               ),
                             ),
                           ],

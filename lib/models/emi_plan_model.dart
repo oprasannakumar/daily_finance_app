@@ -110,6 +110,8 @@ class EmiPlan {
   final String? notes;
   final String? linkedTransactionId;
   final String? linkedTransactionRef;
+  final String? reversalTransactionRef;
+  final String? feeTransactionRef;
 
   EmiPlan({
     required this.id,
@@ -128,6 +130,8 @@ class EmiPlan {
     this.notes,
     this.linkedTransactionId,
     this.linkedTransactionRef,
+    this.reversalTransactionRef,
+    this.feeTransactionRef,
   });
 
   /// The non-converted swipe amount that remains on the regular credit card statement.
@@ -248,6 +252,8 @@ class EmiPlan {
     String? notes,
     String? linkedTransactionId,
     String? linkedTransactionRef,
+    String? reversalTransactionRef,
+    String? feeTransactionRef,
   }) {
     return EmiPlan(
       id: id ?? this.id,
@@ -266,6 +272,8 @@ class EmiPlan {
       notes: notes ?? this.notes,
       linkedTransactionId: linkedTransactionId ?? this.linkedTransactionId,
       linkedTransactionRef: linkedTransactionRef ?? this.linkedTransactionRef,
+      reversalTransactionRef: reversalTransactionRef ?? this.reversalTransactionRef,
+      feeTransactionRef: feeTransactionRef ?? this.feeTransactionRef,
     );
   }
 
@@ -285,6 +293,8 @@ class EmiPlan {
         'notes': notes,
         'linkedTransactionId': linkedTransactionId,
         'linkedTransactionRef': linkedTransactionRef,
+        'reversalTransactionRef': reversalTransactionRef,
+        'feeTransactionRef': feeTransactionRef,
         'installments': installments.map((it) => it.toJson()).toList(),
       };
 
@@ -320,6 +330,8 @@ class EmiPlan {
       notes: json['notes'] as String?,
       linkedTransactionId: json['linkedTransactionId'] as String?,
       linkedTransactionRef: json['linkedTransactionRef'] as String?,
+      reversalTransactionRef: json['reversalTransactionRef'] as String?,
+      feeTransactionRef: json['feeTransactionRef'] as String?,
     );
   }
 
@@ -341,6 +353,8 @@ class EmiPlan {
       jsonEncode(installments.map((it) => it.toJson()).toList()),
       linkedTransactionId ?? '',
       linkedTransactionRef ?? '',
+      reversalTransactionRef ?? '',
+      feeTransactionRef ?? '',
     ];
   }
 
@@ -412,6 +426,8 @@ class EmiPlan {
 
     final linkedTxId = row.length > 14 ? getString(14) : null;
     final linkedTxRef = row.length > 15 ? getString(15) : null;
+    final reversalTxRef = row.length > 16 ? getString(16) : null;
+    final feeTxRef = row.length > 17 ? getString(17) : null;
 
     if (installments.isEmpty) {
       installments = calculateSchedule(
@@ -439,6 +455,8 @@ class EmiPlan {
       notes: notes.isNotEmpty ? notes : null,
       linkedTransactionId: linkedTxId?.isNotEmpty == true ? linkedTxId : null,
       linkedTransactionRef: linkedTxRef?.isNotEmpty == true ? linkedTxRef : null,
+      reversalTransactionRef: reversalTxRef?.isNotEmpty == true ? reversalTxRef : null,
+      feeTransactionRef: feeTxRef?.isNotEmpty == true ? feeTxRef : null,
     );
   }
 }
