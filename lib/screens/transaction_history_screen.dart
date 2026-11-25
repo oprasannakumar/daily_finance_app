@@ -9,15 +9,19 @@ import '../utils/currency_formatter.dart';
 import '../widgets/faceted_filter_sheet.dart';
 import '../widgets/statement_export_dialog.dart';
 import '../widgets/emi_conversion_sheet.dart';
+import 'borrowers_ledger_screen.dart';
+import 'emi_manager_screen.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   final Listenable? refreshListenable;
   final String? initialSearchQuery;
+  final String? initialAccountFilter;
 
   const TransactionHistoryScreen({
     super.key,
     this.refreshListenable,
     this.initialSearchQuery,
+    this.initialAccountFilter,
   });
 
   @override
@@ -61,6 +65,10 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       _searchController.text = initialQuery;
       _filterCriteria.narrationQuery = initialQuery;
     }
+    final initialAccount = widget.initialAccountFilter?.trim();
+    if (initialAccount != null && initialAccount.isNotEmpty) {
+      _filterCriteria.selectedAccounts.add(initialAccount);
+    }
     widget.refreshListenable?.addListener(_onRefreshNotified);
     StorageService.instance.transactionsNotifier.addListener(_loadTransactions);
     StorageService.instance.balanceConfigNotifier.addListener(_loadTransactions);
@@ -89,6 +97,27 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
   void _onRefreshNotified() {
     _loadTransactions();
+  }
+
+  void _openEmiPlan(FinanceTransaction tx) {
+    HapticFeedback.selectionClick();
+    final plan = _emiPlanById[tx.id] ?? _emiPlanByRef[tx.referenceId];
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        settings: const RouteSettings(name: 'EMIs'),
+        builder: (_) => EmiManagerScreen(initialPlanId: plan?.id),
+      ),
+    );
+  }
+
+  void _openBorrowerLedger(String borrowerName) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        settings: const RouteSettings(name: 'Borrowers'),
+        builder: (_) => BorrowersLedgerScreen(initialBorrowerName: borrowerName),
+      ),
+    );
   }
 
   Future<void> _loadTransactions({bool forceRefresh = false}) async {
@@ -1356,27 +1385,31 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                                           const SizedBox(width: 6),
                                           // EMI converted indicator
                                           if (_emiLinkedIds.contains(tx.id) || _emiLinkedRefs.contains(tx.referenceId)) ...[
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFFF5C38).withValues(alpha: 0.12),
-                                                borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(color: const Color(0xFFFF5C38).withValues(alpha: 0.4), width: 0.8),
-                                              ),
-                                              child: const Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(Icons.credit_card, size: 10, color: Color(0xFFFF5C38)),
-                                                  SizedBox(width: 3),
-                                                  Text(
-                                                    'EMI',
-                                                    style: TextStyle(
-                                                      fontSize: 9.5,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Color(0xFFFF5C38),
+                                            InkWell(
+                                              onTap: () => _openEmiPlan(tx),
+                                              borderRadius: BorderRadius.circular(6),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFF5C38).withValues(alpha: 0.12),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: const Color(0xFFFF5C38).withValues(alpha: 0.4), width: 0.8),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.credit_card, size: 10, color: Color(0xFFFF5C38)),
+                                                    SizedBox(width: 3),
+                                                    Text(
+                                                      'EMI',
+                                                      style: TextStyle(
+                                                        fontSize: 9.5,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Color(0xFFFF5C38),
+                                                      ),
                                                     ),
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
                                             ),
                                             const SizedBox(width: 4),
@@ -1575,7 +1608,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                                                     spacing: 4,
                                                     runSpacing: 2,
                                                     children: visibleRecipients.map((r) {
-                                                      return Container(
+                                                      final chip = Container(
                                                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                                                         decoration: BoxDecoration(
                                                           color: r.isPersonal
@@ -1597,6 +1630,12 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                                                             color: r.isPersonal ? const Color(0xFF475569) : const Color(0xFF0F766E),
                                                           ),
                                                         ),
+                                                      );
+                                                      if (r.isPersonal) return chip;
+                                                      return InkWell(
+                                                        onTap: () => _openBorrowerLedger(r.name),
+                                                        borderRadius: BorderRadius.circular(4),
+                                                        child: chip,
                                                       );
                                                     }).toList(),
                                                   ),

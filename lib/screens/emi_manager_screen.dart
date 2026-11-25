@@ -9,7 +9,9 @@ import '../widgets/emi_conversion_sheet.dart';
 import 'transaction_history_screen.dart';
 
 class EmiManagerScreen extends StatefulWidget {
-  const EmiManagerScreen({super.key});
+  final String? initialPlanId;
+
+  const EmiManagerScreen({super.key, this.initialPlanId});
 
   @override
   State<EmiManagerScreen> createState() => _EmiManagerScreenState();
@@ -457,6 +459,7 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
+          initiallyExpanded: widget.initialPlanId == plan.id,
           tilePadding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
           childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
           showTrailingIcon: false,

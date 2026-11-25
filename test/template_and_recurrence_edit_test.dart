@@ -36,7 +36,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Open Quick-Switch -> Masters -> Templates
-    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
+    await tester.tap(find.byKey(const Key('quick_switch_trackball')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Masters'));
     await tester.pumpAndSettle();
@@ -98,7 +98,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Open Quick-Switch -> Masters -> Templates
-    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
+    await tester.tap(find.byKey(const Key('quick_switch_trackball')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Masters'));
     await tester.pumpAndSettle();
@@ -221,7 +221,7 @@ void main() {
     expect(find.text('2'), findsNothing);
 
     // Open Quick-Switch -> Masters -> Recurring to verify both exist in Manage Masters
-    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
+    await tester.tap(find.byKey(const Key('quick_switch_trackball')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Masters'));
     await tester.pumpAndSettle();
@@ -272,7 +272,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 1. Open Quick-Switch -> Masters -> Recurring
-    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
+    await tester.tap(find.byKey(const Key('quick_switch_trackball')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Masters'));
     await tester.pumpAndSettle();
@@ -303,7 +303,7 @@ void main() {
     expect(txs.any((t) => t.narration == 'WiFi Fiber Internet'), isTrue);
 
     // 3. Open Quick-Switch -> Masters -> Recurring again
-    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
+    await tester.tap(find.byKey(const Key('quick_switch_trackball')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Masters'));
     await tester.pumpAndSettle();

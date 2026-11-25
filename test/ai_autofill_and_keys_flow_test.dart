@@ -18,8 +18,8 @@ void main() {
     await tester.pumpWidget(const DailyFinanceApp());
     await tester.pumpAndSettle();
 
-    // Tap bottom Quick-Switch pill
-    final menuBtn = find.byIcon(Icons.keyboard_arrow_up_rounded);
+    // Tap movable Quick-Switch trackball
+    final menuBtn = find.byKey(const Key('quick_switch_trackball'));
     expect(menuBtn, findsOneWidget);
     await tester.tap(menuBtn);
     await tester.pumpAndSettle();

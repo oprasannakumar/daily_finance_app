@@ -1,14 +1,25 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/quick_actions_service.dart';
 import '../services/quick_nav_controller.dart';
 
-/// Universal bottom floating pill and swipe-up Quick-Switch sheet rendered
-/// above the Navigator so any screen is 1 gesture away.
-class QuickSwitchOverlay extends StatelessWidget {
+/// Universal movable floating trackball and Quick-Switch sheet rendered
+/// above the Navigator so any screen is 1 tap away from anywhere.
+class QuickSwitchOverlay extends StatefulWidget {
   final Widget child;
 
   const QuickSwitchOverlay({super.key, required this.child});
+
+  @override
+  State<QuickSwitchOverlay> createState() => _QuickSwitchOverlayState();
+}
+
+class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
+  static const String _prefKeyX = 'quick_switch_trackball_x';
+  static const String _prefKeyY = 'quick_switch_trackball_y';
+  static const double _ballSize = 46.0;
 
   static const List<List<Map<String, String>>> _menuRows = [
     [
@@ -28,6 +39,47 @@ class QuickSwitchOverlay extends StatelessWidget {
       {'emoji': '🧾', 'label': 'Invoices'},
     ],
   ];
+
+  Offset? _position;
+  bool _isDragging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedPosition();
+  }
+
+  Future<void> _loadSavedPosition() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final x = prefs.getDouble(_prefKeyX);
+      final y = prefs.getDouble(_prefKeyY);
+      if (x != null && y != null && mounted) {
+        setState(() {
+          _position = Offset(x, y);
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _savePosition(Offset pos) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_prefKeyX, pos.dx);
+      await prefs.setDouble(_prefKeyY, pos.dy);
+    } catch (_) {}
+  }
+
+  Offset _clampPosition(Offset raw, Size screenSize, EdgeInsets padding) {
+    final minX = 8.0;
+    final maxX = (screenSize.width - _ballSize - 8.0).clamp(minX, double.infinity);
+    final minY = padding.top + 8.0;
+    final maxY = (screenSize.height - padding.bottom - _ballSize - 8.0).clamp(minY, double.infinity);
+    return Offset(
+      raw.dx.clamp(minX, maxX),
+      raw.dy.clamp(minY, maxY),
+    );
+  }
 
   void _openQuickSwitchSheet() {
     final navContext = QuickActionsService.instance.navigatorKey.currentContext;
@@ -205,7 +257,8 @@ class QuickSwitchOverlay extends StatelessWidget {
               ],
               const SizedBox(height: 10),
               Text(
-                'Tip: Flick the bottom pill left or right to cycle screens',
+                'Tip: Drag trackball anywhere • Long-press to jump Entry ↔ History',
+                textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11, color: textSecondary),
               ),
             ],
@@ -218,12 +271,20 @@ class QuickSwitchOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = QuickNavController.instance;
-    final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final mq = MediaQuery.of(context);
+    final keyboardVisible = mq.viewInsets.bottom > 0;
+    final screenSize = mq.size;
+    final padding = mq.padding;
+
+    final defaultPos = Offset(
+      screenSize.width - _ballSize - 14.0,
+      screenSize.height - padding.bottom - _ballSize - 70.0,
+    );
+    final effectivePos = _clampPosition(_position ?? defaultPos, screenSize, padding);
 
     return Stack(
       children: [
-        child,
+        widget.child,
         ListenableBuilder(
           listenable: controller,
           builder: (context, _) {
@@ -234,71 +295,91 @@ class QuickSwitchOverlay extends StatelessWidget {
             }
 
             final isDark = Theme.of(context).brightness == Brightness.dark;
-            final pillBg = isDark
-                ? const Color(0xFF1B2042).withValues(alpha: 0.94)
-                : Colors.white.withValues(alpha: 0.94);
-            final borderColor = isDark ? const Color(0xFF36417A) : const Color(0xFFE2E8F0);
-            final textColor = isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B);
-            final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+            final accent = isDark ? const Color(0xFFA78BFA) : const Color(0xFFFF5C38);
+            final outerBg = isDark
+                ? const Color(0xFF151932).withValues(alpha: 0.90)
+                : Colors.white.withValues(alpha: 0.92);
+            final innerBg = isDark
+                ? const Color(0xFF232A54)
+                : const Color(0xFFFFF3EE);
+            final borderColor = _isDragging
+                ? accent
+                : (isDark ? const Color(0xFF3E498A) : const Color(0xFFE2E8F0));
             final current = controller.currentScreen;
             final emoji = QuickNavController.routeEmojis[current] ?? '✨';
 
             return Positioned(
-              left: 0,
-              right: 0,
-              bottom: bottomPadding + 6,
-              child: Center(
-                child: Material(
-                  color: Colors.transparent,
-                  child: GestureDetector(
-                    onTap: _openQuickSwitchSheet,
-                    onVerticalDragEnd: (details) {
-                      if ((details.primaryVelocity ?? 0) < -120) {
-                        _openQuickSwitchSheet();
-                      }
-                    },
-                    onHorizontalDragEnd: (details) {
-                      final v = details.primaryVelocity ?? 0;
-                      if (v < -180) {
-                        controller.cycleScreen(1);
-                      } else if (v > 180) {
-                        controller.cycleScreen(-1);
-                      }
-                    },
+              left: effectivePos.dx,
+              top: effectivePos.dy,
+              child: Material(
+                color: Colors.transparent,
+                child: GestureDetector(
+                  key: const Key('quick_switch_trackball'),
+                  onTap: _openQuickSwitchSheet,
+                  onLongPress: () {
+                    HapticFeedback.mediumImpact();
+                    if (controller.currentScreen == 'Entry') {
+                      controller.navigateTo('History');
+                    } else {
+                      controller.navigateTo('Entry');
+                    }
+                  },
+                  onPanStart: (_) {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      _isDragging = true;
+                      _position ??= effectivePos;
+                    });
+                  },
+                  onPanUpdate: (details) {
+                    setState(() {
+                      final next = (_position ?? effectivePos) + details.delta;
+                      _position = _clampPosition(next, screenSize, padding);
+                    });
+                  },
+                  onPanEnd: (_) {
+                    setState(() => _isDragging = false);
+                    if (_position != null) {
+                      unawaited(_savePosition(_position!));
+                    }
+                  },
+                  child: AnimatedScale(
+                    scale: _isDragging ? 1.12 : 1.0,
+                    duration: const Duration(milliseconds: 120),
                     child: Container(
-                      height: 30,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      width: _ballSize,
+                      height: _ballSize,
                       decoration: BoxDecoration(
-                        color: pillBg,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: borderColor, width: 1.1),
+                        color: outerBg,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: borderColor,
+                          width: _isDragging ? 2.0 : 1.3,
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
-                            blurRadius: 12,
-                            offset: const Offset(0, 3),
+                            color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.16),
+                            blurRadius: _isDragging ? 16 : 10,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.chevron_left_rounded, size: 15, color: mutedColor),
-                          const SizedBox(width: 4),
-                          Text(emoji, style: const TextStyle(fontSize: 12)),
-                          const SizedBox(width: 5),
-                          Text(
-                            current,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: textColor,
+                      child: Center(
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: innerBg,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: accent.withValues(alpha: 0.45),
+                              width: 1.0,
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          Icon(Icons.keyboard_arrow_up_rounded, size: 15, color: mutedColor),
-                          Icon(Icons.chevron_right_rounded, size: 15, color: mutedColor),
-                        ],
+                          child: Center(
+                            child: Text(emoji, style: const TextStyle(fontSize: 14)),
+                          ),
+                        ),
                       ),
                     ),
                   ),

@@ -9,7 +9,9 @@ import '../widgets/transaction_details_dialog.dart';
 import '../widgets/borrower_export_dialog.dart';
 
 class BorrowersLedgerScreen extends StatefulWidget {
-  const BorrowersLedgerScreen({super.key});
+  final String? initialBorrowerName;
+
+  const BorrowersLedgerScreen({super.key, this.initialBorrowerName});
 
   @override
   State<BorrowersLedgerScreen> createState() => _BorrowersLedgerScreenState();
@@ -32,6 +34,11 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
   @override
   void initState() {
     super.initState();
+    final initial = widget.initialBorrowerName?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      _searchQuery = initial;
+      _searchCtrl.text = initial;
+    }
     final warm = StorageService.instance.cachedLoanEntriesSync;
     if (warm != null && warm.isNotEmpty) {
       _entries = warm;

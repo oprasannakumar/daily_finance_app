@@ -7,6 +7,7 @@ import '../services/storage_service.dart';
 import '../utils/currency_formatter.dart';
 import 'emi_manager_screen.dart';
 import 'financial_health_dashboard_screen.dart';
+import 'transaction_history_screen.dart';
 
 class AccountBalancesScreen extends StatefulWidget {
   final bool isInitialSetup;
@@ -601,6 +602,16 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
   // ==========================================
   // TAB 1: BANK ACCOUNTS - VIEW MODE
   // ==========================================
+  void _openAccountHistory(String accountName) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        settings: const RouteSettings(name: 'History'),
+        builder: (_) => TransactionHistoryScreen(initialAccountFilter: accountName),
+      ),
+    );
+  }
+
   Widget _buildBankViewTab(Color cardBg, Color textPrimary, Color textSecondary, Color borderColor, bool isDark, Color primaryColor) {
     final bankList = _bankControllers.keys.toList();
 
@@ -750,7 +761,9 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
               final openingBal = _config.bankOpeningBalances[acc] ?? 0.0;
               final diff = liveBal - openingBal;
 
-              return Container(
+              return GestureDetector(
+                onTap: () => _openAccountHistory(acc),
+                child: Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -846,6 +859,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                       onPressed: () => _removeAccountDialog('Bank Accounts', acc),
                     ),
                   ],
+                ),
                 ),
               );
             }),
@@ -1230,7 +1244,9 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
               final nextDue = liveSummary?.nextDueDate;
               final dueBill = liveSummary?.dueBill;
 
-              return Container(
+              return GestureDetector(
+                onTap: () => _openAccountHistory(card),
+                child: Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -1548,6 +1564,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                       ),
                     ],
                   ],
+                ),
                 ),
               );
             }),
@@ -2363,7 +2380,9 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
               final openingBal = _config.walletOpeningBalances[acc] ?? 0.0;
               final diff = liveBal - openingBal;
 
-              return Container(
+              return GestureDetector(
+                onTap: () => _openAccountHistory(acc),
+                child: Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -2459,6 +2478,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                       onPressed: () => _removeAccountDialog('Wallets', acc),
                     ),
                   ],
+                ),
                 ),
               );
             }),
@@ -2736,7 +2756,9 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
               final openingBal = _config.rewardOpeningBalances[acc] ?? 0.0;
               final diff = liveBal - openingBal;
 
-              return Container(
+              return GestureDetector(
+                onTap: () => _openAccountHistory(acc),
+                child: Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -2832,6 +2854,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                       onPressed: () => _removeAccountDialog('Rewards', acc),
                     ),
                   ],
+                ),
                 ),
               );
             }),
