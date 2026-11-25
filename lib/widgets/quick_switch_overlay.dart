@@ -33,7 +33,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   static const List<Map<String, String>> _radialItems = [
     {'emoji': '📊', 'label': 'Dashboard'},
     {'emoji': '🔑', 'label': 'API Keys'},
-    {'emoji': '📜', 'label': 'History'},
     {'emoji': '🤝', 'label': 'Borrowers'},
     {'emoji': '💳', 'label': 'EMIs'},
     {'emoji': '⚙️', 'label': 'Masters'},
