@@ -1,8 +1,8 @@
 # 🧾 Smart Ledger & Daily Finance App
 
-[![Download APK](https://img.shields.io/badge/Download-Release%20APK%20(v1.0.0)-FF5C38?style=for-the-badge&logo=android)](https://github.com/oprasannakumar/daily_finance_app/releases/download/v1.0.0/SmartLedger-v1.0.0.apk)
+[![Download APK](https://img.shields.io/badge/Download-Latest%20Release%20APK-FF5C38?style=for-the-badge&logo=android)](https://github.com/oprasannakumar/daily_finance_app/releases/latest/download/SmartLedger-Release.apk)
 [![Latest Release](https://img.shields.io/github/v/release/oprasannakumar/daily_finance_app?style=for-the-badge&color=00D2B4)](https://github.com/oprasannakumar/daily_finance_app/releases/latest)
-[![Flutter](https://img.shields.io/badge/Flutter-3.29.0-02569B?style=for-the-badge&logo=flutter)](https://flutter.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-3.47.7-02569B?style=for-the-badge&logo=flutter)](https://flutter.dev)
 [![Google Sheets API](https://img.shields.io/badge/Google%20Sheets-API%20v4-34A853?style=for-the-badge&logo=googlesheets)](https://developers.google.com/sheets/api)
 [![Gemini Vision AI](https://img.shields.io/badge/Gemini%20AI-Vision%20OCR-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
@@ -15,7 +15,7 @@ An intelligent, privacy-first personal finance tracking, debt ledger, and invoic
 
 You can download and install the pre-compiled Android release APK directly without cloning the code:
 
-👉 **[Download SmartLedger-v1.0.0.apk](https://github.com/oprasannakumar/daily_finance_app/releases/download/v1.0.0/SmartLedger-v1.0.0.apk)**
+👉 **[Download SmartLedger-Release.apk (Latest)](https://github.com/oprasannakumar/daily_finance_app/releases/latest/download/SmartLedger-Release.apk)**
 
 *(You can also find all versions under the [GitHub Releases](https://github.com/oprasannakumar/daily_finance_app/releases) tab).*
 

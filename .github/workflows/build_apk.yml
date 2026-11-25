@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -38,3 +41,15 @@ jobs:
         with:
           name: SmartLedger-Release-APK
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | tr '+' '-')
+          TAG="v${VERSION}"
+          cp build/app/outputs/flutter-apk/app-release.apk SmartLedger-Release.apk
+          gh release create "$TAG" SmartLedger-Release.apk \
+            --title "Smart Ledger $TAG" \
+            --notes "Automated release build for commit ${{ github.sha }}" \
+            --latest || gh release upload "$TAG" SmartLedger-Release.apk --clobber
