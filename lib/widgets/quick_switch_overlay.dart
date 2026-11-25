@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,7 +6,8 @@ import '../services/quick_actions_service.dart';
 import '../services/quick_nav_controller.dart';
 
 /// Universal movable translucent trackball with:
-/// - Hold & swipe radial gesture selector (8 screens around the ball)
+/// - Tap to open a compact floating Quick-Jump menu anchored right next to the ball
+/// - Long-press (or Settings button in menu) to open Trackball Settings
 /// - Configurable Single-Tap, Double-Tap, Auto-Hide, and Transparency
 /// - 5-second Screenshot Hide mode
 class QuickSwitchOverlay extends StatefulWidget {
@@ -28,9 +28,10 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   static const String _prefKeyDoubleTap = 'quick_switch_trackball_double_tap';
 
   static const double _ballSize = 46.0;
-  static const double _radialRadius = 66.0;
+  static const double _menuWidth = 228.0;
+  static const double _menuHeight = 232.0;
 
-  static const List<Map<String, String>> _radialItems = [
+  static const List<Map<String, String>> _menuItems = [
     {'emoji': '📊', 'label': 'Dashboard'},
     {'emoji': '🔑', 'label': 'API Keys'},
     {'emoji': '🤝', 'label': 'Borrowers'},
@@ -38,9 +39,11 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
     {'emoji': '⚙️', 'label': 'Masters'},
     {'emoji': '💰', 'label': 'Balances'},
     {'emoji': '🧾', 'label': 'Invoices'},
+    {'emoji': '🔄', 'label': 'Entry ↔ History'},
   ];
 
   static const List<String> _actionOptions = [
+    'Quick Menu',
     'Trackball Settings',
     'Entry ↔ History',
     'Entry',
@@ -57,11 +60,12 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
 
   Offset? _position;
   bool _isDragging = false;
+  bool _isMenuOpen = false;
 
   // Customization state
   double _opacity = 0.40;
   bool _autoHide = false;
-  String _singleTapAction = 'Trackball Settings';
+  String _singleTapAction = 'Quick Menu';
   String _doubleTapAction = 'None';
 
   // Auto-hide & screenshot hide timers
@@ -69,15 +73,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   Timer? _idleTimer;
   bool _hiddenForScreenshot = false;
   Timer? _screenshotHideTimer;
-
-  // Radial gesture & pointer state
-  bool _isRadialOpen = false;
-  Offset _radialOrigin = Offset.zero;
-  int? _selectedRadialIndex;
-  Timer? _holdTimer;
-  Offset? _pointerDownPos;
-  Offset? _lastPointerPos;
-  int? _activePointerId;
 
   @override
   void initState() {
@@ -89,7 +84,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   void dispose() {
     _idleTimer?.cancel();
     _screenshotHideTimer?.cancel();
-    _holdTimer?.cancel();
     super.dispose();
   }
 
@@ -144,7 +138,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
     }
     if (_autoHide) {
       _idleTimer = Timer(const Duration(seconds: 3), () {
-        if (mounted && _autoHide && !_isDragging && !_isRadialOpen) {
+        if (mounted && _autoHide && !_isDragging && !_isMenuOpen) {
           setState(() => _isIdleFaded = true);
         }
       });
@@ -153,7 +147,10 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
 
   void _hideTemporarilyForScreenshot() {
     _screenshotHideTimer?.cancel();
-    setState(() => _hiddenForScreenshot = true);
+    setState(() {
+      _isMenuOpen = false;
+      _hiddenForScreenshot = true;
+    });
     _screenshotHideTimer = Timer(const Duration(seconds: 5), () {
       if (mounted) {
         setState(() => _hiddenForScreenshot = false);
@@ -173,17 +170,42 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
     );
   }
 
+  Offset _computeMenuOrigin(Offset ballTopLeft, Size screenSize, EdgeInsets padding) {
+    final ballCenterX = ballTopLeft.dx + _ballSize / 2;
+    final rawLeft = ballCenterX >= screenSize.width / 2
+        ? ballTopLeft.dx + _ballSize - _menuWidth
+        : ballTopLeft.dx;
+    final maxLeft = (screenSize.width - _menuWidth - 12.0).clamp(12.0, double.infinity);
+    final left = rawLeft.clamp(12.0, maxLeft);
+
+    final minTop = padding.top + 12.0;
+    final maxTop = (screenSize.height - padding.bottom - _menuHeight - 12.0)
+        .clamp(minTop, double.infinity);
+    final aboveTop = ballTopLeft.dy - _menuHeight - 10.0;
+    final top = aboveTop >= minTop
+        ? aboveTop
+        : (ballTopLeft.dy + _ballSize + 10.0).clamp(minTop, maxTop);
+
+    return Offset(left, top);
+  }
+
   void _executeAction(String action) {
     _resetIdleTimer();
     final controller = QuickNavController.instance;
     switch (action) {
       case 'None':
         return;
+      case 'Quick Menu':
+        HapticFeedback.selectionClick();
+        setState(() => _isMenuOpen = !_isMenuOpen);
+        return;
       case 'Trackball Settings':
+        setState(() => _isMenuOpen = false);
         _openCustomizeSheet();
         return;
       case 'Entry ↔ History':
         HapticFeedback.selectionClick();
+        setState(() => _isMenuOpen = false);
         if (controller.currentScreen == 'Entry') {
           controller.navigateTo('History');
         } else {
@@ -191,94 +213,9 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
         }
         return;
       default:
+        setState(() => _isMenuOpen = false);
         controller.navigateTo(action);
         return;
-    }
-  }
-
-  List<Offset> _computeRadialPositions(Offset ballCenter, Size screenSize, EdgeInsets padding) {
-    const double safeMargin = 10.0;
-    const double iconHalf = 22.0; // half of selected 44px orb
-    final double minX = safeMargin + iconHalf;
-    final double maxX = (screenSize.width - safeMargin - iconHalf).clamp(minX, double.infinity);
-    final double minY = padding.top + safeMargin + iconHalf;
-    final double maxY = (screenSize.height - padding.bottom - safeMargin - iconHalf).clamp(minY, double.infinity);
-
-    final bool fitsLeft = ballCenter.dx - _radialRadius >= minX;
-    final bool fitsRight = ballCenter.dx + _radialRadius <= maxX;
-    final bool fitsTop = ballCenter.dy - _radialRadius >= minY;
-    final bool fitsBottom = ballCenter.dy + _radialRadius <= maxY;
-
-    final int count = _radialItems.length;
-    final List<Offset> positions = [];
-
-    if (fitsLeft && fitsRight && fitsTop && fitsBottom) {
-      // Full 360° ring around the ball
-      for (int i = 0; i < count; i++) {
-        final angle = -math.pi / 2 + (i * 2 * math.pi / count);
-        positions.add(Offset(
-          (ballCenter.dx + _radialRadius * math.cos(angle)).clamp(minX, maxX),
-          (ballCenter.dy + _radialRadius * math.sin(angle)).clamp(minY, maxY),
-        ));
-      }
-      return positions;
-    }
-
-    // Edge or corner: use double-layer concentric arcs (3 inner + 4 outer) on the open side
-    final double dx = !fitsRight ? -1.0 : (!fitsLeft ? 1.0 : 0.0);
-    final double dy = !fitsBottom ? -1.0 : (!fitsTop ? 1.0 : 0.0);
-    final double centerAngle = math.atan2(dy, dx);
-    final bool isCorner = dx != 0.0 && dy != 0.0;
-
-    final int innerCount = count ~/ 2; // 3
-    final int outerCount = count - innerCount; // 4
-    const double innerRadius = 56.0;
-    const double outerRadius = 102.0;
-    final double innerSpan = isCorner ? math.pi * 0.48 : math.pi * 0.72;
-    final double outerSpan = isCorner ? math.pi * 0.56 : math.pi * 0.84;
-
-    for (int i = 0; i < innerCount; i++) {
-      final t = innerCount > 1 ? i / (innerCount - 1) : 0.5;
-      final angle = (centerAngle - innerSpan / 2) + t * innerSpan;
-      positions.add(Offset(
-        (ballCenter.dx + innerRadius * math.cos(angle)).clamp(minX, maxX),
-        (ballCenter.dy + innerRadius * math.sin(angle)).clamp(minY, maxY),
-      ));
-    }
-    for (int i = 0; i < outerCount; i++) {
-      final t = outerCount > 1 ? i / (outerCount - 1) : 0.5;
-      final angle = (centerAngle - outerSpan / 2) + t * outerSpan;
-      positions.add(Offset(
-        (ballCenter.dx + outerRadius * math.cos(angle)).clamp(minX, maxX),
-        (ballCenter.dy + outerRadius * math.sin(angle)).clamp(minY, maxY),
-      ));
-    }
-
-    return positions;
-  }
-
-  void _updateRadialSelection(Offset fingerPos, Size screenSize, EdgeInsets padding) {
-    if ((fingerPos - _radialOrigin).distance < 20.0) {
-      if (_selectedRadialIndex != null) {
-        setState(() => _selectedRadialIndex = null);
-      }
-      return;
-    }
-
-    final positions = _computeRadialPositions(_radialOrigin, screenSize, padding);
-    int bestIndex = 0;
-    double bestDist = double.infinity;
-    for (int i = 0; i < positions.length; i++) {
-      final d = (fingerPos - positions[i]).distance;
-      if (d < bestDist) {
-        bestDist = d;
-        bestIndex = i;
-      }
-    }
-
-    if (_selectedRadialIndex != bestIndex) {
-      HapticFeedback.selectionClick();
-      setState(() => _selectedRadialIndex = bestIndex);
     }
   }
 
@@ -527,6 +464,176 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
     });
   }
 
+  Widget _buildFloatingMenu(
+    BuildContext context,
+    QuickNavController controller,
+    Offset menuOrigin,
+    bool isDark,
+    Color accent,
+  ) {
+    final cardBg = isDark ? const Color(0xFF151932) : Colors.white;
+    final tileBg = isDark ? const Color(0xFF1E2448) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? const Color(0xFF2E376E) : const Color(0xFFE2E8F0);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return Positioned(
+      left: menuOrigin.dx,
+      top: menuOrigin.dy,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.92, end: 1.0),
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        builder: (context, scale, child) {
+          return Transform.scale(
+            scale: scale,
+            child: Opacity(
+              opacity: ((scale - 0.92) / 0.08).clamp(0.0, 1.0),
+              child: child,
+            ),
+          );
+        },
+        child: Material(
+          key: const Key('quick_switch_floating_menu'),
+          type: MaterialType.transparency,
+          child: Container(
+            width: _menuWidth,
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            decoration: BoxDecoration(
+              color: cardBg.withValues(alpha: 0.97),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: borderColor, width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.18),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Quick Jump',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: textSecondary,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: _hideTemporarilyForScreenshot,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.visibility_off_outlined,
+                          size: 16,
+                          color: textSecondary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    InkWell(
+                      key: const Key('quick_switch_menu_settings_btn'),
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        setState(() => _isMenuOpen = false);
+                        _openCustomizeSheet();
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.tune_rounded,
+                          size: 16,
+                          color: accent,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                for (int row = 0; row < (_menuItems.length / 2).ceil(); row++) ...[
+                  if (row > 0) const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      for (int col = 0; col < 2; col++) ...[
+                        if (col > 0) const SizedBox(width: 6),
+                        Expanded(
+                          child: () {
+                            final idx = row * 2 + col;
+                            if (idx >= _menuItems.length) {
+                              return const SizedBox.shrink();
+                            }
+                            final item = _menuItems[idx];
+                            final label = item['label']!;
+                            final isActive = controller.currentScreen == label;
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(11),
+                              onTap: () => _executeAction(label),
+                              child: Container(
+                                height: 38,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                decoration: BoxDecoration(
+                                  color: isActive ? accent.withValues(alpha: 0.16) : tileBg,
+                                  borderRadius: BorderRadius.circular(11),
+                                  border: Border.all(
+                                    color: isActive ? accent : borderColor,
+                                    width: isActive ? 1.3 : 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      item['emoji']!,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        decoration: TextDecoration.none,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Expanded(
+                                      child: Text(
+                                        label,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: isActive ? accent : textPrimary,
+                                          decoration: TextDecoration.none,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = QuickNavController.instance;
@@ -540,7 +647,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
       screenSize.height - padding.bottom - _ballSize - 70.0,
     );
     final effectivePos = _clampPosition(_position ?? defaultPos, screenSize, padding);
-    final ballCenter = Offset(effectivePos.dx + _ballSize / 2, effectivePos.dy + _ballSize / 2);
 
     return Stack(
       children: [
@@ -559,125 +665,28 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
             final isDark = Theme.of(context).brightness == Brightness.dark;
             final accent = isDark ? const Color(0xFFA78BFA) : const Color(0xFFFF5C38);
             final outerBg = isDark ? const Color(0xFF151932) : Colors.white;
-            final borderColor = _isDragging || _isRadialOpen
+            final borderColor = _isDragging || _isMenuOpen
                 ? accent
                 : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1));
-            final displayOpacity = _isDragging || _isRadialOpen
+            final displayOpacity = _isDragging || _isMenuOpen
                 ? 0.95
                 : (_isIdleFaded && _autoHide ? 0.14 : _opacity);
 
-            final radialPositions = _isRadialOpen
-                ? _computeRadialPositions(_radialOrigin, screenSize, padding)
-                : const <Offset>[];
-
-            double labelTop = padding.top + 12.0;
-            if (radialPositions.isNotEmpty) {
-              final minIconY = radialPositions.map((p) => p.dy).reduce(math.min);
-              final maxIconY = radialPositions.map((p) => p.dy).reduce(math.max);
-              final candidateAbove = minIconY - 58.0;
-              if (candidateAbove >= padding.top + 8.0) {
-                labelTop = candidateAbove;
-              } else {
-                labelTop = (maxIconY + 32.0).clamp(
-                  padding.top + 8.0,
-                  screenSize.height - padding.bottom - 40.0,
-                );
-              }
-            }
+            final menuOrigin = _computeMenuOrigin(effectivePos, screenSize, padding);
 
             return Stack(
               children: [
-                if (_isRadialOpen) ...[
+                if (_isMenuOpen) ...[
                   Positioned.fill(
-                    child: IgnorePointer(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () => setState(() => _isMenuOpen = false),
                       child: Container(
-                        color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.25),
+                        color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.10),
                       ),
                     ),
                   ),
-                  // Selected radial label pill (automatically above or below icons within safe area)
-                  if (_selectedRadialIndex != null)
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      top: labelTop,
-                      child: IgnorePointer(
-                        child: Center(
-                          child: Material(
-                            type: MaterialType.transparency,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF1B2042) : Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: accent, width: 1.4),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.2),
-                                    blurRadius: 10,
-                                  ),
-                                ],
-                              ),
-                              child: Text(
-                                '${_radialItems[_selectedRadialIndex!]['emoji']} ${_radialItems[_selectedRadialIndex!]['label']}',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: accent,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  // Radial icons positioned safely inside screen bounds
-                  for (int i = 0; i < radialPositions.length; i++)
-                    () {
-                      final pt = radialPositions[i];
-                      final isSelected = _selectedRadialIndex == i;
-                      final itemSize = isSelected ? 44.0 : 38.0;
-                      return Positioned(
-                        left: pt.dx - itemSize / 2,
-                        top: pt.dy - itemSize / 2,
-                        child: IgnorePointer(
-                          child: Material(
-                            type: MaterialType.transparency,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 100),
-                              width: itemSize,
-                              height: itemSize,
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? accent
-                                    : (isDark ? const Color(0xFF1B2042) : Colors.white),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: isSelected ? Colors.white : borderColor,
-                                  width: isSelected ? 2.0 : 1.1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: isSelected ? 0.35 : 0.15),
-                                    blurRadius: isSelected ? 12 : 6,
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Text(
-                                  _radialItems[i]['emoji']!,
-                                  style: TextStyle(
-                                    fontSize: isSelected ? 19 : 15,
-                                    decoration: TextDecoration.none,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }(),
+                  _buildFloatingMenu(context, controller, menuOrigin, isDark, accent),
                 ],
                 Positioned(
                   left: effectivePos.dx,
@@ -687,109 +696,52 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                     child: AnimatedOpacity(
                       opacity: displayOpacity,
                       duration: const Duration(milliseconds: 220),
-                      child: Listener(
-                        onPointerDown: (event) {
-                          if (_activePointerId != null) return;
-                          _activePointerId = event.pointer;
-                          _pointerDownPos = event.position;
-                          _lastPointerPos = event.position;
+                      child: GestureDetector(
+                        key: const Key('quick_switch_trackball'),
+                        onTap: () {
+                          if (_isDragging) return;
+                          _executeAction(_singleTapAction);
+                        },
+                        onDoubleTap: _doubleTapAction == 'None'
+                            ? null
+                            : () {
+                                if (_isDragging) return;
+                                _executeAction(_doubleTapAction);
+                              },
+                        onLongPress: () {
+                          if (_isDragging) return;
+                          HapticFeedback.mediumImpact();
+                          setState(() => _isMenuOpen = false);
+                          _openCustomizeSheet();
+                        },
+                        onPanStart: (_) {
                           _resetIdleTimer();
-                          _holdTimer?.cancel();
-                          _holdTimer = Timer(const Duration(milliseconds: 300), () {
-                            if (!mounted || _activePointerId == null || _isDragging) return;
-                            HapticFeedback.mediumImpact();
-                            setState(() {
-                              _isRadialOpen = true;
-                              _radialOrigin = ballCenter;
-                              _selectedRadialIndex = null;
-                            });
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            _isDragging = true;
+                            _isMenuOpen = false;
+                            _position ??= effectivePos;
                           });
                         },
-                        onPointerMove: (event) {
-                          if (event.pointer != _activePointerId) return;
-                          final delta = event.position - (_lastPointerPos ?? event.position);
-                          _lastPointerPos = event.position;
-
-                          if (_isRadialOpen) {
-                            _updateRadialSelection(event.position, screenSize, padding);
-                            return;
-                          }
-
-                          final movedFromDown =
-                              (event.position - (_pointerDownPos ?? event.position)).distance;
-                          if (!_isDragging && movedFromDown > 12.0) {
-                            _holdTimer?.cancel();
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _isDragging = true;
-                              _position ??= effectivePos;
-                            });
-                          }
-
-                          if (_isDragging) {
-                            setState(() {
-                              final next = (_position ?? effectivePos) + delta;
-                              _position = _clampPosition(next, screenSize, padding);
-                            });
+                        onPanUpdate: (details) {
+                          setState(() {
+                            final next = (_position ?? effectivePos) + details.delta;
+                            _position = _clampPosition(next, screenSize, padding);
+                          });
+                        },
+                        onPanEnd: (_) {
+                          setState(() => _isDragging = false);
+                          _resetIdleTimer();
+                          if (_position != null) {
+                            unawaited(_savePosition(_position!));
                           }
                         },
-                        onPointerUp: (event) {
-                          if (event.pointer != _activePointerId) return;
-                          _holdTimer?.cancel();
-                          _activePointerId = null;
-                          _pointerDownPos = null;
-                          _lastPointerPos = null;
-
-                          if (_isRadialOpen) {
-                            final selected = _selectedRadialIndex;
-                            setState(() {
-                              _isRadialOpen = false;
-                              _selectedRadialIndex = null;
-                            });
-                            _resetIdleTimer();
-                            if (selected != null) {
-                              controller.navigateTo(_radialItems[selected]['label']!);
-                            }
-                            return;
-                          }
-
-                          if (_isDragging) {
-                            setState(() => _isDragging = false);
-                            _resetIdleTimer();
-                            if (_position != null) {
-                              unawaited(_savePosition(_position!));
-                            }
-                          }
-                        },
-                        onPointerCancel: (event) {
-                          if (event.pointer != _activePointerId) return;
-                          _holdTimer?.cancel();
-                          _activePointerId = null;
-                          _pointerDownPos = null;
-                          _lastPointerPos = null;
-                          if (_isRadialOpen || _isDragging) {
-                            setState(() {
-                              _isRadialOpen = false;
-                              _selectedRadialIndex = null;
-                              _isDragging = false;
-                            });
-                          }
+                        onPanCancel: () {
+                          setState(() => _isDragging = false);
                           _resetIdleTimer();
                         },
-                        child: GestureDetector(
-                          key: const Key('quick_switch_trackball'),
-                          onTap: () {
-                            if (_isRadialOpen || _isDragging) return;
-                            _executeAction(_singleTapAction);
-                          },
-                          onDoubleTap: _doubleTapAction == 'None'
-                              ? null
-                              : () {
-                                  if (_isRadialOpen || _isDragging) return;
-                                  _executeAction(_doubleTapAction);
-                                },
-                          child: AnimatedScale(
-                          scale: _isDragging || _isRadialOpen ? 1.12 : 1.0,
+                        child: AnimatedScale(
+                          scale: _isDragging || _isMenuOpen ? 1.10 : 1.0,
                           duration: const Duration(milliseconds: 120),
                           child: Container(
                             width: _ballSize,
@@ -799,7 +751,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: borderColor,
-                                width: _isDragging || _isRadialOpen ? 2.0 : 1.3,
+                                width: _isDragging || _isMenuOpen ? 2.0 : 1.3,
                               ),
                               boxShadow: [
                                 BoxShadow(
@@ -834,7 +786,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                               ),
                             ),
                           ),
-                        ),
                         ),
                       ),
                     ),
