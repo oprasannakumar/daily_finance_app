@@ -13,6 +13,7 @@ import '../services/ai_transaction_service.dart';
 import '../services/google_auth_service.dart';
 import '../services/google_sheets_service.dart';
 import '../services/clipboard_transaction_parser.dart';
+import '../services/quick_nav_controller.dart';
 import '../widgets/swipeable_date_picker.dart';
 import '../widgets/payment_breakdown_card.dart';
 import '../widgets/popup_select_field.dart';
@@ -111,6 +112,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   @override
   void initState() {
     super.initState();
+    QuickNavController.instance.registerRootHandler(_handleMenuItemClick);
     _speech = stt.SpeechToText();
     _initSpeech();
     _referenceId = FinanceTransaction.generateReferenceId(_selectedDate);
@@ -528,6 +530,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
   @override
   void dispose() {
+    QuickNavController.instance.unregisterRootHandler(_handleMenuItemClick);
     try {
       _speech.stop();
     } catch (_) {}
@@ -556,6 +559,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     HapticFeedback.lightImpact();
     final result = await Navigator.of(context).push<InvoiceSummary>(
       MaterialPageRoute(
+        settings: const RouteSettings(name: 'Invoices'),
         builder: (_) => InvoiceManagerScreen(
           initialDate: _selectedDate,
           onInvoiceSelected: _onInvoiceSelected,
@@ -890,6 +894,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     HapticFeedback.mediumImpact();
     final result = await Navigator.of(context).push(
       PageRouteBuilder(
+        settings: const RouteSettings(name: 'History'),
         pageBuilder: (context, animation, secondaryAnimation) => const TransactionHistoryScreen(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           const begin = Offset(1.0, 0.0);
@@ -4284,7 +4289,10 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       case 'Dashboard':
       case 'Financial Health':
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FinancialHealthDashboardScreen()),
+          MaterialPageRoute(
+            settings: const RouteSettings(name: 'Dashboard'),
+            builder: (_) => const FinancialHealthDashboardScreen(),
+          ),
         );
         break;
       case 'History':
@@ -4297,6 +4305,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       case 'Masters':
         Navigator.of(context).push(
           MaterialPageRoute(
+            settings: const RouteSettings(name: 'Masters'),
             builder: (_) => ManageDetailsScreen(
               onSelectTemplate: (t) => _applyTemplate(t, isForEdit: false),
               onEditTemplate: (t) => _applyTemplate(t, isForEdit: true),
@@ -4309,6 +4318,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       case 'Templates':
         Navigator.of(context).push(
           MaterialPageRoute(
+            settings: const RouteSettings(name: 'Templates'),
             builder: (_) => ManageDetailsScreen(
               initialCategory: 'Templates',
               onSelectTemplate: (t) => _applyTemplate(t, isForEdit: false),
@@ -4322,6 +4332,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       case 'Recurring':
         Navigator.of(context).push(
           MaterialPageRoute(
+            settings: const RouteSettings(name: 'Recurring'),
             builder: (_) => ManageDetailsScreen(
               initialCategory: 'Recurring',
               onSelectTemplate: (t) => _applyTemplate(t, isForEdit: false),
@@ -4334,18 +4345,27 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         break;
       case 'Borrowers':
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const BorrowersLedgerScreen()),
+          MaterialPageRoute(
+            settings: const RouteSettings(name: 'Borrowers'),
+            builder: (_) => const BorrowersLedgerScreen(),
+          ),
         );
         break;
       case 'Balances':
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AccountBalancesScreen()),
+          MaterialPageRoute(
+            settings: const RouteSettings(name: 'Balances'),
+            builder: (_) => const AccountBalancesScreen(),
+          ),
         );
         break;
       case 'EMIs':
       case 'Credit Card EMIs':
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const EmiManagerScreen()),
+          MaterialPageRoute(
+            settings: const RouteSettings(name: 'EMIs'),
+            builder: (_) => const EmiManagerScreen(),
+          ),
         );
         break;
       case 'Google Sheets':

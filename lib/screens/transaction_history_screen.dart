@@ -12,8 +12,13 @@ import '../widgets/emi_conversion_sheet.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   final Listenable? refreshListenable;
+  final String? initialSearchQuery;
 
-  const TransactionHistoryScreen({super.key, this.refreshListenable});
+  const TransactionHistoryScreen({
+    super.key,
+    this.refreshListenable,
+    this.initialSearchQuery,
+  });
 
   @override
   State<TransactionHistoryScreen> createState() => TransactionHistoryScreenState();
@@ -51,6 +56,11 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    final initialQuery = widget.initialSearchQuery?.trim();
+    if (initialQuery != null && initialQuery.isNotEmpty) {
+      _searchController.text = initialQuery;
+      _filterCriteria.narrationQuery = initialQuery;
+    }
     widget.refreshListenable?.addListener(_onRefreshNotified);
     StorageService.instance.transactionsNotifier.addListener(_loadTransactions);
     StorageService.instance.balanceConfigNotifier.addListener(_loadTransactions);

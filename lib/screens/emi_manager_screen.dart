@@ -6,6 +6,7 @@ import '../services/google_sheets_service.dart';
 import '../services/storage_service.dart';
 import '../utils/currency_formatter.dart';
 import '../widgets/emi_conversion_sheet.dart';
+import 'transaction_history_screen.dart';
 
 class EmiManagerScreen extends StatefulWidget {
   const EmiManagerScreen({super.key});
@@ -517,32 +518,47 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
               ),
               if (plan.linkedTransactionRef != null) ...[
                 const SizedBox(height: 5),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: teal.withValues(alpha: 0.09),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: teal.withValues(alpha: 0.25)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.link_rounded, size: 13, color: teal),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          'Linked Swipe: ${plan.linkedTransactionRef}',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: teal),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                InkWell(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        settings: const RouteSettings(name: 'History'),
+                        builder: (_) => TransactionHistoryScreen(
+                          initialSearchQuery: plan.linkedTransactionRef,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Swipe: ₹${IndianCurrency.formatSmart(plan.totalTransactionAmount)}',
-                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500, color: textSecondary),
-                      ),
-                    ],
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: teal.withValues(alpha: 0.09),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: teal.withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.link_rounded, size: 13, color: teal),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            'Linked Swipe: ${plan.linkedTransactionRef}',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: teal),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Swipe: ₹${IndianCurrency.formatSmart(plan.totalTransactionAmount)}',
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500, color: textSecondary),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(Icons.open_in_new_rounded, size: 11, color: teal),
+                      ],
+                    ),
                   ),
                 ),
               ],

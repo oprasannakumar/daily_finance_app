@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'screens/transaction_form_screen.dart';
 import 'services/quick_actions_service.dart';
+import 'services/quick_nav_controller.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme_colors.dart';
+import 'widgets/quick_switch_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +25,7 @@ class DailyFinanceApp extends StatelessWidget {
       builder: (context, isDark, child) {
         return MaterialApp(
           navigatorKey: QuickActionsService.instance.navigatorKey,
+          navigatorObservers: [QuickNavController.instance.observer],
           title: 'Smart Entry Finance',
           debugShowCheckedModeBanner: false,
           themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
@@ -178,7 +181,7 @@ class DailyFinanceApp extends StatelessWidget {
                   }
                 }
               },
-              child: child,
+              child: QuickSwitchOverlay(child: child ?? const SizedBox.shrink()),
             );
           },
           home: const TransactionFormScreen(),
