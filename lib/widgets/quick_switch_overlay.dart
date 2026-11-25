@@ -28,7 +28,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   static const String _prefKeyDoubleTap = 'quick_switch_trackball_double_tap';
 
   static const double _ballSize = 46.0;
-  static const double _radialRadius = 92.0;
+  static const double _radialRadius = 66.0;
 
   static const List<Map<String, String>> _radialItems = [
     {'emoji': '📊', 'label': 'Dashboard'},
@@ -780,28 +780,32 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                     Positioned(
                       left: 0,
                       right: 0,
-                      top: (ringCenter.dy - _radialRadius - 56).clamp(padding.top + 8.0, screenSize.height),
+                      top: (ringCenter.dy - _radialRadius - 54).clamp(padding.top + 8.0, screenSize.height),
                       child: IgnorePointer(
                         child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1B2042) : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: accent, width: 1.4),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.2),
-                                  blurRadius: 10,
+                          child: Material(
+                            type: MaterialType.transparency,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1B2042) : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: accent, width: 1.4),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 10,
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                '${_radialItems[_selectedRadialIndex!]['emoji']} ${_radialItems[_selectedRadialIndex!]['label']}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: accent,
+                                  decoration: TextDecoration.none,
                                 ),
-                              ],
-                            ),
-                            child: Text(
-                              '${_radialItems[_selectedRadialIndex!]['emoji']} ${_radialItems[_selectedRadialIndex!]['label']}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: accent,
                               ),
                             ),
                           ),
@@ -813,35 +817,41 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                     () {
                       final pt = _radialItemCenter(ringCenter, i);
                       final isSelected = _selectedRadialIndex == i;
-                      final itemSize = isSelected ? 48.0 : 40.0;
+                      final itemSize = isSelected ? 44.0 : 38.0;
                       return Positioned(
                         left: pt.dx - itemSize / 2,
                         top: pt.dy - itemSize / 2,
                         child: IgnorePointer(
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 100),
-                            width: itemSize,
-                            height: itemSize,
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? accent
-                                  : (isDark ? const Color(0xFF1B2042) : Colors.white),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected ? Colors.white : borderColor,
-                                width: isSelected ? 2.0 : 1.1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: isSelected ? 0.35 : 0.15),
-                                  blurRadius: isSelected ? 12 : 6,
+                          child: Material(
+                            type: MaterialType.transparency,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 100),
+                              width: itemSize,
+                              height: itemSize,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? accent
+                                    : (isDark ? const Color(0xFF1B2042) : Colors.white),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected ? Colors.white : borderColor,
+                                  width: isSelected ? 2.0 : 1.1,
                                 ),
-                              ],
-                            ),
-                            child: Center(
-                              child: Text(
-                                _radialItems[i]['emoji']!,
-                                style: TextStyle(fontSize: isSelected ? 20 : 16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: isSelected ? 0.35 : 0.15),
+                                    blurRadius: isSelected ? 12 : 6,
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  _radialItems[i]['emoji']!,
+                                  style: TextStyle(
+                                    fontSize: isSelected ? 19 : 15,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
