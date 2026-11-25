@@ -102,7 +102,7 @@ void main() {
 
       // Serialize to sheet row and back
       final sheetRow = plan.toSheetRow();
-      expect(sheetRow.length, equals(14));
+      expect(sheetRow.length, equals(16));
       expect(sheetRow[0], equals('EMI-HP-VICTUS-OVERRIDE'));
       expect(sheetRow[5], equals(10236.49));
 
@@ -113,6 +113,53 @@ void main() {
       expect(restored.installments[0].interest, equals(149.84));
       expect(restored.installments[0].applicableTaxes, equals(26.97));
       expect(restored.installments[1].emiAmount, closeTo(1791.66, 0.1));
+    });
+
+    test('Transaction linkage serialization (linkedTransactionId & linkedTransactionRef)', () {
+      final schedule = EmiPlan.calculateSchedule(
+        principal: 5000.0,
+        annualInterestRate: 15.0,
+        tenureMonths: 3,
+        firstEmiDate: DateTime(2026, 11, 25),
+      );
+
+      final plan = EmiPlan(
+        id: 'EMI-LINKED-001',
+        title: 'Flipkart Big Billion Days',
+        account: 'SBI SimplyClick Credit Card',
+        transactionDate: DateTime(2026, 11, 10),
+        totalTransactionAmount: 25000.0,
+        bookingPrincipal: 5000.0,
+        annualInterestRate: 15.0,
+        tenureMonths: 3,
+        firstEmiDate: DateTime(2026, 11, 25),
+        installments: schedule,
+        linkedTransactionId: 'tx_12345678',
+        linkedTransactionRef: 'REF-10112026-ABCD',
+      );
+
+      expect(plan.linkedTransactionId, equals('tx_12345678'));
+      expect(plan.linkedTransactionRef, equals('REF-10112026-ABCD'));
+      expect(plan.isPartialConversion, isTrue);
+      expect(plan.nonEmiBalance, equals(20000.0));
+
+      // JSON round-trip
+      final json = plan.toJson();
+      expect(json['linkedTransactionId'], equals('tx_12345678'));
+      expect(json['linkedTransactionRef'], equals('REF-10112026-ABCD'));
+      final fromJson = EmiPlan.fromJson(json);
+      expect(fromJson.linkedTransactionId, equals('tx_12345678'));
+      expect(fromJson.linkedTransactionRef, equals('REF-10112026-ABCD'));
+
+      // Sheet row round-trip
+      final row = plan.toSheetRow();
+      expect(row.length, equals(16));
+      expect(row[14], equals('tx_12345678'));
+      expect(row[15], equals('REF-10112026-ABCD'));
+
+      final fromSheet = EmiPlan.fromSheetRow(row);
+      expect(fromSheet.linkedTransactionId, equals('tx_12345678'));
+      expect(fromSheet.linkedTransactionRef, equals('REF-10112026-ABCD'));
     });
 
     test('Progress tracking & installment payment status updates', () {

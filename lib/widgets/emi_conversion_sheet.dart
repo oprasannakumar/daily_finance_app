@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/emi_plan_model.dart';
 import '../models/transaction_model.dart';
 import '../services/google_sheets_service.dart';
+import '../services/storage_service.dart';
 import '../utils/currency_formatter.dart';
 
 class EmiConversionSheet extends StatefulWidget {
@@ -39,7 +40,6 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
   final _formKey = GlobalKey<FormState>();
 
   late TextEditingController _titleController;
-  late TextEditingController _accountController;
   late TextEditingController _totalAmountController;
   late TextEditingController _bookingPrincipalController;
   late TextEditingController _roiController;
@@ -52,6 +52,13 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
   late DateTime _firstEmiDate;
   bool _isPartialConversion = false;
   bool _isSaving = false;
+
+  String? _linkedTransactionId;
+  String? _linkedTransactionRef;
+  String? _linkedTransactionNarration;
+
+  List<String> _creditCardOptions = [];
+  String? _selectedCreditCard;
 
   List<EmiInstallment> _installments = [];
 
@@ -66,7 +73,7 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
 
     if (plan != null) {
       _titleController = TextEditingController(text: plan.title);
-      _accountController = TextEditingController(text: plan.account);
+      _selectedCreditCard = plan.account;
       _totalAmountController = TextEditingController(text: plan.totalTransactionAmount.toStringAsFixed(2));
       _bookingPrincipalController = TextEditingController(text: plan.bookingPrincipal.toStringAsFixed(2));
       _roiController = TextEditingController(text: plan.annualInterestRate.toStringAsFixed(2));
@@ -77,16 +84,13 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
       _transactionDate = plan.transactionDate;
       _firstEmiDate = plan.firstEmiDate;
       _isPartialConversion = plan.isPartialConversion;
+      _linkedTransactionId = plan.linkedTransactionId;
+      _linkedTransactionRef = plan.linkedTransactionRef;
       _installments = plan.installments.map((it) => it.copyWith()).toList();
     } else if (tx != null) {
-      final title = tx.narration.isNotEmpty ? tx.narration : 'Credit Card EMI';
-      final account = tx.fromSummary.isNotEmpty ? tx.fromSummary : 'Credit Card';
-      final total = tx.totalAmount;
-
-      _titleController = TextEditingController(text: title);
-      _accountController = TextEditingController(text: account);
-      _totalAmountController = TextEditingController(text: total.toStringAsFixed(2));
-      _bookingPrincipalController = TextEditingController(text: total.toStringAsFixed(2));
+      _titleController = TextEditingController(text: tx.narration.isNotEmpty ? tx.narration : 'Credit Card EMI');
+      _totalAmountController = TextEditingController(text: tx.totalAmount.toStringAsFixed(2));
+      _bookingPrincipalController = TextEditingController(text: tx.totalAmount.toStringAsFixed(2));
       _roiController = TextEditingController(text: '17.0');
       _tenureController = TextEditingController(text: '6');
       _processingFeeController = TextEditingController(text: '45.00');
@@ -95,10 +99,12 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
       _transactionDate = tx.date;
       _firstEmiDate = EmiPlan.addMonthsClamped(tx.date, 1);
       _isPartialConversion = false;
+      _linkedTransactionId = tx.id;
+      _linkedTransactionRef = tx.referenceId;
+      _linkedTransactionNarration = tx.narration;
       _recalculateMathematicalSchedule();
     } else {
       _titleController = TextEditingController(text: 'Credit Card EMI');
-      _accountController = TextEditingController(text: 'Credit Card');
       _totalAmountController = TextEditingController(text: '10000.00');
       _bookingPrincipalController = TextEditingController(text: '10000.00');
       _roiController = TextEditingController(text: '17.0');
@@ -111,12 +117,261 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
       _isPartialConversion = false;
       _recalculateMathematicalSchedule();
     }
+
+    _loadCreditCards();
+  }
+
+  Future<void> _loadCreditCards() async {
+    final categories = await StorageService.instance.getCategoryAccounts();
+    final ccFromCats = categories['Credit Cards'] ?? [];
+    final balanceConfig = await StorageService.instance.getAccountBalanceConfig();
+    final ccFromConfig = balanceConfig.creditCardLimits.keys.toList();
+
+    final set = <String>{};
+    for (final c in ccFromCats) {
+      if (c.trim().isNotEmpty && c != 'Other') set.add(c.trim());
+    }
+    for (final c in ccFromConfig) {
+      if (c.trim().isNotEmpty) set.add(c.trim());
+    }
+    if (set.isEmpty) {
+      set.addAll(['Credit Card', 'HDFC Credit Card', 'SBI Credit Card', 'ICICI Credit Card', 'Axis Credit Card']);
+    }
+
+    // If widget.transaction had a card account, ensure it is added
+    if (widget.transaction != null) {
+      for (final b in widget.transaction!.breakdowns) {
+        if (b.effectiveAccount.isNotEmpty) {
+          set.add(b.effectiveAccount);
+          _selectedCreditCard ??= b.effectiveAccount;
+          break;
+        }
+      }
+    }
+
+    if (widget.existingPlan != null && widget.existingPlan!.account.isNotEmpty) {
+      set.add(widget.existingPlan!.account);
+      _selectedCreditCard = widget.existingPlan!.account;
+    }
+
+    if (mounted) {
+      setState(() {
+        _creditCardOptions = set.toList();
+        _selectedCreditCard ??= _creditCardOptions.isNotEmpty ? _creditCardOptions.first : 'Credit Card';
+      });
+    }
+  }
+
+  void _applyTransaction(FinanceTransaction tx) {
+    setState(() {
+      _linkedTransactionId = tx.id;
+      _linkedTransactionRef = tx.referenceId;
+      _linkedTransactionNarration = tx.narration;
+
+      if (_titleController.text.isEmpty || _titleController.text == 'Credit Card EMI') {
+        _titleController.text = tx.narration.isNotEmpty ? tx.narration : 'Credit Card EMI';
+      }
+
+      // Detect card name from breakdowns
+      String detectedCard = '';
+      for (final b in tx.breakdowns) {
+        if (b.effectiveAccount.isNotEmpty) {
+          detectedCard = b.effectiveAccount;
+          break;
+        }
+      }
+      if (detectedCard.isNotEmpty) {
+        if (!_creditCardOptions.contains(detectedCard)) {
+          _creditCardOptions.insert(0, detectedCard);
+        }
+        _selectedCreditCard = detectedCard;
+      }
+
+      _transactionDate = tx.date;
+      _firstEmiDate = EmiPlan.addMonthsClamped(tx.date, 1);
+      _totalAmountController.text = tx.totalAmount.toStringAsFixed(2);
+      if (!_isPartialConversion) {
+        _bookingPrincipalController.text = tx.totalAmount.toStringAsFixed(2);
+      }
+      _notesController.text = 'Converted from Tx: ${tx.referenceId}';
+      _recalculateMathematicalSchedule();
+    });
+  }
+
+  Future<void> _pickPastTransaction() async {
+    final allTx = await StorageService.instance.getTransactions();
+    if (!mounted) return;
+
+    final candidates = allTx.where((t) => t.totalAmount > 0).toList();
+    candidates.sort((a, b) => b.date.compareTo(a.date));
+
+    final picked = await showModalBottomSheet<FinanceTransaction>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        String searchQuery = '';
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            final bg = isDark ? const Color(0xFF13172E) : Colors.white;
+            final cardBg = isDark ? const Color(0xFF1B203D) : const Color(0xFFF8FAFC);
+            final borderColor = isDark ? const Color(0xFF2C3258) : const Color(0xFFE2E8F0);
+            final textPrimary = isDark ? Colors.white : const Color(0xFF1E293B);
+            final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+            const coral = Color(0xFFFF5C38);
+
+            final filtered = candidates.where((t) {
+              if (searchQuery.isEmpty) return true;
+              final q = searchQuery.toLowerCase();
+              return t.narration.toLowerCase().contains(q) ||
+                  t.referenceId.toLowerCase().contains(q) ||
+                  t.fromSummary.toLowerCase().contains(q) ||
+                  t.totalAmount.toString().contains(q);
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(ctx).size.height * 0.85,
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Pick Transaction to Convert',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary)),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search by narration, card, ref...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      isDense: true,
+                    ),
+                    onChanged: (val) {
+                      setSheetState(() => searchQuery = val.trim());
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? Center(child: Text('No matching transactions found', style: TextStyle(color: textSecondary)))
+                        : ListView.builder(
+                            itemCount: filtered.length,
+                            itemBuilder: (ctx, i) {
+                              final t = filtered[i];
+                              final cardName = t.fromSummary.isNotEmpty ? t.fromSummary : 'Account';
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                decoration: BoxDecoration(
+                                  color: cardBg,
+                                  border: Border.all(color: borderColor),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: coral.withValues(alpha: 0.12),
+                                    child: const Icon(Icons.credit_card, color: coral, size: 20),
+                                  ),
+                                  title: Text(
+                                    t.narration.isNotEmpty ? t.narration : 'Transaction',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: textPrimary),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    '${DateFormat('dd MMM yyyy').format(t.date)} • $cardName\nRef: ${t.referenceId}',
+                                    style: TextStyle(fontSize: 11, color: textSecondary),
+                                  ),
+                                  trailing: Text(
+                                    '₹${IndianCurrency.formatSmart(t.totalAmount)}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: coral),
+                                  ),
+                                  onTap: () => Navigator.pop(ctx, t),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (picked != null) {
+      _applyTransaction(picked);
+    }
+  }
+
+  Future<void> _addNewCardDialog() async {
+    final ctrl = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final newCard = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E2240) : Colors.white,
+        title: const Text('Add Credit Card'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            labelText: 'Card Name',
+            hintText: 'e.g. HDFC Regalia, SBI SimplyClick',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5C38)),
+            onPressed: () {
+              final name = ctrl.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.pop(ctx, name);
+              }
+            },
+            child: const Text('Add', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (newCard != null && newCard.isNotEmpty) {
+      setState(() {
+        if (!_creditCardOptions.contains(newCard)) {
+          _creditCardOptions.insert(0, newCard);
+        }
+        _selectedCreditCard = newCard;
+      });
+      await StorageService.instance.addAccountToCategory('Credit Cards', newCard);
+    }
   }
 
   @override
   void dispose() {
     _titleController.dispose();
-    _accountController.dispose();
     _totalAmountController.dispose();
     _bookingPrincipalController.dispose();
     _roiController.dispose();
@@ -327,7 +582,7 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
       final plan = EmiPlan(
         id: planId,
         title: _titleController.text.trim(),
-        account: _accountController.text.trim(),
+        account: _selectedCreditCard ?? 'Credit Card',
         transactionDate: _transactionDate,
         totalTransactionAmount: _totalTxAmount,
         bookingPrincipal: _bookingPrincipal,
@@ -339,6 +594,8 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
         installments: _installments,
         status: widget.existingPlan?.status ?? 'ACTIVE',
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+        linkedTransactionId: _linkedTransactionId,
+        linkedTransactionRef: _linkedTransactionRef,
       );
 
       await GoogleSheetsService.instance.saveEmiPlan(plan);
@@ -379,7 +636,7 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
     final totalRepayable = _installments.fold(0.0, (sum, it) => sum + it.totalDueWithTax) + _processingFee + _processingFeeGst;
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.92,
+      height: MediaQuery.of(context).size.height * 0.94,
       decoration: BoxDecoration(
         color: bg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -442,42 +699,177 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 children: [
-                  // Plan Title & Account
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: TextFormField(
-                          controller: _titleController,
-                          style: TextStyle(color: textPrimary, fontSize: 14),
-                          decoration: InputDecoration(
-                            labelText: 'EMI Plan Title',
-                            hintText: 'e.g. HP Victus Laptop',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            filled: true,
-                            fillColor: cardBg,
-                            isDense: true,
+                  // Linked Transaction Card / Picker Banner
+                  if (_linkedTransactionRef != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isDark
+                              ? [const Color(0xFF231E3D), const Color(0xFF1B2A3D)]
+                              : [const Color(0xFFFFF4F0), const Color(0xFFF0FDF4)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: coral.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: coral.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.link_rounded, color: coral, size: 20),
                           ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text('Linked Swipe Transaction',
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: coral)),
+                                    const SizedBox(width: 6),
+                                    Text('($_linkedTransactionRef)',
+                                        style: TextStyle(fontSize: 11, color: textSecondary)),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _linkedTransactionNarration ?? _titleController.text,
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textPrimary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Swipe Total: ₹${IndianCurrency.formatSmart(_totalTxAmount)} • ${DateFormat('dd MMM yyyy').format(_transactionDate)}',
+                                  style: TextStyle(fontSize: 11, color: textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _pickPastTransaction,
+                            child: const Text('Change', style: TextStyle(fontSize: 12, color: coral)),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        border: Border.all(color: borderColor),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: InkWell(
+                        onTap: _pickPastTransaction,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: teal.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.receipt_long_rounded, color: teal, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Convert from Past Transaction',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary)),
+                                    Text('Tap to select a credit card swipe from your ledger',
+                                        style: TextStyle(fontSize: 11, color: textSecondary)),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 2,
-                        child: TextFormField(
-                          controller: _accountController,
-                          style: TextStyle(color: textPrimary, fontSize: 14),
-                          decoration: InputDecoration(
-                            labelText: 'Card / Account',
-                            hintText: 'Credit Card',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            filled: true,
-                            fillColor: cardBg,
-                            isDense: true,
+                    ),
+
+                  // Plan Title
+                  TextFormField(
+                    controller: _titleController,
+                    style: TextStyle(color: textPrimary, fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'EMI Plan Title',
+                      hintText: 'e.g. HP Victus Laptop',
+                      prefixIcon: const Icon(Icons.title, size: 18),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      filled: true,
+                      fillColor: cardBg,
+                      isDense: true,
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Credit Card Selector Dropdown
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      border: Border.all(color: borderColor),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.credit_card, size: 20, color: coral),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _creditCardOptions.contains(_selectedCreditCard)
+                                  ? _selectedCreditCard
+                                  : (_creditCardOptions.isNotEmpty ? _creditCardOptions.first : null),
+                              dropdownColor: cardBg,
+                              hint: Text('Select Credit Card', style: TextStyle(color: textSecondary, fontSize: 13)),
+                              items: [
+                                ..._creditCardOptions.map((card) => DropdownMenuItem<String>(
+                                      value: card,
+                                      child: Text(
+                                        card,
+                                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: textPrimary),
+                                      ),
+                                    )),
+                                const DropdownMenuItem<String>(
+                                  value: '__ADD_NEW__',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.add, size: 16, color: coral),
+                                      SizedBox(width: 6),
+                                      Text('+ Add / Type Custom Card',
+                                          style: TextStyle(fontSize: 13, color: coral, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              onChanged: (val) {
+                                if (val == '__ADD_NEW__') {
+                                  _addNewCardDialog();
+                                } else if (val != null) {
+                                  setState(() => _selectedCreditCard = val);
+                                }
+                              },
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 12),
 
@@ -502,7 +894,7 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Tx Date', style: TextStyle(fontSize: 10, color: textSecondary)),
+                                    Text('Swipe Date', style: TextStyle(fontSize: 10, color: textSecondary)),
                                     Text(DateFormat('dd/MM/yyyy').format(_transactionDate),
                                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textPrimary)),
                                   ],

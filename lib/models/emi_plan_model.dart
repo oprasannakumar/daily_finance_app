@@ -108,6 +108,8 @@ class EmiPlan {
   final List<EmiInstallment> installments;
   final String status; // 'ACTIVE', 'COMPLETED', 'PRECLOSED'
   final String? notes;
+  final String? linkedTransactionId;
+  final String? linkedTransactionRef;
 
   EmiPlan({
     required this.id,
@@ -124,6 +126,8 @@ class EmiPlan {
     required this.installments,
     this.status = 'ACTIVE',
     this.notes,
+    this.linkedTransactionId,
+    this.linkedTransactionRef,
   });
 
   /// The non-converted swipe amount that remains on the regular credit card statement.
@@ -242,6 +246,8 @@ class EmiPlan {
     List<EmiInstallment>? installments,
     String? status,
     String? notes,
+    String? linkedTransactionId,
+    String? linkedTransactionRef,
   }) {
     return EmiPlan(
       id: id ?? this.id,
@@ -258,6 +264,8 @@ class EmiPlan {
       installments: installments ?? this.installments.map((it) => it.copyWith()).toList(),
       status: status ?? this.status,
       notes: notes ?? this.notes,
+      linkedTransactionId: linkedTransactionId ?? this.linkedTransactionId,
+      linkedTransactionRef: linkedTransactionRef ?? this.linkedTransactionRef,
     );
   }
 
@@ -275,6 +283,8 @@ class EmiPlan {
         'firstEmiDate': DateFormat('yyyy-MM-dd').format(firstEmiDate),
         'status': status,
         'notes': notes,
+        'linkedTransactionId': linkedTransactionId,
+        'linkedTransactionRef': linkedTransactionRef,
         'installments': installments.map((it) => it.toJson()).toList(),
       };
 
@@ -308,6 +318,8 @@ class EmiPlan {
       installments: installments,
       status: json['status'] as String? ?? 'ACTIVE',
       notes: json['notes'] as String?,
+      linkedTransactionId: json['linkedTransactionId'] as String?,
+      linkedTransactionRef: json['linkedTransactionRef'] as String?,
     );
   }
 
@@ -327,6 +339,8 @@ class EmiPlan {
       status,
       notes ?? '',
       jsonEncode(installments.map((it) => it.toJson()).toList()),
+      linkedTransactionId ?? '',
+      linkedTransactionRef ?? '',
     ];
   }
 
@@ -396,6 +410,9 @@ class EmiPlan {
       }
     }
 
+    final linkedTxId = row.length > 14 ? getString(14) : null;
+    final linkedTxRef = row.length > 15 ? getString(15) : null;
+
     if (installments.isEmpty) {
       installments = calculateSchedule(
         principal: principal > 0 ? principal : totalAmount,
@@ -420,6 +437,8 @@ class EmiPlan {
       installments: installments,
       status: status,
       notes: notes.isNotEmpty ? notes : null,
+      linkedTransactionId: linkedTxId?.isNotEmpty == true ? linkedTxId : null,
+      linkedTransactionRef: linkedTxRef?.isNotEmpty == true ? linkedTxRef : null,
     );
   }
 }

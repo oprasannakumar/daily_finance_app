@@ -7,6 +7,7 @@ import '../services/storage_service.dart';
 import '../utils/currency_formatter.dart';
 import '../widgets/faceted_filter_sheet.dart';
 import '../widgets/statement_export_dialog.dart';
+import '../widgets/emi_conversion_sheet.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   final Listenable? refreshListenable;
@@ -22,6 +23,8 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   List<FinanceTransaction> _transactions = [];
   LiveAccountBalanceSummary? _liveSummary;
   bool _isLoading = true;
+  Set<String> _emiLinkedIds = {};
+  Set<String> _emiLinkedRefs = {};
 
   // Modern Flipkart / Amazon Faceted Filter Criteria
   TransactionFilterCriteria _filterCriteria = TransactionFilterCriteria();
@@ -47,6 +50,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     widget.refreshListenable?.addListener(_onRefreshNotified);
     StorageService.instance.transactionsNotifier.addListener(_loadTransactions);
     StorageService.instance.balanceConfigNotifier.addListener(_loadTransactions);
+    StorageService.instance.emiPlansNotifier.addListener(_loadTransactions);
     _loadTransactions();
   }
 
@@ -65,6 +69,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     widget.refreshListenable?.removeListener(_onRefreshNotified);
     StorageService.instance.transactionsNotifier.removeListener(_loadTransactions);
     StorageService.instance.balanceConfigNotifier.removeListener(_loadTransactions);
+    StorageService.instance.emiPlansNotifier.removeListener(_loadTransactions);
     super.dispose();
   }
 
@@ -76,10 +81,23 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     if (forceRefresh && mounted) setState(() => _isLoading = true);
     final list = await _storage.getTransactions(forceRefresh: forceRefresh);
     final live = await _storage.getLiveAccountBalances();
+    final emiPlans = await _storage.getCachedEmiPlans();
+    final linkedRefs = <String>{};
+    final linkedIds = <String>{};
+    for (final p in emiPlans) {
+      if (p.linkedTransactionRef != null && p.linkedTransactionRef!.isNotEmpty) {
+        linkedRefs.add(p.linkedTransactionRef!);
+      }
+      if (p.linkedTransactionId != null && p.linkedTransactionId!.isNotEmpty) {
+        linkedIds.add(p.linkedTransactionId!);
+      }
+    }
     if (mounted) {
       setState(() {
         _transactions = list;
         _liveSummary = live;
+        _emiLinkedRefs = linkedRefs;
+        _emiLinkedIds = linkedIds;
         _isLoading = false;
         // Clean up selected IDs that no longer exist
         _selectedIds.removeWhere((id) => !_transactions.any((t) => t.id == id));
@@ -462,7 +480,26 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               ...tx.breakdowns.map((b) => _buildBreakdownRow(b)),
             ],
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            // Convert to Credit Card EMI Button
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF5C38),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.credit_card_outlined, size: 20),
+                label: const Text('Convert to Credit Card EMI',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  EmiConversionSheet.show(context, transaction: tx);
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
             Row(
               children: [
                 // Delete button inside log
@@ -1203,6 +1240,33 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                                             ),
                                           ),
                                           const SizedBox(width: 6),
+                                          // EMI converted indicator
+                                          if (_emiLinkedIds.contains(tx.id) || _emiLinkedRefs.contains(tx.referenceId)) ...[
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFF5C38).withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: const Color(0xFFFF5C38).withValues(alpha: 0.4), width: 0.8),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.credit_card, size: 10, color: Color(0xFFFF5C38)),
+                                                  SizedBox(width: 3),
+                                                  Text(
+                                                    'EMI',
+                                                    style: TextStyle(
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFFFF5C38),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                          ],
                                           // Sync status indicator: ONLY SHOWN IF NOT YET SYNCED!
                                           if (isPending) ...[
                                             Container(

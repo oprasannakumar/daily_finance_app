@@ -423,14 +423,56 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  Text(plan.account, style: TextStyle(fontSize: 12, color: textSecondary)),
-                  const SizedBox(width: 6),
-                  Text('•', style: TextStyle(color: textSecondary)),
-                  const SizedBox(width: 6),
-                  Text('${plan.tenureMonths} Mo @ ${plan.annualInterestRate}%',
-                      style: TextStyle(fontSize: 12, color: textSecondary)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: coral.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.credit_card, size: 12, color: coral),
+                        const SizedBox(width: 4),
+                        Text(
+                          plan.account,
+                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: coral),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('${plan.tenureMonths} Mo @ ${plan.annualInterestRate}% p.a.',
+                      style: TextStyle(fontSize: 11.5, color: textSecondary)),
                 ],
               ),
+              if (plan.linkedTransactionRef != null) ...[
+                const SizedBox(height: 5),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: teal.withValues(alpha: 0.09),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: teal.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.link_rounded, size: 13, color: teal),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Linked Swipe: ${plan.linkedTransactionRef}',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: teal),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Swipe: ₹${IndianCurrency.formatSmart(plan.totalTransactionAmount)}',
+                        style: TextStyle(fontSize: 10.5, color: textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
 
               // Progress Bar
