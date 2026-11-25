@@ -456,9 +456,9 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          trailing: const SizedBox.shrink(),
+          tilePadding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+          showTrailingIcon: false,
           title: Row(
             children: [
               Expanded(
