@@ -529,25 +529,29 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
               if (plan.linkedTransactionRef != null) ...[
                 const SizedBox(height: 5),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: teal.withValues(alpha: 0.09),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: teal.withValues(alpha: 0.25)),
                   ),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.link_rounded, size: 13, color: teal),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Linked Swipe: ${plan.linkedTransactionRef}',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: teal),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          'Linked Swipe: ${plan.linkedTransactionRef}',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: teal),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       Text(
                         'Swipe: ₹${IndianCurrency.formatSmart(plan.totalTransactionAmount)}',
-                        style: TextStyle(fontSize: 10.5, color: textSecondary),
+                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500, color: textSecondary),
                       ),
                     ],
                   ),
@@ -584,18 +588,43 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
               if (plan.isPartialConversion) ...[
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                   decoration: BoxDecoration(
                     color: Colors.amber.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.amber.withValues(alpha: 0.25)),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.pie_chart_outline, size: 13, color: Colors.amber),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 1.5),
+                        child: Icon(Icons.pie_chart_outline, size: 13, color: Colors.amber),
+                      ),
                       const SizedBox(width: 6),
-                      Text(
-                        'Partial: ₹${IndianCurrency.formatSmart(plan.bookingPrincipal)} of ₹${IndianCurrency.formatSmart(plan.totalTransactionAmount)} (Non-EMI Due: ₹${IndianCurrency.formatSmart(plan.nonEmiBalance)})',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.amber),
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            text: 'Partial: ',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber),
+                            children: [
+                              TextSpan(
+                                text: '₹${IndianCurrency.formatSmart(plan.bookingPrincipal)} of ₹${IndianCurrency.formatSmart(plan.totalTransactionAmount)}',
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              const TextSpan(
+                                text: '  •  Non-EMI Due: ',
+                                style: TextStyle(color: Colors.amber),
+                              ),
+                              TextSpan(
+                                text: '₹${IndianCurrency.formatSmart(plan.nonEmiBalance)}',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          style: const TextStyle(fontSize: 11, color: Colors.amber),
+                        ),
                       ),
                     ],
                   ),

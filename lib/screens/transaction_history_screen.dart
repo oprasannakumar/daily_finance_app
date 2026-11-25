@@ -547,7 +547,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                       if (linkedPlan.isPartialConversion) ...[
                         const SizedBox(height: 2),
                         Text(
-                          'Remaining Immediate Due: ₹${IndianCurrency.format(linkedPlan.nonEmiBalance)}',
+                          'Non-EMI Due: ₹${IndianCurrency.format(linkedPlan.nonEmiBalance)}',
                           style: const TextStyle(fontSize: 11.5, color: Colors.grey),
                         ),
                       ],
