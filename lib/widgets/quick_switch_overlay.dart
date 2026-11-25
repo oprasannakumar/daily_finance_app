@@ -215,38 +215,96 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
     }
   }
 
-  Offset _computeRingCenter(Offset ballCenter, Size screenSize, EdgeInsets padding) {
-    final minX = _radialRadius + 34.0;
-    final maxX = (screenSize.width - _radialRadius - 34.0).clamp(minX, double.infinity);
-    final minY = padding.top + _radialRadius + 40.0;
-    final maxY = (screenSize.height - padding.bottom - _radialRadius - 40.0).clamp(minY, double.infinity);
-    return Offset(
-      ballCenter.dx.clamp(minX, maxX),
-      ballCenter.dy.clamp(minY, maxY),
-    );
-  }
+  List<Offset> _computeRadialPositions(Offset ballCenter, Size screenSize, EdgeInsets padding) {
+    const double safeMargin = 10.0;
+    const double iconHalf = 22.0; // half of selected 44px orb
+    final double minX = safeMargin + iconHalf;
+    final double maxX = (screenSize.width - safeMargin - iconHalf).clamp(minX, double.infinity);
+    final double minY = padding.top + safeMargin + iconHalf;
+    final double maxY = (screenSize.height - padding.bottom - safeMargin - iconHalf).clamp(minY, double.infinity);
 
-  Offset _radialItemCenter(Offset ringCenter, int index) {
-    final angle = -math.pi / 2 + (index * 2 * math.pi / _radialItems.length);
-    return Offset(
-      ringCenter.dx + _radialRadius * math.cos(angle),
-      ringCenter.dy + _radialRadius * math.sin(angle),
-    );
+    final bool fitsLeft = ballCenter.dx - _radialRadius >= minX;
+    final bool fitsRight = ballCenter.dx + _radialRadius <= maxX;
+    final bool fitsTop = ballCenter.dy - _radialRadius >= minY;
+    final bool fitsBottom = ballCenter.dy + _radialRadius <= maxY;
+
+    final int count = _radialItems.length;
+    final List<Offset> positions = [];
+
+    if (fitsLeft && fitsRight && fitsTop && fitsBottom) {
+      // Full 360° ring around the ball
+      for (int i = 0; i < count; i++) {
+        final angle = -math.pi / 2 + (i * 2 * math.pi / count);
+        positions.add(Offset(
+          (ballCenter.dx + _radialRadius * math.cos(angle)).clamp(minX, maxX),
+          (ballCenter.dy + _radialRadius * math.sin(angle)).clamp(minY, maxY),
+        ));
+      }
+      return positions;
+    }
+
+    // Edge or corner: fan icons completely toward the open inward side
+    final double dx = !fitsRight ? -1.0 : (!fitsLeft ? 1.0 : 0.0);
+    final double dy = !fitsBottom ? -1.0 : (!fitsTop ? 1.0 : 0.0);
+    final double centerAngle = math.atan2(dy, dx);
+    final bool isCorner = dx != 0.0 && dy != 0.0;
+
+    if (!isCorner) {
+      // Single edge (left, right, top, or bottom): crisp 170° semi-circle on open side
+      const double edgeRadius = 82.0;
+      const double span = math.pi * 0.94;
+      final double startAngle = centerAngle - span / 2;
+      for (int i = 0; i < count; i++) {
+        final t = count > 1 ? i / (count - 1) : 0.5;
+        final angle = startAngle + t * span;
+        positions.add(Offset(
+          (ballCenter.dx + edgeRadius * math.cos(angle)).clamp(minX, maxX),
+          (ballCenter.dy + edgeRadius * math.sin(angle)).clamp(minY, maxY),
+        ));
+      }
+    } else {
+      // Corner: 2 clean concentric arcs inside the open quadrant (3 inner + 4 outer)
+      final int innerCount = count ~/ 2; // 3
+      final int outerCount = count - innerCount; // 4
+      const double innerRadius = 56.0;
+      const double outerRadius = 104.0;
+      const double innerSpan = math.pi * 0.48;
+      const double outerSpan = math.pi * 0.56;
+
+      for (int i = 0; i < innerCount; i++) {
+        final t = innerCount > 1 ? i / (innerCount - 1) : 0.5;
+        final angle = (centerAngle - innerSpan / 2) + t * innerSpan;
+        positions.add(Offset(
+          (ballCenter.dx + innerRadius * math.cos(angle)).clamp(minX, maxX),
+          (ballCenter.dy + innerRadius * math.sin(angle)).clamp(minY, maxY),
+        ));
+      }
+      for (int i = 0; i < outerCount; i++) {
+        final t = outerCount > 1 ? i / (outerCount - 1) : 0.5;
+        final angle = (centerAngle - outerSpan / 2) + t * outerSpan;
+        positions.add(Offset(
+          (ballCenter.dx + outerRadius * math.cos(angle)).clamp(minX, maxX),
+          (ballCenter.dy + outerRadius * math.sin(angle)).clamp(minY, maxY),
+        ));
+      }
+    }
+
+    return positions;
   }
 
   void _updateRadialSelection(Offset fingerPos, Size screenSize, EdgeInsets padding) {
-    if ((fingerPos - _radialOrigin).distance < 22.0) {
+    if ((fingerPos - _radialOrigin).distance < 20.0) {
       if (_selectedRadialIndex != null) {
         setState(() => _selectedRadialIndex = null);
       }
       return;
     }
 
-    final ringCenter = _computeRingCenter(_radialOrigin, screenSize, padding);
+    final positions = _computeRadialPositions(_radialOrigin, screenSize, padding);
     int bestIndex = 0;
     double bestDist = double.infinity;
-    for (int i = 0; i < _radialItems.length; i++) {
-      final d = (fingerPos - _radialItemCenter(ringCenter, i)).distance;
+    for (int i = 0; i < positions.length; i++) {
+      final d = (fingerPos - positions[i]).distance;
       if (d < bestDist) {
         bestDist = d;
         bestIndex = i;
@@ -762,7 +820,24 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                 ? 0.95
                 : (_isIdleFaded && _autoHide ? 0.14 : _opacity);
 
-            final ringCenter = _computeRingCenter(_radialOrigin, screenSize, padding);
+            final radialPositions = _isRadialOpen
+                ? _computeRadialPositions(_radialOrigin, screenSize, padding)
+                : const <Offset>[];
+
+            double labelTop = padding.top + 12.0;
+            if (radialPositions.isNotEmpty) {
+              final minIconY = radialPositions.map((p) => p.dy).reduce(math.min);
+              final maxIconY = radialPositions.map((p) => p.dy).reduce(math.max);
+              final candidateAbove = minIconY - 58.0;
+              if (candidateAbove >= padding.top + 8.0) {
+                labelTop = candidateAbove;
+              } else {
+                labelTop = (maxIconY + 32.0).clamp(
+                  padding.top + 8.0,
+                  screenSize.height - padding.bottom - 40.0,
+                );
+              }
+            }
 
             return Stack(
               children: [
@@ -774,12 +849,12 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                       ),
                     ),
                   ),
-                  // Selected radial label pill above ring
+                  // Selected radial label pill (automatically above or below icons within safe area)
                   if (_selectedRadialIndex != null)
                     Positioned(
-                      left: 0,
-                      right: 0,
-                      top: (ringCenter.dy - _radialRadius - 54).clamp(padding.top + 8.0, screenSize.height),
+                      left: 16,
+                      right: 16,
+                      top: labelTop,
                       child: IgnorePointer(
                         child: Center(
                           child: Material(
@@ -811,10 +886,10 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                         ),
                       ),
                     ),
-                  // 8 radial icons around ringCenter
-                  for (int i = 0; i < _radialItems.length; i++)
+                  // Radial icons positioned safely inside screen bounds
+                  for (int i = 0; i < radialPositions.length; i++)
                     () {
-                      final pt = _radialItemCenter(ringCenter, i);
+                      final pt = radialPositions[i];
                       final isSelected = _selectedRadialIndex == i;
                       final itemSize = isSelected ? 44.0 : 38.0;
                       return Positioned(
