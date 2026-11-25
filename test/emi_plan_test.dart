@@ -242,22 +242,7 @@ void main() {
         totalAmount: 72272.47,
       );
 
-      // Reversal transaction created by EMI conversion (+10,236.49 to card)
-      final reversalTx = FinanceTransaction(
-        date: DateTime(2026, 10, 11),
-        referenceId: 'REF-11102026-REV1',
-        narration: 'EMI Conversion Credit: HP Victus Laptop',
-        flow: 'Deposit',
-        invoice: '',
-        purpose: 'Credit Card EMI Reversal',
-        spentFor: 'Self',
-        breakdowns: [
-          PaymentBreakdown(paymentType: 'Credit', account: 'HDFC Credit Card', amount: 10236.49),
-        ],
-        totalAmount: 10236.49,
-      );
-
-      // Processing fee transaction (-53.10)
+      // One-time processing fee transaction (-53.10)
       final feeTx = FinanceTransaction(
         date: DateTime(2026, 10, 11),
         referenceId: 'REF-11102026-FEE1',
@@ -293,22 +278,22 @@ void main() {
         firstEmiDate: DateTime(2026, 10, 24),
         installments: schedule,
         linkedTransactionRef: 'REF-11102026-LAPTOP',
-        reversalTransactionRef: 'REF-11102026-REV1',
+        reversalTransactionRef: null,
         feeTransactionRef: 'REF-11102026-FEE1',
       );
 
       final summary = LiveAccountBalanceSummary.calculate(
         config: config,
-        transactions: [swipeTx, reversalTx, feeTx],
+        transactions: [swipeTx, feeTx],
         categories: {'Credit Cards': ['HDFC Credit Card']},
         emiPlans: [emiPlan],
       );
 
       final ccSummary = summary.creditCardSummaries['HDFC Credit Card']!;
-      // Card used balance: 72272.47 - 10236.49 + 53.10 = 62089.08
-      expect(ccSummary.usedLimit, closeTo(62089.08, 0.01));
-      // Available limit: 150000 - 62089.08 = 87910.92
-      expect(ccSummary.availableLimit, closeTo(87910.92, 0.01));
+      // Card used balance: 72272.47 + 53.10 = 72325.57 (Principal stays blocked)
+      expect(ccSummary.usedLimit, closeTo(72325.57, 0.01));
+      // Available limit: 150000 - 72325.57 = 77674.43
+      expect(ccSummary.availableLimit, closeTo(77674.43, 0.01));
       // Active EMI metrics
       expect(ccSummary.activeEmiPlansCount, equals(1));
       expect(ccSummary.unbilledEmiPrincipal, equals(10236.49));
@@ -316,7 +301,7 @@ void main() {
       expect(summary.totalUnbilledEmiPrincipal, equals(10236.49));
     });
 
-    test('Automatic billing date processing creates single combined installment transaction and undo works', () async {
+    test('Automatic billing date processing creates Interest & GST transaction and undo works', () async {
       TestWidgetsFlutterBinding.ensureInitialized();
       SharedPreferences.setMockInitialValues({});
 
@@ -356,8 +341,9 @@ void main() {
       final txs = await storage.getTransactions();
       expect(txs.any((t) => t.referenceId == posted[0].transactionRef), isTrue);
       final postedTx = txs.firstWhere((t) => t.referenceId == posted[0].transactionRef);
-      expect(postedTx.purpose, equals('Credit Card EMI Installment'));
-      expect(postedTx.totalAmount, equals(posted[0].installment.totalDueWithTax));
+      expect(postedTx.purpose, equals('Credit Card EMI Interest & GST'));
+      final expectedCharge = posted[0].installment.interest + posted[0].installment.applicableTaxes;
+      expect(postedTx.totalAmount, closeTo(expectedCharge, 0.01));
       expect(postedTx.flow, equals('Withdraw'));
 
       // Test Undo
@@ -368,6 +354,100 @@ void main() {
       final plansAfterUndo = await storage.getCachedEmiPlans();
       expect(plansAfterUndo.first.installments[0].isPaid, isFalse);
       expect(plansAfterUndo.first.installments[0].paymentReference, isNull);
+    });
+
+    test('isEligibleForEmiConversion only allows Credit Card and Debit Card outflows', () {
+      final knownCards = {'SBI BPCL', 'HDFC Regalia'};
+
+      final ccTx = FinanceTransaction(
+        date: DateTime(2026, 10, 11),
+        referenceId: 'REF-CC-01',
+        narration: 'Laptop swipe',
+        flow: 'Withdraw',
+        invoice: '',
+        purpose: 'Shopping',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(paymentType: 'Credit', account: 'SBI BPCL', amount: 72272.47),
+        ],
+        totalAmount: 72272.47,
+      );
+      expect(ccTx.isEligibleForEmiConversion(knownCreditCards: knownCards), isTrue);
+
+      final dcTx = FinanceTransaction(
+        date: DateTime(2026, 10, 12),
+        referenceId: 'REF-DC-01',
+        narration: 'Debit card POS purchase',
+        flow: 'Withdraw',
+        invoice: '',
+        purpose: 'Electronics',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(paymentType: 'Debit Card', account: 'HDFC Bank', amount: 15000.0),
+        ],
+        totalAmount: 15000.0,
+      );
+      expect(dcTx.isEligibleForEmiConversion(knownCreditCards: knownCards), isTrue);
+
+      final cashTx = FinanceTransaction(
+        date: DateTime(2026, 10, 13),
+        referenceId: 'REF-CASH-01',
+        narration: 'Cash expense',
+        flow: 'Withdraw',
+        invoice: '',
+        purpose: 'Groceries',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(paymentType: 'Cash', account: 'Cash', amount: 500.0),
+        ],
+        totalAmount: 500.0,
+      );
+      expect(cashTx.isEligibleForEmiConversion(knownCreditCards: knownCards), isFalse);
+
+      final upiTx = FinanceTransaction(
+        date: DateTime(2026, 10, 14),
+        referenceId: 'REF-UPI-01',
+        narration: 'UPI transfer',
+        flow: 'Withdraw',
+        invoice: '',
+        purpose: 'Food',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(paymentType: 'UPI', account: 'HDFC Bank', amount: 350.0),
+        ],
+        totalAmount: 350.0,
+      );
+      expect(upiTx.isEligibleForEmiConversion(knownCreditCards: knownCards), isFalse);
+
+      final depositTx = FinanceTransaction(
+        date: DateTime(2026, 10, 15),
+        referenceId: 'REF-DEP-01',
+        narration: 'Salary deposit',
+        flow: 'Deposit',
+        invoice: '',
+        purpose: 'Salary',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(paymentType: 'Net', account: 'HDFC Bank', amount: 80000.0),
+        ],
+        totalAmount: 80000.0,
+      );
+      expect(depositTx.isEligibleForEmiConversion(knownCreditCards: knownCards), isFalse);
+
+      final emiInternalTx = FinanceTransaction(
+        date: DateTime(2026, 10, 16),
+        referenceId: 'EMI-REV-01',
+        narration: 'EMI Conversion Credit',
+        flow: 'Deposit',
+        invoice: '',
+        purpose: 'Credit Card EMI Reversal',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(paymentType: 'Credit', account: 'SBI BPCL', amount: 10236.49),
+        ],
+        totalAmount: 10236.49,
+      );
+      expect(emiInternalTx.isEligibleForEmiConversion(knownCreditCards: knownCards), isFalse);
     });
   });
 }

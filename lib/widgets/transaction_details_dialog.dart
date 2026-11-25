@@ -341,7 +341,7 @@ class TransactionDetailsDialog extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (tx.totalAmount > 0) ...[
+                  if (tx.totalAmount > 0 && tx.isEligibleForEmiConversion()) ...[
                     const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
@@ -357,7 +357,7 @@ class TransactionDetailsDialog extends StatelessWidget {
                           ),
                         ),
                         icon: const Icon(Icons.credit_card, size: 16),
-                        label: const Text('Convert to Credit Card EMI', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                        label: const Text('Convert to Card EMI', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
                         onPressed: () {
                           Navigator.of(context).pop();
                           EmiConversionSheet.show(context, transaction: tx);

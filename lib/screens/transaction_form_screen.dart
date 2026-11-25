@@ -141,11 +141,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     try {
       final posted = await _storage.processDueEmiInstallments();
       if (posted.isNotEmpty && mounted) {
-        final totalPostedAmt = posted.fold(0.0, (sum, p) => sum + p.installment.totalDueWithTax);
+        final totalFeeAmt = posted.fold(0.0, (sum, p) => sum + p.installment.interest + p.installment.applicableTaxes);
         final firstItem = posted.first;
+        final firstFee = firstItem.installment.interest + firstItem.installment.applicableTaxes;
         final msg = posted.length == 1
-            ? 'Auto-posted Installment #${firstItem.installment.installmentNumber} for "${firstItem.plan.title}" (₹${IndianCurrency.format(firstItem.installment.totalDueWithTax)}) to ${firstItem.plan.account}'
-            : 'Auto-posted ${posted.length} due EMI installments (₹${IndianCurrency.format(totalPostedAmt)}) to credit cards';
+            ? 'Logged Interest & GST for Installment #${firstItem.installment.installmentNumber} of "${firstItem.plan.title}" (₹${IndianCurrency.format(firstFee)}) on ${firstItem.plan.account}'
+            : 'Logged Interest & GST for ${posted.length} due EMI installments (₹${IndianCurrency.format(totalFeeAmt)}) on credit cards';
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -28,6 +28,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   Set<String> _emiLinkedRefs = {};
   Map<String, EmiPlan> _emiPlanById = {};
   Map<String, EmiPlan> _emiPlanByRef = {};
+  Set<String> _knownCreditCards = {};
 
   // Modern Flipkart / Amazon Faceted Filter Criteria
   TransactionFilterCriteria _filterCriteria = TransactionFilterCriteria();
@@ -99,6 +100,15 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         planById[p.linkedTransactionId!] = p;
       }
     }
+    final categories = await _storage.getCategoryAccounts();
+    final ccFromCats = categories['Credit Cards'] ?? [];
+    final balanceConfig = await _storage.getAccountBalanceConfig();
+    final ccFromConfig = balanceConfig.creditCardLimits.keys.toList();
+    final knownCreditCards = <String>{
+      ...ccFromCats.map((c) => c.trim()).where((c) => c.isNotEmpty && c != 'Other'),
+      ...ccFromConfig.map((c) => c.trim()).where((c) => c.isNotEmpty),
+    };
+
     if (mounted) {
       setState(() {
         _transactions = list;
@@ -107,6 +117,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         _emiLinkedIds = linkedIds;
         _emiPlanById = planById;
         _emiPlanByRef = planByRef;
+        _knownCreditCards = knownCreditCards;
         _isLoading = false;
         // Clean up selected IDs that no longer exist
         _selectedIds.removeWhere((id) => !_transactions.any((t) => t.id == id));
@@ -570,6 +581,10 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                 );
               }
 
+              if (!tx.isEligibleForEmiConversion(knownCreditCards: _knownCreditCards)) {
+                return const SizedBox.shrink();
+              }
+
               return SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -579,7 +594,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   icon: const Icon(Icons.credit_card_outlined, size: 20),
-                  label: const Text('Convert to Credit Card EMI',
+                  label: const Text('Convert to Card EMI',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
                   onPressed: () {
                     Navigator.pop(ctx);

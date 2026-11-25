@@ -96,38 +96,44 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
     bool clearRef = false;
 
     if (newStatus == true) {
-      final shouldPost = await showDialog<bool>(
+      final shouldPost = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Post Installment to Card?'),
+          title: Text('Pay Installment #$installmentNumber?'),
           content: Text(
-            'Mark Installment #$installmentNumber as paid and post ₹${IndianCurrency.format(inst.totalDueWithTax)} debit to ${plan.account} in Transaction History / Ledger?',
+            'Mark Installment #$installmentNumber as paid (MRA: ₹${IndianCurrency.format(inst.totalDueWithTax)}) to release ₹${IndianCurrency.format(inst.principal)} of blocked principal on ${plan.account}?',
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
+              onPressed: () => Navigator.pop(ctx, 'cancel'),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'mark_only'),
               child: const Text('Mark Paid Only'),
             ),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF5C38)),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Post to Card & Ledger'),
+              onPressed: () => Navigator.pop(ctx, 'record_payment'),
+              child: const Text('Pay & Release Limit'),
             ),
           ],
         ),
       );
 
-      if (shouldPost == true) {
+      if (shouldPost == null || shouldPost == 'cancel') return;
+
+      if (shouldPost == 'record_payment') {
         final refId = FinanceTransaction.generateReferenceId(inst.billingDate);
-        final narration = 'EMI Installment #$installmentNumber: ${plan.title} (Prin: ₹${IndianCurrency.format(inst.principal)} + Int: ₹${IndianCurrency.format(inst.interest)} + GST: ₹${IndianCurrency.format(inst.applicableTaxes)})';
+        final narration = 'EMI Installment #$installmentNumber Payment: ${plan.title} (Releasing Prin: ₹${IndianCurrency.format(inst.principal)})';
         final instTx = FinanceTransaction(
           date: inst.billingDate,
           referenceId: refId,
           narration: narration,
-          flow: 'Withdraw',
+          flow: 'Deposit', // Credit/payment to card releases the blocked principal limit
           invoice: '',
-          purpose: 'Credit Card EMI Installment',
+          purpose: 'Credit Card EMI Payment',
           spentFor: 'Self',
           breakdowns: [
             PaymentBreakdown(
@@ -588,7 +594,7 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
                       const Icon(Icons.pie_chart_outline, size: 13, color: Colors.amber),
                       const SizedBox(width: 6),
                       Text(
-                        'Partial: ₹${IndianCurrency.formatSmart(plan.bookingPrincipal)} of ₹${IndianCurrency.formatSmart(plan.totalTransactionAmount)} (Card Bal: ₹${IndianCurrency.formatSmart(plan.nonEmiBalance)})',
+                        'Partial: ₹${IndianCurrency.formatSmart(plan.bookingPrincipal)} of ₹${IndianCurrency.formatSmart(plan.totalTransactionAmount)} (Non-EMI Due: ₹${IndianCurrency.formatSmart(plan.nonEmiBalance)})',
                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.amber),
                       ),
                     ],

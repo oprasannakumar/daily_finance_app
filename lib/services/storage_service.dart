@@ -598,6 +598,12 @@ class StorageService {
               .map((item) => FinanceTransaction.fromJson(jsonDecode(item)))
               .toList()
             ..sort((a, b) => b.date.compareTo(a.date));
+          // Clean up any legacy EMI reversal transactions to restore card balances
+          if (_cachedTransactions!.any((t) => t.purpose == 'Credit Card EMI Reversal' || t.referenceId.startsWith('EMI-REV-'))) {
+            _cachedTransactions!.removeWhere((t) => t.purpose == 'Credit Card EMI Reversal' || t.referenceId.startsWith('EMI-REV-'));
+            unawaited(_persistTransactions(prefs, _cachedTransactions!));
+          }
+
           GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
 
           // Resume any pending background sync operations or silent refresh
@@ -899,29 +905,36 @@ class StorageService {
         // Check if billing date has arrived or passed and installment is not yet paid/posted
         if (!inst.isPaid && (inst.paymentReference == null || inst.paymentReference!.isEmpty)) {
           if (today.isAfter(instDate) || today.isAtSameMomentAs(instDate)) {
-            final refId = FinanceTransaction.generateReferenceId(inst.billingDate);
+            final financeCharge = inst.interest + inst.applicableTaxes;
+            String refId = '';
 
-            // Construct single combined installment transaction
-            final narration = 'EMI Installment #${inst.installmentNumber}: ${plan.title} (Prin: ₹${IndianCurrency.format(inst.principal)} + Int: ₹${IndianCurrency.format(inst.interest)} + GST: ₹${IndianCurrency.format(inst.applicableTaxes)})';
-            final instTx = FinanceTransaction(
-              date: inst.billingDate,
-              referenceId: refId,
-              narration: narration,
-              flow: 'Withdraw',
-              invoice: '',
-              purpose: 'Credit Card EMI Installment',
-              spentFor: 'Self',
-              breakdowns: [
-                PaymentBreakdown(
-                  paymentType: 'Credit',
-                  account: plan.account,
-                  amount: inst.totalDueWithTax,
-                ),
-              ],
-              totalAmount: inst.totalDueWithTax,
-            );
+            // As in real banking, the billing date charges monthly interest & GST onto the card.
+            // The principal is NOT debited again, because it was already swiped in the original purchase.
+            if (financeCharge > 0) {
+              refId = FinanceTransaction.generateReferenceId(inst.billingDate);
+              final narration = 'EMI Interest & GST #${inst.installmentNumber}: ${plan.title} (Int: ₹${IndianCurrency.format(inst.interest)} + GST: ₹${IndianCurrency.format(inst.applicableTaxes)})';
+              final instTx = FinanceTransaction(
+                date: inst.billingDate,
+                referenceId: refId,
+                narration: narration,
+                flow: 'Withdraw',
+                invoice: '',
+                purpose: 'Credit Card EMI Interest & GST',
+                spentFor: 'Self',
+                breakdowns: [
+                  PaymentBreakdown(
+                    paymentType: 'Credit',
+                    account: plan.account,
+                    amount: financeCharge,
+                  ),
+                ],
+                totalAmount: financeCharge,
+              );
 
-            await saveTransaction(instTx);
+              await saveTransaction(instTx);
+            } else {
+              refId = 'BILLED-#${inst.installmentNumber}';
+            }
 
             final updatedInst = inst.copyWith(
               isPaid: true,

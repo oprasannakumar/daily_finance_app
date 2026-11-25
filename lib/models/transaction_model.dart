@@ -409,6 +409,72 @@ class FinanceTransaction {
           .toList(),
     );
   }
+
+  /// Checks whether this transaction represents an outflow (expense/withdrawal) paid
+  /// via a Credit Card or Debit Card.
+  /// Transactions eligible for EMI conversion must be paid out from a Credit or Debit card.
+  bool isEligibleForEmiConversion({Iterable<String>? knownCreditCards}) {
+    // 1. Must be an outflow: not deposit, not transfer, not self-transfer
+    final f = flow.trim().toLowerCase();
+    if (f == 'deposit' || f == 'transfer' || isSelfTransfer) return false;
+    if (totalAmount <= 0) return false;
+
+    // 2. Ignore internal EMI ledger entries (installments, interest/fees, reversals)
+    final p = purpose.trim().toLowerCase();
+    if (p.contains('emi installment') ||
+        p.contains('emi interest') ||
+        p.contains('emi reversal') ||
+        p.contains('emi fee') ||
+        p.startsWith('credit card emi') ||
+        p.startsWith('debit card emi')) {
+      return false;
+    }
+    if (referenceId.startsWith('EMI-')) {
+      return false;
+    }
+
+    bool isCardMatch(String accountName, [String? paymentType]) {
+      final acc = accountName.trim().toLowerCase();
+      final pt = paymentType?.trim().toLowerCase();
+
+      // Check payment type (e.g. 'Credit', 'Credit Card', 'Debit', 'Debit Card')
+      if (pt != null) {
+        if (pt.contains('credit') || pt.contains('debit') || pt.contains('card')) {
+          return true;
+        }
+      }
+
+      // Check known credit cards configured in settings/categories
+      if (knownCreditCards != null && knownCreditCards.isNotEmpty) {
+        if (knownCreditCards.any((c) => c.trim().toLowerCase() == acc)) {
+          return true;
+        }
+      }
+
+      // Check account name for keywords
+      if (acc.contains('credit') || acc.contains('debit') || acc.contains('card')) {
+        return true;
+      }
+
+      return false;
+    }
+
+    if (breakdowns.isNotEmpty) {
+      for (final b in breakdowns) {
+        if (b.amount > 0 && isCardMatch(b.effectiveAccount, b.paymentType)) {
+          return true;
+        }
+      }
+    }
+
+    if (isCardMatch(fromSummary)) return true;
+
+    return false;
+  }
+
+  /// Backward-compatible alias for isEligibleForEmiConversion.
+  bool isCreditCardExpense({Iterable<String>? knownCreditCards}) =>
+      isEligibleForEmiConversion(knownCreditCards: knownCreditCards);
 }
 
 class RecurringTransaction {
