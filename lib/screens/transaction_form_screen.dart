@@ -4137,6 +4137,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       {'emoji': '💳', 'label': 'EMIs'},
       {'emoji': '⚙️', 'label': 'Masters'},
     ];
+    final balanceItem = {'emoji': '💰', 'label': 'Balances'};
 
     showGeneralDialog(
       context: context,
@@ -4243,6 +4244,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                             Expanded(child: buildMenuItem(row4[1])),
                           ],
                         ),
+                        const SizedBox(height: 6),
+                        buildMenuItem(balanceItem, fullWidth: true),
                       ],
                     ),
                   ),
@@ -5152,67 +5155,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // 1. Top Bar: 🟢 🧾 | ✨ Smart Entry | 🔗 🌙/☀️
+                            // 1. Top Bar: Profile | ✨ Smart Entry | 🌙/☀️ ⋮
                             Row(
                               children: [
-                                Container(
-                                  width: 9,
-                                  height: 9,
-                                  decoration: const BoxDecoration(
-                                    color: cyanAccent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                InkWell(
-                                  onTap: _navigateToInvoiceManager,
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF1B2042) : const Color(0xFFF0FDFA),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: isDark ? const Color(0xFF2C3360) : const Color(0xFFCCFBF1),
-                                        width: 1.2,
-                                      ),
-                                    ),
-                                    child: const Center(
-                                      child: Text('🧾', style: TextStyle(fontSize: 16)),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Center(
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '✨ ',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            color: isDark ? const Color(0xFFC084FC) : const Color(0xFFA855F7),
-                                          ),
-                                        ),
-                                        Text(
-                                          'Smart Entry',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: isDark ? const Color(0xFFC084FC) : const Color(0xFFA855F7),
-                                            letterSpacing: 0.2,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                ThemeToggleRotatingButton(
-                                  isDark: isDark,
-                                  onToggle: () => StorageService.instance.toggleDarkMode(),
-                                ),
-                                const SizedBox(width: 8),
                                 ValueListenableBuilder<GoogleUserProfile?>(
                                   valueListenable: GoogleAuthService.instance.currentUserNotifier,
                                   builder: (context, gUser, _) {
@@ -5254,6 +5199,35 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                       ),
                                     );
                                   },
+                                ),
+                                Expanded(
+                                  child: Center(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '✨ ',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            color: isDark ? const Color(0xFFC084FC) : const Color(0xFFA855F7),
+                                          ),
+                                        ),
+                                        Text(
+                                          'Smart Entry',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark ? const Color(0xFFC084FC) : const Color(0xFFA855F7),
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                ThemeToggleRotatingButton(
+                                  isDark: isDark,
+                                  onToggle: () => StorageService.instance.toggleDarkMode(),
                                 ),
                                 const SizedBox(width: 8),
                                 InkWell(
