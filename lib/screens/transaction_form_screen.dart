@@ -4123,21 +4123,17 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
     final row1 = [
       {'emoji': '📊', 'label': 'Dashboard'},
-      {'emoji': '💰', 'label': 'Balances'},
-    ];
-    final row2 = [
-      {'emoji': '🤝', 'label': 'Borrowers'},
       {'emoji': '🔑', 'label': 'API Keys'},
     ];
+    final row2 = [
+      {'emoji': '📜', 'label': 'History'},
+      {'emoji': '🤝', 'label': 'Borrowers'},
+    ];
     final row3 = [
-      {'emoji': '⌛', 'label': 'Recurring'},
       {'emoji': '📋', 'label': 'Templates'},
+      {'emoji': '⌛', 'label': 'Recurring'},
     ];
     final row4 = [
-      {'emoji': '📜', 'label': 'History'},
-      {'emoji': '🧾', 'label': 'Invoices'},
-    ];
-    final row5 = [
       {'emoji': '💳', 'label': 'EMIs'},
       {'emoji': '⚙️', 'label': 'Masters'},
     ];
@@ -4245,14 +4241,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                             Expanded(child: buildMenuItem(row4[0])),
                             const SizedBox(width: 6),
                             Expanded(child: buildMenuItem(row4[1])),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(child: buildMenuItem(row5[0])),
-                            const SizedBox(width: 6),
-                            Expanded(child: buildMenuItem(row5[1])),
                           ],
                         ),
                       ],

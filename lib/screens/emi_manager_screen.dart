@@ -456,20 +456,9 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isCompleted ? Colors.grey.withValues(alpha: 0.15) : coral.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              isCompleted ? Icons.check_circle_outline : Icons.credit_card,
-              color: isCompleted ? Colors.grey : coral,
-              size: 22,
-            ),
-          ),
+          tilePadding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          trailing: const SizedBox.shrink(),
           title: Row(
             children: [
               Expanded(
