@@ -51,7 +51,16 @@ You can download and install the pre-compiled Android release APK directly witho
 - **View / Edit Mode**: Toggle edit mode to add new accounts, remove duplicate accounts/cards, or manually adjust baseline balances.
 - **Real-Time Auditing**: Automatically deducts expenses and credits deposits across active balances.
 
-### 5. ☁️ Google Sheets Dual-Database Sync
+### 5. 💳 Credit Card EMI Conversion & Amortization Manager
+- **Partial Conversion Support**: Convert either the full swipe amount or only a specific portion into EMI (e.g. ₹72,272.47 swipe with ₹10,236.49 booked into EMI), keeping the remaining non-EMI balance tracked for the immediate statement cycle.
+- **Precision Amortization Engine**: Built-in reducing-balance amortization calculator supporting variable tenure (3, 6, 9, 12, 18, 24, 36 months) with 18% GST calculation on interest.
+- **Full Manual Schedule Customization**: Edit any individual installment (MRA, Principal, Interest, GST, or Billing Date) to match bank-specific broken-period interest down to the exact paise.
+- **Bank-Specific Processing Fees**: Enter custom one-time bank processing fees and fee taxes.
+- **1-Tap Payment Tracking**: View overall repayment progress, remaining principal debt, and toggle monthly installment payments with 1 tap.
+- **Direct Conversion from Ledger**: Open any recorded credit card expense in the ledger and convert it into an EMI plan in seconds.
+- **Google Sheets Cloud Sync**: Automatically backs up and synchronizes all active EMI plans and full schedule JSON to the `"Active_EMIs"` sheet.
+
+### 6. ☁️ Google Sheets Dual-Database Sync
 - **Primary Finance Spreadsheet**: Syncs main transaction logs, loan splits, account balances, and recurring templates.
 - **`Grocery_DB` Spreadsheet**: Syncs `"Invoice"` records (itemized lines) and `"Dealer_Prices"` catalog.
 - **Offline-First Resilience**: Local-first caching via `SharedPreferences`; background sync with pending delete queue ensures zero data loss offline.

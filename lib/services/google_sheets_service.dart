@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../models/account_balance_model.dart';
+import '../models/emi_plan_model.dart';
 import '../models/invoice_model.dart';
 import '../models/transaction_model.dart';
 import 'google_auth_service.dart';
@@ -195,6 +196,24 @@ class GoogleSheetsService {
     'Last Updated',
   ];
 
+  /// 10. Active EMIs (Credit card EMI conversions and schedules)
+  static const List<String> requiredEmiHeaders = [
+    'EMI ID',
+    'Title',
+    'Account',
+    'Tx Date',
+    'Total Tx Amount',
+    'Principal Converted',
+    'Tenure',
+    'ROI',
+    'Processing Fee',
+    'Processing Fee GST',
+    'First EMI Date',
+    'Status',
+    'Notes',
+    'Schedule JSON',
+  ];
+
   // Resolved titles and GIDs cached during session
   String _txTitle = 'Full Statement';
   int _txGid = 0;
@@ -214,6 +233,8 @@ class GoogleSheetsService {
   int _balancesGid = 7;
   String _configTitle = 'App Config & Masters';
   int _configGid = 8;
+  String _emiTitle = 'Active_EMIs';
+  int _emiGid = 9;
 
   // =========================================================================
   // ROW FORMATTERS
@@ -2342,6 +2363,7 @@ class GoogleSheetsService {
       bool hasBilling = false;
       bool hasBalances = false;
       bool hasConfig = false;
+      bool hasEmi = false;
 
       if (metaRes.statusCode == 200) {
         final metaData = jsonDecode(metaRes.body);
@@ -2407,6 +2429,10 @@ class GoogleSheetsService {
             hasConfig = true;
             _configTitle = title;
             _configGid = gid;
+          } else if (RegExp(r'^active\s*emis?$|^emis?$', caseSensitive: false).hasMatch(title)) {
+            hasEmi = true;
+            _emiTitle = title;
+            _emiGid = gid;
           }
         }
       }
@@ -2458,6 +2484,11 @@ class GoogleSheetsService {
         _configGid = 8;
         addRequests.add({'addSheet': {'properties': {'title': _configTitle, 'sheetId': _configGid}}});
       }
+      if (!hasEmi) {
+        _emiTitle = 'Active_EMIs';
+        _emiGid = 9;
+        addRequests.add({'addSheet': {'properties': {'title': _emiTitle, 'sheetId': _emiGid}}});
+      }
 
       if (addRequests.isNotEmpty) {
         final batchUrl = Uri.parse(
@@ -2488,12 +2519,13 @@ class GoogleSheetsService {
               if (addedTitle == _billingTitle) _billingGid = addedGid;
               if (addedTitle == _balancesTitle) _balancesGid = addedGid;
               if (addedTitle == _configTitle) _configGid = addedGid;
+              if (addedTitle == _emiTitle) _emiGid = addedGid;
             }
           }
         }
       }
 
-      // Update headers for all 9 sheets
+      // Update headers for all sheets
       await _writeHeaderIfEmpty(token, sheetId, _txTitle, 'A1:J1', requiredHeaders);
       await _writeHeaderIfEmpty(token, sheetId, _monthlyTitle, 'A1:J1', requiredMonthlyHeaders);
       await _writeHeaderIfEmpty(token, sheetId, _selfTransferTitle, 'A1:H1', requiredSelfTransferHeaders);
@@ -2503,6 +2535,7 @@ class GoogleSheetsService {
       await _writeHeaderIfEmpty(token, sheetId, _billingTitle, 'A1:G1', requiredBillingHeaders);
       await _writeHeaderIfEmpty(token, sheetId, _balancesTitle, 'A1:J1', requiredBalancesHeaders);
       await _writeHeaderIfEmpty(token, sheetId, _configTitle, 'A1:E1', requiredConfigHeaders);
+      await _writeHeaderIfEmpty(token, sheetId, _emiTitle, 'A1:N1', requiredEmiHeaders);
       _sheetsEnsured = true;
     } catch (e) {
       debugPrint('Error ensuring all sheets and headers: $e');
@@ -2702,6 +2735,8 @@ class GoogleSheetsService {
           _balancesGid = 7;
           _configTitle = 'App Config & Masters';
           _configGid = 8;
+          _emiTitle = 'Active_EMIs';
+          _emiGid = 9;
 
           // Write exact headers for each sheet
           await _writeHeaderIfEmpty(token, id, _txTitle, 'A1:J1', requiredHeaders);
@@ -2713,6 +2748,7 @@ class GoogleSheetsService {
           await _writeHeaderIfEmpty(token, id, _billingTitle, 'A1:G1', requiredBillingHeaders);
           await _writeHeaderIfEmpty(token, id, _balancesTitle, 'A1:J1', requiredBalancesHeaders);
           await _writeHeaderIfEmpty(token, id, _configTitle, 'A1:E1', requiredConfigHeaders);
+          await _writeHeaderIfEmpty(token, id, _emiTitle, 'A1:N1', requiredEmiHeaders);
           return id;
         }
       } else {
@@ -3760,6 +3796,178 @@ class GoogleSheetsService {
   void clearSessionCache() {
     cachedTransactions = null;
     cachedLoanEntries = null;
+  }
+
+  // =========================================================================
+  // CREDIT CARD EMIs (Active_EMIs)
+  // =========================================================================
+
+  Future<List<EmiPlan>> fetchEmiPlans({bool forceRefresh = false}) async {
+    // 1. Local-first
+    final cached = await StorageService.instance.getCachedEmiPlans();
+    if (!forceRefresh && cached.isNotEmpty) {
+      return cached;
+    }
+
+    final token = await GoogleAuthService.instance.getAccessToken();
+    if (token == null) return cached;
+
+    final sheetId = await getSpreadsheetId();
+    if (sheetId == null) return cached;
+
+    try {
+      await _ensureAllSheetsAndHeaders(token, sheetId);
+      final range = Uri.encodeComponent("'$_emiTitle'!A2:N");
+      final url = Uri.parse('https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/$range');
+      final res = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final values = data['values'] as List<dynamic>?;
+        if (values != null && values.isNotEmpty) {
+          final plans = <EmiPlan>[];
+          for (final row in values) {
+            if (row is List<dynamic> && row.isNotEmpty && row[0]?.toString().trim().isNotEmpty == true) {
+              try {
+                plans.add(EmiPlan.fromSheetRow(row));
+              } catch (e) {
+                debugPrint('Error parsing EMI row: $e');
+              }
+            }
+          }
+          await StorageService.instance.saveCachedEmiPlans(plans);
+          return plans;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching EMI plans from sheet: $e');
+    }
+
+    return cached;
+  }
+
+  Future<bool> saveEmiPlan(EmiPlan plan) async {
+    // 1. Local-first update
+    await StorageService.instance.saveEmiPlanLocal(plan);
+
+    // 2. Google Sheets sync
+    final token = await GoogleAuthService.instance.getAccessToken();
+    if (token == null) return true;
+
+    final sheetId = await getSpreadsheetId();
+    if (sheetId == null) return true;
+
+    try {
+      await _ensureAllSheetsAndHeaders(token, sheetId);
+      final allPlans = await StorageService.instance.getCachedEmiPlans();
+      final rows = allPlans.map((p) => p.toSheetRow()).toList();
+
+      final clearUrl = Uri.parse(
+        'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:N")}:clear',
+      );
+      await http.post(clearUrl, headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'});
+
+      if (rows.isNotEmpty) {
+        final putUrl = Uri.parse(
+          'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:N${rows.length + 1}")}?valueInputOption=USER_ENTERED',
+        );
+        await http.put(
+          putUrl,
+          headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+          body: jsonEncode({'values': rows}),
+        );
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error syncing EMI plan to sheet: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateEmiInstallmentPaid(
+    String planId,
+    int installmentNumber,
+    bool isPaid, {
+    DateTime? paidDate,
+  }) async {
+    // 1. Local update
+    await StorageService.instance.updateEmiInstallmentLocal(
+      planId,
+      installmentNumber,
+      isPaid,
+      paidDate: paidDate,
+    );
+
+    // 2. Sync full EMI table to sheet
+    final token = await GoogleAuthService.instance.getAccessToken();
+    if (token == null) return true;
+
+    final sheetId = await getSpreadsheetId();
+    if (sheetId == null) return true;
+
+    try {
+      await _ensureAllSheetsAndHeaders(token, sheetId);
+      final allPlans = await StorageService.instance.getCachedEmiPlans();
+      final rows = allPlans.map((p) => p.toSheetRow()).toList();
+
+      final clearUrl = Uri.parse(
+        'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:N")}:clear',
+      );
+      await http.post(clearUrl, headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'});
+
+      if (rows.isNotEmpty) {
+        final putUrl = Uri.parse(
+          'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:N${rows.length + 1}")}?valueInputOption=USER_ENTERED',
+        );
+        await http.put(
+          putUrl,
+          headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+          body: jsonEncode({'values': rows}),
+        );
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error updating EMI installment in sheet: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteEmiPlan(String planId) async {
+    // 1. Local delete
+    await StorageService.instance.deleteEmiPlanLocal(planId);
+
+    // 2. Google Sheets sync
+    final token = await GoogleAuthService.instance.getAccessToken();
+    if (token == null) return true;
+
+    final sheetId = await getSpreadsheetId();
+    if (sheetId == null) return true;
+
+    try {
+      await _ensureAllSheetsAndHeaders(token, sheetId);
+      final allPlans = await StorageService.instance.getCachedEmiPlans();
+      final rows = allPlans.map((p) => p.toSheetRow()).toList();
+
+      final clearUrl = Uri.parse(
+        'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:N")}:clear',
+      );
+      await http.post(clearUrl, headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'});
+
+      if (rows.isNotEmpty) {
+        final putUrl = Uri.parse(
+          'https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/${Uri.encodeComponent("'$_emiTitle'!A2:N${rows.length + 1}")}?valueInputOption=USER_ENTERED',
+        );
+        await http.put(
+          putUrl,
+          headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+          body: jsonEncode({'values': rows}),
+        );
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting EMI plan from sheet: $e');
+      return false;
+    }
   }
 }
 

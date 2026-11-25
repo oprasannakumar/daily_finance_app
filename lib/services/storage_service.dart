@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/account_balance_model.dart';
+import '../models/emi_plan_model.dart';
 import '../models/invoice_model.dart';
 import '../models/transaction_model.dart';
 import 'google_auth_service.dart';
@@ -23,9 +24,11 @@ class StorageService {
   static const String _keyGroceryDbId = 'grocery_db_spreadsheet_id';
   static const String _keyCachedInvoices = 'cached_grocery_invoices_v2';
   static const String _keyCachedDealerPrices = 'cached_dealer_prices_v1';
+  static const String _keyCachedEmiPlans = 'cached_active_emi_plans_v1';
 
   List<InvoiceItemRecord>? _cachedInvoices;
   List<DealerPriceItem>? _cachedDealerPrices;
+  List<EmiPlan>? _cachedEmiPlans;
 
   static final StorageService instance = StorageService._internal();
   StorageService._internal();
@@ -35,6 +38,7 @@ class StorageService {
   final ValueNotifier<int> recurringNotifier = ValueNotifier<int>(0);
   final ValueNotifier<int> transactionsNotifier = ValueNotifier<int>(0);
   final ValueNotifier<int> loansNotifier = ValueNotifier<int>(0);
+  final ValueNotifier<int> emiPlansNotifier = ValueNotifier<int>(0);
   final ValueNotifier<int> pendingSyncNotifier = ValueNotifier<int>(0);
   final ValueNotifier<Set<String>> pendingSyncSetNotifier = ValueNotifier<Set<String>>({});
   final ValueNotifier<AccountBalanceConfig?> balanceConfigNotifier = ValueNotifier<AccountBalanceConfig?>(null);
@@ -784,6 +788,82 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     final encoded = items.map((e) => jsonEncode(e.toJson())).toList();
     await prefs.setStringList(_keyCachedDealerPrices, encoded);
+  }
+
+  Future<List<EmiPlan>> getCachedEmiPlans() async {
+    if (_cachedEmiPlans != null && _cachedEmiPlans!.isNotEmpty) {
+      return List<EmiPlan>.from(_cachedEmiPlans!);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_keyCachedEmiPlans);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        _cachedEmiPlans = raw
+            .map((item) => EmiPlan.fromJson(jsonDecode(item) as Map<String, dynamic>))
+            .toList();
+        return List<EmiPlan>.from(_cachedEmiPlans!);
+      } catch (e) {
+        debugPrint('Error parsing cached EMI plans: $e');
+      }
+    }
+    _cachedEmiPlans = [];
+    return [];
+  }
+
+  Future<void> saveCachedEmiPlans(List<EmiPlan> plans) async {
+    _cachedEmiPlans = List<EmiPlan>.from(plans);
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = plans.map((e) => jsonEncode(e.toJson())).toList();
+    await prefs.setStringList(_keyCachedEmiPlans, encoded);
+    emiPlansNotifier.value++;
+  }
+
+  Future<void> saveEmiPlanLocal(EmiPlan plan) async {
+    final list = await getCachedEmiPlans();
+    final idx = list.indexWhere((p) => p.id == plan.id);
+    if (idx != -1) {
+      list[idx] = plan;
+    } else {
+      list.insert(0, plan);
+    }
+    await saveCachedEmiPlans(list);
+  }
+
+  Future<void> deleteEmiPlanLocal(String id) async {
+    final list = await getCachedEmiPlans();
+    list.removeWhere((p) => p.id == id);
+    await saveCachedEmiPlans(list);
+  }
+
+  Future<void> updateEmiInstallmentLocal(
+    String planId,
+    int installmentNumber,
+    bool isPaid, {
+    DateTime? paidDate,
+  }) async {
+    final list = await getCachedEmiPlans();
+    final pIdx = list.indexWhere((p) => p.id == planId);
+    if (pIdx != -1) {
+      final plan = list[pIdx];
+      final newInst = plan.installments.map((it) {
+        if (it.installmentNumber == installmentNumber) {
+          return it.copyWith(
+            isPaid: isPaid,
+            paidDate: isPaid ? (paidDate ?? DateTime.now()) : null,
+          );
+        }
+        return it;
+      }).toList();
+
+      final allPaid = newInst.every((it) => it.isPaid);
+      final newStatus = allPaid ? 'COMPLETED' : 'ACTIVE';
+
+      list[pIdx] = plan.copyWith(
+        installments: newInst,
+        status: newStatus,
+      );
+      await saveCachedEmiPlans(list);
+    }
   }
 
   List<LoanEntry> _extractLoanEntriesFromTransactions(List<FinanceTransaction> txList) {

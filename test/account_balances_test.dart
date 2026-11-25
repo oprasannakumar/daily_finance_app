@@ -326,6 +326,7 @@ void main() {
     test('Wallets and Rewards opening balances and live tracking calculations', () {
       final config = AccountBalanceConfig(
         isConfigured: true,
+        setupDate: DateTime(2026, 11, 24, 0, 0),
         walletOpeningBalances: {
           'Paytm Wallet': 1500.0,
           'Amazon Pay Balance': 350.0,

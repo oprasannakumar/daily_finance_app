@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/transaction_model.dart';
 import '../utils/currency_formatter.dart';
+import 'emi_conversion_sheet.dart';
 
 /// Modal dialog displaying full Transaction Details matching media_1794925377895_6e40cb46.png
 class TransactionDetailsDialog extends StatelessWidget {
@@ -316,25 +317,54 @@ class TransactionDetailsDialog extends StatelessWidget {
             Divider(color: isDark ? const Color(0xFF262C54) : const Color(0xFFF1E5DC), height: 1),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'Total Amount',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: coralAccent,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Total Amount',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: coralAccent,
+                        ),
+                      ),
+                      Text(
+                        '₹${IndianCurrency.format(tx.totalAmount)}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: coralAccent,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '₹${IndianCurrency.format(tx.totalAmount)}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: coralAccent,
+                  if (tx.totalAmount > 0) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: coralAccent.withValues(alpha: 0.12),
+                          foregroundColor: coralAccent,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: const BorderSide(color: coralAccent, width: 1),
+                          ),
+                        ),
+                        icon: const Icon(Icons.credit_card, size: 16),
+                        label: const Text('Convert to Credit Card EMI', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          EmiConversionSheet.show(context, transaction: tx);
+                        },
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

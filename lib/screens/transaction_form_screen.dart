@@ -28,6 +28,7 @@ import 'account_balances_screen.dart';
 import 'financial_health_dashboard_screen.dart';
 import '../models/invoice_model.dart';
 import 'invoice_manager_screen.dart';
+import 'emi_manager_screen.dart';
 
 class TransactionFormScreen extends StatefulWidget {
   final VoidCallback? onTransactionSaved;
@@ -4082,7 +4083,10 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       {'emoji': '📜', 'label': 'History'},
       {'emoji': '🧾', 'label': 'Invoices'},
     ];
-    final masterItem = {'emoji': '⚙️', 'label': 'Masters'};
+    final row5 = [
+      {'emoji': '💳', 'label': 'EMIs'},
+      {'emoji': '⚙️', 'label': 'Masters'},
+    ];
 
     showGeneralDialog(
       context: context,
@@ -4190,7 +4194,13 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                           ],
                         ),
                         const SizedBox(height: 6),
-                        buildMenuItem(masterItem, fullWidth: true),
+                        Row(
+                          children: [
+                            Expanded(child: buildMenuItem(row5[0])),
+                            const SizedBox(width: 6),
+                            Expanded(child: buildMenuItem(row5[1])),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -4276,6 +4286,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       case 'Balances':
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AccountBalancesScreen()),
+        );
+        break;
+      case 'EMIs':
+      case 'Credit Card EMIs':
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const EmiManagerScreen()),
         );
         break;
       case 'Google Sheets':
