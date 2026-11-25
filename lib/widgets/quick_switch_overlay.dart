@@ -90,10 +90,14 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   bool _hiddenForScreenshot = false;
   Timer? _screenshotHideTimer;
 
-  // Radial gesture state
+  // Radial gesture & pointer state
   bool _isRadialOpen = false;
   Offset _radialOrigin = Offset.zero;
   int? _selectedRadialIndex;
+  Timer? _holdTimer;
+  Offset? _pointerDownPos;
+  Offset? _lastPointerPos;
+  int? _activePointerId;
 
   @override
   void initState() {
@@ -105,6 +109,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   void dispose() {
     _idleTimer?.cancel();
     _screenshotHideTimer?.cancel();
+    _holdTimer?.cancel();
     super.dispose();
   }
 
@@ -852,57 +857,108 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                     child: AnimatedOpacity(
                       opacity: displayOpacity,
                       duration: const Duration(milliseconds: 220),
-                      child: GestureDetector(
-                        key: const Key('quick_switch_trackball'),
-                        onTap: () => _executeAction(_singleTapAction),
-                        onDoubleTap: _doubleTapAction == 'None'
-                            ? null
-                            : () => _executeAction(_doubleTapAction),
-                        onLongPressStart: (details) {
-                          HapticFeedback.mediumImpact();
+                      child: Listener(
+                        onPointerDown: (event) {
+                          if (_activePointerId != null) return;
+                          _activePointerId = event.pointer;
+                          _pointerDownPos = event.position;
+                          _lastPointerPos = event.position;
                           _resetIdleTimer();
-                          setState(() {
-                            _isRadialOpen = true;
-                            _radialOrigin = ballCenter;
-                            _selectedRadialIndex = null;
+                          _holdTimer?.cancel();
+                          _holdTimer = Timer(const Duration(milliseconds: 300), () {
+                            if (!mounted || _activePointerId == null || _isDragging) return;
+                            HapticFeedback.mediumImpact();
+                            setState(() {
+                              _isRadialOpen = true;
+                              _radialOrigin = ballCenter;
+                              _selectedRadialIndex = null;
+                            });
                           });
                         },
-                        onLongPressMoveUpdate: (details) {
-                          _updateRadialSelection(details.globalPosition, screenSize, padding);
-                        },
-                        onLongPressEnd: (_) {
-                          final selected = _selectedRadialIndex;
-                          setState(() {
-                            _isRadialOpen = false;
-                            _selectedRadialIndex = null;
-                          });
-                          _resetIdleTimer();
-                          if (selected != null) {
-                            controller.navigateTo(_radialItems[selected]['label']!);
+                        onPointerMove: (event) {
+                          if (event.pointer != _activePointerId) return;
+                          final delta = event.position - (_lastPointerPos ?? event.position);
+                          _lastPointerPos = event.position;
+
+                          if (_isRadialOpen) {
+                            _updateRadialSelection(event.position, screenSize, padding);
+                            return;
+                          }
+
+                          final movedFromDown =
+                              (event.position - (_pointerDownPos ?? event.position)).distance;
+                          if (!_isDragging && movedFromDown > 12.0) {
+                            _holdTimer?.cancel();
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _isDragging = true;
+                              _position ??= effectivePos;
+                            });
+                          }
+
+                          if (_isDragging) {
+                            setState(() {
+                              final next = (_position ?? effectivePos) + delta;
+                              _position = _clampPosition(next, screenSize, padding);
+                            });
                           }
                         },
-                        onPanStart: (_) {
-                          HapticFeedback.selectionClick();
-                          _resetIdleTimer();
-                          setState(() {
-                            _isDragging = true;
-                            _position ??= effectivePos;
-                          });
-                        },
-                        onPanUpdate: (details) {
-                          setState(() {
-                            final next = (_position ?? effectivePos) + details.delta;
-                            _position = _clampPosition(next, screenSize, padding);
-                          });
-                        },
-                        onPanEnd: (_) {
-                          setState(() => _isDragging = false);
-                          _resetIdleTimer();
-                          if (_position != null) {
-                            unawaited(_savePosition(_position!));
+                        onPointerUp: (event) {
+                          if (event.pointer != _activePointerId) return;
+                          _holdTimer?.cancel();
+                          _activePointerId = null;
+                          _pointerDownPos = null;
+                          _lastPointerPos = null;
+
+                          if (_isRadialOpen) {
+                            final selected = _selectedRadialIndex;
+                            setState(() {
+                              _isRadialOpen = false;
+                              _selectedRadialIndex = null;
+                            });
+                            _resetIdleTimer();
+                            if (selected != null) {
+                              controller.navigateTo(_radialItems[selected]['label']!);
+                            }
+                            return;
+                          }
+
+                          if (_isDragging) {
+                            setState(() => _isDragging = false);
+                            _resetIdleTimer();
+                            if (_position != null) {
+                              unawaited(_savePosition(_position!));
+                            }
                           }
                         },
-                        child: AnimatedScale(
+                        onPointerCancel: (event) {
+                          if (event.pointer != _activePointerId) return;
+                          _holdTimer?.cancel();
+                          _activePointerId = null;
+                          _pointerDownPos = null;
+                          _lastPointerPos = null;
+                          if (_isRadialOpen || _isDragging) {
+                            setState(() {
+                              _isRadialOpen = false;
+                              _selectedRadialIndex = null;
+                              _isDragging = false;
+                            });
+                          }
+                          _resetIdleTimer();
+                        },
+                        child: GestureDetector(
+                          key: const Key('quick_switch_trackball'),
+                          onTap: () {
+                            if (_isRadialOpen || _isDragging) return;
+                            _executeAction(_singleTapAction);
+                          },
+                          onDoubleTap: _doubleTapAction == 'None'
+                              ? null
+                              : () {
+                                  if (_isRadialOpen || _isDragging) return;
+                                  _executeAction(_doubleTapAction);
+                                },
+                          child: AnimatedScale(
                           scale: _isDragging || _isRadialOpen ? 1.12 : 1.0,
                           duration: const Duration(milliseconds: 120),
                           child: Container(
@@ -948,6 +1004,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                               ),
                             ),
                           ),
+                        ),
                         ),
                       ),
                     ),
