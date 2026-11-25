@@ -40,27 +40,8 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
     {'emoji': '🧾', 'label': 'Invoices'},
   ];
 
-  static const List<List<Map<String, String>>> _menuRows = [
-    [
-      {'emoji': '📊', 'label': 'Dashboard'},
-      {'emoji': '🔑', 'label': 'API Keys'},
-    ],
-    [
-      {'emoji': '📜', 'label': 'History'},
-      {'emoji': '🤝', 'label': 'Borrowers'},
-    ],
-    [
-      {'emoji': '💳', 'label': 'EMIs'},
-      {'emoji': '⚙️', 'label': 'Masters'},
-    ],
-    [
-      {'emoji': '💰', 'label': 'Balances'},
-      {'emoji': '🧾', 'label': 'Invoices'},
-    ],
-  ];
-
   static const List<String> _actionOptions = [
-    'Quick-Switch Menu',
+    'Trackball Settings',
     'Entry ↔ History',
     'Entry',
     'History',
@@ -80,7 +61,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   // Customization state
   double _opacity = 0.40;
   bool _autoHide = false;
-  String _singleTapAction = 'Quick-Switch Menu';
+  String _singleTapAction = 'Trackball Settings';
   String _doubleTapAction = 'None';
 
   // Auto-hide & screenshot hide timers
@@ -198,8 +179,8 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
     switch (action) {
       case 'None':
         return;
-      case 'Quick-Switch Menu':
-        _openQuickSwitchSheet();
+      case 'Trackball Settings':
+        _openCustomizeSheet();
         return;
       case 'Entry ↔ History':
         HapticFeedback.selectionClick();
@@ -243,50 +224,34 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
       return positions;
     }
 
-    // Edge or corner: fan icons completely toward the open inward side
+    // Edge or corner: use double-layer concentric arcs (3 inner + 4 outer) on the open side
     final double dx = !fitsRight ? -1.0 : (!fitsLeft ? 1.0 : 0.0);
     final double dy = !fitsBottom ? -1.0 : (!fitsTop ? 1.0 : 0.0);
     final double centerAngle = math.atan2(dy, dx);
     final bool isCorner = dx != 0.0 && dy != 0.0;
 
-    if (!isCorner) {
-      // Single edge (left, right, top, or bottom): crisp 170° semi-circle on open side
-      const double edgeRadius = 82.0;
-      const double span = math.pi * 0.94;
-      final double startAngle = centerAngle - span / 2;
-      for (int i = 0; i < count; i++) {
-        final t = count > 1 ? i / (count - 1) : 0.5;
-        final angle = startAngle + t * span;
-        positions.add(Offset(
-          (ballCenter.dx + edgeRadius * math.cos(angle)).clamp(minX, maxX),
-          (ballCenter.dy + edgeRadius * math.sin(angle)).clamp(minY, maxY),
-        ));
-      }
-    } else {
-      // Corner: 2 clean concentric arcs inside the open quadrant (3 inner + 4 outer)
-      final int innerCount = count ~/ 2; // 3
-      final int outerCount = count - innerCount; // 4
-      const double innerRadius = 56.0;
-      const double outerRadius = 104.0;
-      const double innerSpan = math.pi * 0.48;
-      const double outerSpan = math.pi * 0.56;
+    final int innerCount = count ~/ 2; // 3
+    final int outerCount = count - innerCount; // 4
+    const double innerRadius = 56.0;
+    const double outerRadius = 102.0;
+    final double innerSpan = isCorner ? math.pi * 0.48 : math.pi * 0.72;
+    final double outerSpan = isCorner ? math.pi * 0.56 : math.pi * 0.84;
 
-      for (int i = 0; i < innerCount; i++) {
-        final t = innerCount > 1 ? i / (innerCount - 1) : 0.5;
-        final angle = (centerAngle - innerSpan / 2) + t * innerSpan;
-        positions.add(Offset(
-          (ballCenter.dx + innerRadius * math.cos(angle)).clamp(minX, maxX),
-          (ballCenter.dy + innerRadius * math.sin(angle)).clamp(minY, maxY),
-        ));
-      }
-      for (int i = 0; i < outerCount; i++) {
-        final t = outerCount > 1 ? i / (outerCount - 1) : 0.5;
-        final angle = (centerAngle - outerSpan / 2) + t * outerSpan;
-        positions.add(Offset(
-          (ballCenter.dx + outerRadius * math.cos(angle)).clamp(minX, maxX),
-          (ballCenter.dy + outerRadius * math.sin(angle)).clamp(minY, maxY),
-        ));
-      }
+    for (int i = 0; i < innerCount; i++) {
+      final t = innerCount > 1 ? i / (innerCount - 1) : 0.5;
+      final angle = (centerAngle - innerSpan / 2) + t * innerSpan;
+      positions.add(Offset(
+        (ballCenter.dx + innerRadius * math.cos(angle)).clamp(minX, maxX),
+        (ballCenter.dy + innerRadius * math.sin(angle)).clamp(minY, maxY),
+      ));
+    }
+    for (int i = 0; i < outerCount; i++) {
+      final t = outerCount > 1 ? i / (outerCount - 1) : 0.5;
+      final angle = (centerAngle - outerSpan / 2) + t * outerSpan;
+      positions.add(Offset(
+        (ballCenter.dx + outerRadius * math.cos(angle)).clamp(minX, maxX),
+        (ballCenter.dy + outerRadius * math.sin(angle)).clamp(minY, maxY),
+      ));
     }
 
     return positions;
@@ -317,7 +282,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
     }
   }
 
-  void _openQuickSwitchSheet() {
+  void _openCustomizeSheet() {
     final navContext = QuickActionsService.instance.navigatorKey.currentContext;
     if (navContext == null) return;
 
@@ -326,228 +291,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
 
     HapticFeedback.lightImpact();
     controller.setQuickSheetOpen(true);
-
-    final isDark = Theme.of(navContext).brightness == Brightness.dark;
-    final sheetBg = isDark ? const Color(0xFF151932) : Colors.white;
-    final tileBg = isDark ? const Color(0xFF1E2448) : const Color(0xFFF8FAFC);
-    final tileBorder = isDark ? const Color(0xFF2E376E) : const Color(0xFFE2E8F0);
-    final accent = isDark ? const Color(0xFFA78BFA) : const Color(0xFFFF5C38);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final activeScreen = controller.currentScreen;
-
-    showModalBottomSheet<void>(
-      context: navContext,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetCtx) {
-        Widget buildTile(Map<String, String> item) {
-          final label = item['label']!;
-          final isActive = label == activeScreen;
-          return Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                if (label == controller.currentScreen) {
-                  Navigator.of(sheetCtx).pop();
-                } else {
-                  controller.navigateTo(label);
-                }
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                height: 46,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: isActive ? accent.withValues(alpha: isDark ? 0.2 : 0.1) : tileBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isActive ? accent : tileBorder,
-                    width: isActive ? 1.5 : 1.0,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Text(item['emoji']!, style: const TextStyle(fontSize: 16)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
-                          color: isActive ? accent : textPrimary,
-                        ),
-                      ),
-                    ),
-                    if (isActive)
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          color: accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
-
-        final isEntryActive = activeScreen == 'Entry';
-
-        return Container(
-          decoration: BoxDecoration(
-            color: sheetBg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-            border: Border(
-              top: BorderSide(color: tileBorder, width: 1.2),
-            ),
-          ),
-          padding: EdgeInsets.fromLTRB(
-            16,
-            10,
-            16,
-            MediaQuery.of(sheetCtx).padding.bottom + 14,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: textSecondary.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Quick Switch',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: textPrimary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.of(sheetCtx).pop();
-                        _openCustomizeSheet();
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: tileBg,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: tileBorder),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.tune_rounded, size: 13, color: textSecondary),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Customize',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        if (isEntryActive) {
-                          Navigator.of(sheetCtx).pop();
-                        } else {
-                          controller.navigateTo('Entry');
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isEntryActive
-                              ? accent.withValues(alpha: isDark ? 0.2 : 0.12)
-                              : tileBg,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isEntryActive ? accent : tileBorder,
-                            width: isEntryActive ? 1.4 : 1.0,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('✨', style: TextStyle(fontSize: 13)),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Smart Entry',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.bold,
-                                color: isEntryActive ? accent : textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              for (int i = 0; i < _menuRows.length; i++) ...[
-                Row(
-                  children: [
-                    Expanded(child: buildTile(_menuRows[i][0])),
-                    const SizedBox(width: 8),
-                    Expanded(child: buildTile(_menuRows[i][1])),
-                  ],
-                ),
-                if (i < _menuRows.length - 1) const SizedBox(height: 8),
-              ],
-              const SizedBox(height: 10),
-              Text(
-                'Tip: Hold & swipe the trackball to quick-jump • Drag anywhere to move',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: textSecondary),
-              ),
-            ],
-          ),
-        );
-      },
-    ).whenComplete(() {
-      controller.setQuickSheetOpen(false);
-      _resetIdleTimer();
-    });
-  }
-
-  void _openCustomizeSheet() {
-    final navContext = QuickActionsService.instance.navigatorKey.currentContext;
-    if (navContext == null) return;
 
     final isDark = Theme.of(navContext).brightness == Brightness.dark;
     final sheetBg = isDark ? const Color(0xFF151932) : Colors.white;
@@ -778,7 +521,10 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      controller.setQuickSheetOpen(false);
+      _resetIdleTimer();
+    });
   }
 
   @override

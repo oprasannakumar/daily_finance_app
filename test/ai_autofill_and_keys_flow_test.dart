@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:daily_finance_app/main.dart';
 import 'package:daily_finance_app/screens/transaction_form_screen.dart';
+import 'package:daily_finance_app/services/quick_nav_controller.dart';
 import 'package:daily_finance_app/services/storage_service.dart';
 
 void main() {
@@ -18,16 +19,8 @@ void main() {
     await tester.pumpWidget(const DailyFinanceApp());
     await tester.pumpAndSettle();
 
-    // Tap movable Quick-Switch trackball
-    final menuBtn = find.byKey(const Key('quick_switch_trackball'));
-    expect(menuBtn, findsOneWidget);
-    await tester.tap(menuBtn);
-    await tester.pumpAndSettle();
-
-    // Tap 'API Keys' menu item
-    final apiKeysItem = find.text('API Keys');
-    expect(apiKeysItem, findsOneWidget);
-    await tester.tap(apiKeysItem);
+    // Navigate to API Keys via QuickNavController
+    QuickNavController.instance.navigateTo('API Keys');
     await tester.pumpAndSettle();
 
     // Verify dialog title

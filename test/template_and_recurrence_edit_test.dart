@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:daily_finance_app/main.dart';
 import 'package:daily_finance_app/models/transaction_model.dart';
+import 'package:daily_finance_app/services/quick_nav_controller.dart';
 import 'package:daily_finance_app/services/storage_service.dart';
 
 void main() {
@@ -36,9 +37,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Open Quick-Switch -> Masters -> Templates
-    await tester.tap(find.byKey(const Key('quick_switch_trackball')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Masters'));
+    QuickNavController.instance.navigateTo('Masters');
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Templates'));
     await tester.pumpAndSettle();
@@ -98,9 +97,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Open Quick-Switch -> Masters -> Templates
-    await tester.tap(find.byKey(const Key('quick_switch_trackball')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Masters'));
+    QuickNavController.instance.navigateTo('Masters');
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Templates'));
     await tester.pumpAndSettle();
@@ -221,9 +218,7 @@ void main() {
     expect(find.text('2'), findsNothing);
 
     // Open Quick-Switch -> Masters -> Recurring to verify both exist in Manage Masters
-    await tester.tap(find.byKey(const Key('quick_switch_trackball')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Masters'));
+    QuickNavController.instance.navigateTo('Masters');
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Recurring'));
     await tester.pumpAndSettle();
@@ -272,9 +267,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 1. Open Quick-Switch -> Masters -> Recurring
-    await tester.tap(find.byKey(const Key('quick_switch_trackball')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Masters'));
+    QuickNavController.instance.navigateTo('Masters');
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Recurring'));
     await tester.pumpAndSettle();
@@ -303,9 +296,7 @@ void main() {
     expect(txs.any((t) => t.narration == 'WiFi Fiber Internet'), isTrue);
 
     // 3. Open Quick-Switch -> Masters -> Recurring again
-    await tester.tap(find.byKey(const Key('quick_switch_trackball')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Masters'));
+    QuickNavController.instance.navigateTo('Masters');
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Recurring'));
     await tester.pumpAndSettle();
