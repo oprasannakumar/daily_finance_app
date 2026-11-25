@@ -589,7 +589,7 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
 
     if (_installments.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please generate or provide an EMI schedule before saving.')),
+        const SnackBar(content: Text('Please generate or provide an EMI schedule before saving.', textAlign: TextAlign.center)),
       );
       return;
     }
@@ -676,6 +676,7 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
             content: Text(
               'EMI plan "$planTitle" saved!\n'
               'Principal of ₹${IndianCurrency.format(_bookingPrincipal)} is blocked on $cardAccount (released on monthly EMI payments).',
+              textAlign: TextAlign.center,
             ),
             duration: const Duration(seconds: 4),
           ),
@@ -685,7 +686,7 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving EMI plan: $e')),
+          SnackBar(content: Text('Error saving EMI plan: $e', textAlign: TextAlign.center)),
         );
       }
     } finally {

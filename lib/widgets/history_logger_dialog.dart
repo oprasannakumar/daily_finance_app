@@ -237,6 +237,7 @@ class _HistoryLoggerDialogState extends State<HistoryLoggerDialog> {
           content: Text(
             'Deleted "${tx.narration.isNotEmpty ? tx.narration : tx.purpose}" (₹${IndianCurrency.format(tx.totalAmount)})',
             style: const TextStyle(fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
           ),
           backgroundColor: const Color(0xFFEF4444),
           behavior: SnackBarBehavior.floating,

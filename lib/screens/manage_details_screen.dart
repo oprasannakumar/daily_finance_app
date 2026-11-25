@@ -234,6 +234,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
               itemsToAdd.length == 1
                   ? 'Added "${itemsToAdd.first}"'
                   : 'Added ${itemsToAdd.length} items to $category',
+              textAlign: TextAlign.center,
             ),
             behavior: SnackBarBehavior.floating,
             backgroundColor: const Color(0xFF0F766E),
@@ -410,7 +411,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Removed "$item"'),
+          content: Text('Removed "$item"', textAlign: TextAlign.center),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -423,7 +424,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Removed template "${template.name}"'),
+          content: Text('Removed template "${template.name}"', textAlign: TextAlign.center),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -482,7 +483,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Sorted $currentCat ${direction == "asc" ? "A to Z" : "Z to A"}'),
+          content: Text('Sorted $currentCat ${direction == "asc" ? "A to Z" : "Z to A"}', textAlign: TextAlign.center),
           backgroundColor: const Color(0xFF0F766E),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 1),

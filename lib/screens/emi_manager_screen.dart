@@ -202,7 +202,7 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
       await _sheets.deleteEmiPlan(plan.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('EMI Plan "${plan.title}" deleted (Ledger reversal removed)')),
+          SnackBar(content: Text('EMI Plan "${plan.title}" deleted (Ledger reversal removed)', textAlign: TextAlign.center)),
         );
       }
       _loadPlans(fromLocalOnly: true);

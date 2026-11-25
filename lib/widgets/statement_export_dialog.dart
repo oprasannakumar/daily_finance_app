@@ -256,7 +256,7 @@ class _StatementExportDialogState extends State<StatementExportDialog> {
   void _showEmptyNotice() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('No transactions found matching the selected filters.'),
+        content: Text('No transactions found matching the selected filters.', textAlign: TextAlign.center),
         backgroundColor: Colors.orange,
       ),
     );
@@ -264,7 +264,7 @@ class _StatementExportDialogState extends State<StatementExportDialog> {
 
   void _showErrorNotice(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red),
+      SnackBar(content: Text(msg, textAlign: TextAlign.center), backgroundColor: Colors.red),
     );
   }
 

@@ -477,7 +477,7 @@ class _BorrowerExportDialogState extends State<BorrowerExportDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to generate PDF: $e'),
+            content: Text('Failed to generate PDF: $e', textAlign: TextAlign.center),
             backgroundColor: Colors.red,
           ),
         );

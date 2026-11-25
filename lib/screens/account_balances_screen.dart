@@ -373,6 +373,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
         title: Text('Remove $typeLabel?'),
         content: Text(
           'Are you sure you want to remove "$accountName" from your balances and master list?\n\nThis will also remove it from the "Account Balances" sheet in your Google Drive on the next sync.',
+          textAlign: TextAlign.center,
         ),
         actions: [
           TextButton(
@@ -396,7 +397,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Removed "$accountName" successfully'),
+            content: Text('Removed "$accountName" successfully', textAlign: TextAlign.center),
             backgroundColor: const Color(0xFFEF4444),
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),

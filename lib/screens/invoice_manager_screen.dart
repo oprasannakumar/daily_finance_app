@@ -536,7 +536,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
   void _attachNewRecipient(String name) {
     if (_draftRecipients.any((r) => r.recipient.toLowerCase() == name.toLowerCase())) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name group already exists!')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name group already exists!', textAlign: TextAlign.center)));
       return;
     }
     setState(() {
@@ -565,7 +565,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
   void _removeRecipientGroup(_InvoiceRecipientDraft group) {
     if (group.recipient.toLowerCase() == 'self') {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot remove Self group')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot remove Self group', textAlign: TextAlign.center)));
       return;
     }
     setState(() {
@@ -581,11 +581,11 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     final shopName = _dealerController.text.trim();
 
     if (billNo.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter an Invoice / Bill No.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter an Invoice / Bill No.', textAlign: TextAlign.center)));
       return;
     }
     if (shopName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a Dealer / Shop Name.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a Dealer / Shop Name.', textAlign: TextAlign.center)));
       return;
     }
 
@@ -610,7 +610,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
     if (itemsToSave.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one valid item with a positive total.')),
+        const SnackBar(content: Text('Please add at least one valid item with a positive total.', textAlign: TextAlign.center)),
       );
       return;
     }
@@ -647,7 +647,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Invoice $billNo saved successfully!'),
+            content: Text('Invoice $billNo saved successfully!', textAlign: TextAlign.center),
             backgroundColor: const Color(0xFF4ECDC4),
             action: widget.onInvoiceSelected != null
                 ? SnackBarAction(
@@ -669,7 +669,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save invoice. Please check network.')),
+          const SnackBar(content: Text('Failed to save invoice. Please check network.', textAlign: TextAlign.center)),
         );
       }
     }

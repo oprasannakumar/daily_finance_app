@@ -266,7 +266,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Deleted $count transaction(s)'),
+            content: Text('Deleted $count transaction(s)', textAlign: TextAlign.center),
             backgroundColor: const Color(0xFFEF4444),
             behavior: SnackBarBehavior.floating,
           ),
@@ -656,7 +656,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Deleted ${tx.referenceId}'),
+                              content: Text('Deleted ${tx.referenceId}', textAlign: TextAlign.center),
                               backgroundColor: const Color(0xFFEF4444),
                               behavior: SnackBarBehavior.floating,
                             ),

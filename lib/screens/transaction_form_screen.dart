@@ -174,7 +174,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Auto-posted EMI installment(s) undone.'),
+                      content: Text('Auto-posted EMI installment(s) undone.', textAlign: TextAlign.center),
                       duration: Duration(seconds: 2),
                     ),
                   );
@@ -641,6 +641,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           inv.hasBorrowers
               ? '🧾 Loaded ${inv.billNo} with borrower splits (${inv.borrowerShares.keys.join(", ")})'
               : '🧾 Loaded ${inv.billNo} (${inv.shopName})',
+          textAlign: TextAlign.center,
         ),
         backgroundColor: const Color(0xFF4ECDC4),
         duration: const Duration(seconds: 2),
@@ -930,7 +931,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     _loadTransactionForEditing(_multiEditTransactions[0], showSnackbar: false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Loaded ${list.length} transactions for editing'),
+        content: Text('Loaded ${list.length} transactions for editing', textAlign: TextAlign.center),
         backgroundColor: const Color(0xFF3B82F6),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1255,7 +1256,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Split ₹${IndianCurrency.format(_totalAmount)} equally among ${_splitRecipients.length} members'),
+        content: Text('Split ₹${IndianCurrency.format(_totalAmount)} equally among ${_splitRecipients.length} members', textAlign: TextAlign.center),
         backgroundColor: const Color(0xFF0F766E),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 1),
@@ -1402,7 +1403,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Removed ${removed.isPersonal ? "My Share" : removed.name} from split'),
+        content: Text('Removed ${removed.isPersonal ? "My Share" : removed.name} from split', textAlign: TextAlign.center),
         backgroundColor: const Color(0xFF6366F1),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(milliseconds: 1200),
@@ -1494,7 +1495,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (showSnackbar) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Loaded for editing: ${tx.referenceId}'),
+          content: Text('Loaded for editing: ${tx.referenceId}', textAlign: TextAlign.center),
           backgroundColor: const Color(0xFF3B82F6),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1570,7 +1571,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       SnackBar(
         content: Text(isForEdit
             ? 'Loaded template for edit: "${t.name}"'
-            : 'Loaded template: "${t.name}"'),
+            : 'Loaded template: "${t.name}"',
+          textAlign: TextAlign.center,),
         backgroundColor: const Color(0xFF0F766E),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
@@ -1659,6 +1661,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           isEdit
               ? 'Loaded recurrence for edit: "${r.narration}"'
               : 'Loaded "${r.narration}". Hit Save to record & advance schedule.',
+          textAlign: TextAlign.center,
         ),
         backgroundColor: isEdit ? const Color(0xFFF59E0B) : const Color(0xFF0F766E),
         behavior: SnackBarBehavior.floating,
@@ -1713,6 +1716,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   content: Text(
                     'Saved ${result.remainingDrafts.length} transactions!',
                     style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                    textAlign: TextAlign.center,
                   ),
                   backgroundColor: const Color(0xFF10B981),
                   behavior: SnackBarBehavior.floating,
@@ -1746,6 +1750,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                 content: const Text(
                   'Loaded 1 transaction from clipboard',
                   style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                  textAlign: TextAlign.center,
                 ),
                 backgroundColor: const Color(0xFFFF5C38),
                 behavior: SnackBarBehavior.floating,
@@ -1766,6 +1771,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           content: const Text(
             'Nothing found in clipboard',
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+            textAlign: TextAlign.center,
           ),
           backgroundColor: const Color(0xFF475569),
           behavior: SnackBarBehavior.floating,
@@ -1851,7 +1857,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No previous transaction to repeat'),
+            content: Text('No previous transaction to repeat', textAlign: TextAlign.center),
             backgroundColor: Color(0xFFE11D48),
             behavior: SnackBarBehavior.floating,
           ),
@@ -1914,7 +1920,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Repeated transaction (${FinanceTransaction.formatDate(latest.date)})'),
+          content: Text('Repeated transaction (${FinanceTransaction.formatDate(latest.date)})', textAlign: TextAlign.center),
           backgroundColor: const Color(0xFF0F766E),
           behavior: SnackBarBehavior.floating,
         ),
@@ -1981,6 +1987,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           content: const Text(
             'No data is filled in the form',
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+            textAlign: TextAlign.center,
           ),
           backgroundColor: const Color(0xFFE11D48),
           behavior: SnackBarBehavior.floating,
@@ -2167,7 +2174,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           SnackBar(
             content: Text(isEditing
                 ? 'Template "${newTemplate.name}" updated successfully!'
-                : 'Template "${newTemplate.name}" saved!'),
+                : 'Template "${newTemplate.name}" saved!',
+              textAlign: TextAlign.center,),
             backgroundColor: const Color(0xFF0F766E),
             behavior: SnackBarBehavior.floating,
           ),
@@ -2276,7 +2284,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (_splitRecipients.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Split mode requires at least one split member'),
+          content: Text('Split mode requires at least one split member', textAlign: TextAlign.center),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -2297,6 +2305,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         SnackBar(
           content: Text(
             'Split amount mismatch! Total recipient shares (₹${IndianCurrency.format(splitSum)}) must equal Total Amount (₹${IndianCurrency.format(_totalAmount)})',
+            textAlign: TextAlign.center,
           ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
@@ -2365,7 +2374,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (_referenceIdController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Reference ID cannot be empty'),
+          content: Text('Reference ID cannot be empty', textAlign: TextAlign.center),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -2438,7 +2447,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           SnackBar(
             content: Text(_editingRecurringId != null
                 ? 'Updated recurrence: ${recurringTx.narration}'
-                : 'Saved recurring transaction: ${recurringTx.narration}'),
+                : 'Saved recurring transaction: ${recurringTx.narration}',
+              textAlign: TextAlign.center,),
             backgroundColor: const Color(0xFFF59E0B),
             behavior: SnackBarBehavior.floating,
           ),
@@ -2462,7 +2472,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         if (b.paymentType == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Please select Payment Type for "From" mode #${i + 1}'),
+              content: Text('Please select Payment Type for "From" mode #${i + 1}', textAlign: TextAlign.center),
               backgroundColor: Colors.red,
               behavior: SnackBarBehavior.floating,
             ),
@@ -2472,7 +2482,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         if (b.paymentType != 'Cash' && (b.account == null || b.account!.isEmpty)) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Please select Account for "From" mode #${i + 1} (${b.paymentType})'),
+              content: Text('Please select Account for "From" mode #${i + 1} (${b.paymentType})', textAlign: TextAlign.center),
               backgroundColor: Colors.red,
               behavior: SnackBarBehavior.floating,
             ),
@@ -2487,7 +2497,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         if (b.paymentType == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Please select Payment Type for "To" mode #${i + 1}'),
+              content: Text('Please select Payment Type for "To" mode #${i + 1}', textAlign: TextAlign.center),
               backgroundColor: Colors.red,
               behavior: SnackBarBehavior.floating,
             ),
@@ -2497,7 +2507,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         if (b.paymentType != 'Cash' && (b.account == null || b.account!.isEmpty)) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Please select Account for "To" mode #${i + 1} (${b.paymentType})'),
+              content: Text('Please select Account for "To" mode #${i + 1} (${b.paymentType})', textAlign: TextAlign.center),
               backgroundColor: Colors.red,
               behavior: SnackBarBehavior.floating,
             ),
@@ -2520,7 +2530,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       if (_totalFromAmount <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('"From" amount must be greater than zero'),
+            content: Text('"From" amount must be greater than zero', textAlign: TextAlign.center),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -2533,6 +2543,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           SnackBar(
             content: Text(
               'Transfer mismatch! "From" total (₹${IndianCurrency.format(_totalFromAmount)}) must equal "To" total (₹${IndianCurrency.format(_totalToAmount)})',
+              textAlign: TextAlign.center,
             ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
@@ -2577,7 +2588,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isUpdate ? 'Updated Transfer [$effectiveRefId]' : 'Saved Transfer [$effectiveRefId]'),
+            content: Text(isUpdate ? 'Updated Transfer [$effectiveRefId]' : 'Saved Transfer [$effectiveRefId]', textAlign: TextAlign.center),
             backgroundColor: const Color(0xFF6366F1),
             behavior: SnackBarBehavior.floating,
           ),
@@ -2596,7 +2607,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (_flow == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select Flow (Withdraw or Deposit)'),
+          content: Text('Please select Flow (Withdraw or Deposit)', textAlign: TextAlign.center),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -2607,7 +2618,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (_selectedPurpose == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select Purpose'),
+          content: Text('Please select Purpose', textAlign: TextAlign.center),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -2618,7 +2629,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (_selectedSpentFor == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select Spent For'),
+          content: Text('Please select Spent For', textAlign: TextAlign.center),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -2631,7 +2642,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       if (b.paymentType == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Please select Payment Type for mode #${i + 1}'),
+            content: Text('Please select Payment Type for mode #${i + 1}', textAlign: TextAlign.center),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -2641,7 +2652,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       if (b.paymentType != 'Cash' && (b.account == null || b.account!.isEmpty)) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Please select Account for mode #${i + 1} (${b.paymentType})'),
+            content: Text('Please select Account for mode #${i + 1} (${b.paymentType})', textAlign: TextAlign.center),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -2655,7 +2666,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (_totalAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Overall total amount must be positive (currently ₹${IndianCurrency.format(_totalAmount)})'),
+          content: Text('Overall total amount must be positive (currently ₹${IndianCurrency.format(_totalAmount)})', textAlign: TextAlign.center),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -2742,7 +2753,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isUpdate ? 'Updated [$effectiveRefId]' : 'Saved [$effectiveRefId]'),
+          content: Text(isUpdate ? 'Updated [$effectiveRefId]' : 'Saved [$effectiveRefId]', textAlign: TextAlign.center),
           backgroundColor: const Color(0xFF10B981),
           behavior: SnackBarBehavior.floating,
         ),
@@ -3240,7 +3251,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                   setState(() {});
                                                   ScaffoldMessenger.of(context).showSnackBar(
                                                     SnackBar(
-                                                      content: Text('✅ Marked ${bill.cardName} bill as paid'),
+                                                      content: Text('✅ Marked ${bill.cardName} bill as paid', textAlign: TextAlign.center),
                                                       backgroundColor: const Color(0xFF10B981),
                                                       behavior: SnackBarBehavior.floating,
                                                       duration: const Duration(seconds: 2),
@@ -3293,7 +3304,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                 });
                                                 ScaffoldMessenger.of(context).showSnackBar(
                                                   SnackBar(
-                                                    content: Text('⚡ Pre-filled Self Transfer to pay bill for ${bill.cardName}'),
+                                                    content: Text('⚡ Pre-filled Self Transfer to pay bill for ${bill.cardName}', textAlign: TextAlign.center),
                                                     backgroundColor: const Color(0xFF0F766E),
                                                     behavior: SnackBarBehavior.floating,
                                                     duration: const Duration(seconds: 2),
@@ -3400,7 +3411,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Deleted recurrence: "${r.narration}"'),
+                                      content: Text('Deleted recurrence: "${r.narration}"', textAlign: TextAlign.center),
                                       backgroundColor: const Color(0xFFEF4444),
                                       behavior: SnackBarBehavior.floating,
                                       duration: const Duration(seconds: 1),
@@ -3724,7 +3735,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                           if (!sheetCtx.mounted) return;
                                           messenger.showSnackBar(
                                             SnackBar(
-                                              content: Text('✅ Loaded ${txs.length} transactions live from Google Sheets!'),
+                                              content: Text('✅ Loaded ${txs.length} transactions live from Google Sheets!', textAlign: TextAlign.center),
                                               backgroundColor: const Color(0xFF10B981),
                                               behavior: SnackBarBehavior.floating,
                                             ),
@@ -3760,14 +3771,14 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                     final messenger = ScaffoldMessenger.of(sheetCtx);
                                     messenger.showSnackBar(
                                       const SnackBar(
-                                        content: Text('Backing up Masters, Templates, Balances & Recurring...'),
+                                        content: Text('Backing up Masters, Templates, Balances & Recurring...', textAlign: TextAlign.center),
                                         behavior: SnackBarBehavior.floating,
                                       ),
                                     );
                                     final ok = await GoogleSheetsService.instance.backupAllConfigAndMasters();
                                     messenger.showSnackBar(
                                       SnackBar(
-                                        content: Text(ok ? '✅ Backup completed successfully to Google Drive!' : '❌ Backup failed. Check connection.'),
+                                        content: Text(ok ? '✅ Backup completed successfully to Google Drive!' : '❌ Backup failed. Check connection.', textAlign: TextAlign.center),
                                         backgroundColor: ok ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                                         behavior: SnackBarBehavior.floating,
                                       ),
@@ -3793,7 +3804,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                     if (token != null && sheetId != null) {
                                       messenger.showSnackBar(
                                         const SnackBar(
-                                          content: Text('Restoring Masters, Templates & Balances from Google Drive...'),
+                                          content: Text('Restoring Masters, Templates & Balances from Google Drive...', textAlign: TextAlign.center),
                                           behavior: SnackBarBehavior.floating,
                                         ),
                                       );
@@ -3804,7 +3815,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                       _refreshFloatingStats();
                                       messenger.showSnackBar(
                                         const SnackBar(
-                                          content: Text('✅ Restored all configurations from Google Drive!'),
+                                          content: Text('✅ Restored all configurations from Google Drive!', textAlign: TextAlign.center),
                                           backgroundColor: Color(0xFF10B981),
                                           behavior: SnackBarBehavior.floating,
                                         ),
@@ -3879,7 +3890,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                 if (res != null) {
                                                   messenger.showSnackBar(
                                                     SnackBar(
-                                                      content: Text('✅ Connected as ${res.displayName ?? res.email}! Checking Google Sheet...'),
+                                                      content: Text('✅ Connected as ${res.displayName ?? res.email}! Checking Google Sheet...', textAlign: TextAlign.center),
                                                       backgroundColor: const Color(0xFF10B981),
                                                       behavior: SnackBarBehavior.floating,
                                                     ),
@@ -3895,7 +3906,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                   if (err != null && err.isNotEmpty) {
                                                     messenger.showSnackBar(
                                                       SnackBar(
-                                                        content: Text(err),
+                                                        content: Text(err, textAlign: TextAlign.center),
                                                         backgroundColor: const Color(0xFFEF4444),
                                                         behavior: SnackBarBehavior.floating,
                                                       ),
@@ -4074,7 +4085,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       default:
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$label: Coming soon in future update!'),
+            content: Text('$label: Coming soon in future update!', textAlign: TextAlign.center),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             duration: const Duration(seconds: 1),
@@ -4134,7 +4145,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('🎙️ Listening... Speak your transaction'),
+              content: Text('🎙️ Listening... Speak your transaction', textAlign: TextAlign.center),
               backgroundColor: Color(0xFF6366F1),
               duration: Duration(seconds: 3),
               behavior: SnackBarBehavior.floating,
@@ -4145,7 +4156,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Speech recognition unavailable or microphone permission denied.'),
+              content: Text('Speech recognition unavailable or microphone permission denied.', textAlign: TextAlign.center),
               backgroundColor: Colors.red,
               behavior: SnackBarBehavior.floating,
             ),
@@ -4157,7 +4168,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         setState(() => _isListening = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Microphone error: $e'),
+            content: Text('Microphone error: $e', textAlign: TextAlign.center),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -4195,7 +4206,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('🧹 Form Cleared'),
+              content: Text('🧹 Form Cleared', textAlign: TextAlign.center),
               backgroundColor: Color(0xFF10B981),
               behavior: SnackBarBehavior.floating,
             ),
@@ -4213,7 +4224,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('✨ \'${_allTemplates[matchIdx].name}\' Loaded'),
+                  content: Text('✨ \'${_allTemplates[matchIdx].name}\' Loaded', textAlign: TextAlign.center),
                   backgroundColor: const Color(0xFF10B981),
                   behavior: SnackBarBehavior.floating,
                 ),
@@ -4251,7 +4262,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('⚙️ Mode Switched'),
+              content: Text('⚙️ Mode Switched', textAlign: TextAlign.center),
               backgroundColor: Color(0xFF10B981),
               behavior: SnackBarBehavior.floating,
             ),
@@ -4437,6 +4448,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                 parsed.isSelfTransfer
                     ? '✨ Auto-filled [$sourceLabel]: Self Transfer • From ${parsed.fromAccount ?? parsed.fromPaymentType} to ${parsed.toAccount ?? parsed.toPaymentType} (₹${IndianCurrency.formatSmart(parsed.amount)})'
                     : '✨ Auto-filled [$sourceLabel]: ₹${IndianCurrency.formatSmart(parsed.amount)} • ${parsed.flow} • ${parsed.purpose ?? ""} • ${parsed.account ?? ""}',
+                textAlign: TextAlign.center,
               ),
               backgroundColor: const Color(0xFF10B981),
               behavior: SnackBarBehavior.floating,
@@ -4705,7 +4717,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                       Navigator.of(ctx).pop();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('API Keys saved! Cloud AI will be used for auto-fill.'),
+                          content: Text('API Keys saved! Cloud AI will be used for auto-fill.', textAlign: TextAlign.center),
                           backgroundColor: Color(0xFF10B981),
                           behavior: SnackBarBehavior.floating,
                         ),
@@ -4844,6 +4856,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                           content: const Text(
                             'Form cleared',
                             style: TextStyle(fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
                           ),
                           backgroundColor: isDark ? const Color(0xFF2C3360) : const Color(0xFF64748B),
                           behavior: SnackBarBehavior.floating,
@@ -4970,7 +4983,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                     setState(() => _selectedPurpose = 'Fuel');
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('Purpose set to Fuel / Travel'),
+                                        content: Text('Purpose set to Fuel / Travel', textAlign: TextAlign.center),
                                         behavior: SnackBarBehavior.floating,
                                         duration: Duration(milliseconds: 900),
                                       ),
@@ -4986,7 +4999,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                     setState(() => _selectedPurpose = 'Subscription');
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('Purpose set to Cloud / Online'),
+                                        content: Text('Purpose set to Cloud / Online', textAlign: TextAlign.center),
                                         behavior: SnackBarBehavior.floating,
                                         duration: Duration(milliseconds: 900),
                                       ),
@@ -5009,7 +5022,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                     });
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text(_isRecurrenceMode ? 'Recurrence mode enabled (⏳)' : 'Recurrence mode disabled'),
+                                        content: Text(_isRecurrenceMode ? 'Recurrence mode enabled (⏳)' : 'Recurrence mode disabled', textAlign: TextAlign.center),
                                         behavior: SnackBarBehavior.floating,
                                         duration: const Duration(milliseconds: 900),
                                       ),

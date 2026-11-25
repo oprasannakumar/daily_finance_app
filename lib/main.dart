@@ -96,6 +96,11 @@ class DailyFinanceApp extends StatelessWidget {
                 const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
               ),
             ),
+            snackBarTheme: SnackBarThemeData(
+              behavior: SnackBarBehavior.floating,
+              insetPadding: const EdgeInsets.fromLTRB(16, 8, 16, 48),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            ),
           ),
           darkTheme: ThemeData(
             useMaterial3: true,
@@ -161,6 +166,11 @@ class DailyFinanceApp extends StatelessWidget {
               labelTextStyle: WidgetStateProperty.all(
                 const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFF1F5F9)),
               ),
+            ),
+            snackBarTheme: SnackBarThemeData(
+              behavior: SnackBarBehavior.floating,
+              insetPadding: const EdgeInsets.fromLTRB(16, 8, 16, 48),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             ),
           ),
           builder: (context, child) {
