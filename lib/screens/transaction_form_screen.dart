@@ -6177,14 +6177,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                     key: ValueKey('split_dismiss_${recipient.id}'),
                                     borderRadius: BorderRadius.circular(12),
                                     margin: const EdgeInsets.symmetric(vertical: 3),
-                                    border: Border.all(color: inputBorder, width: 1.2),
                                     onDelete: () => _removeSplitRecipient(idx),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? const Color(0xFF151932) : Colors.white,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
+                                    child: ColoredBox(
+                                      color: isDark ? const Color(0xFF151932) : Colors.white,
                                       child: rowWidget,
                                     ),
                                   );

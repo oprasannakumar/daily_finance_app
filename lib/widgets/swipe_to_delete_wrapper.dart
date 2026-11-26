@@ -153,8 +153,10 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
                     child: GestureDetector(
                       onTap: _dragOffset < -20 ? _triggerDelete : null,
                       child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
+                        decoration: BoxDecoration(
+                          borderRadius: widget.borderRadius,
+                          border: widget.backgroundBorder,
+                          gradient: const LinearGradient(
                             colors: [Color(0xFFB91C1C), Color(0xFFEF4444)],
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
@@ -223,13 +225,13 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
                     child: widget.child,
                   ),
                 ),
-                if (widget.border != null || (widget.backgroundBorder != null && _dragOffset.abs() > 0.5))
+                if (widget.border != null)
                   Positioned.fill(
                     child: IgnorePointer(
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: widget.borderRadius,
-                          border: widget.border ?? widget.backgroundBorder,
+                          border: widget.border,
                         ),
                       ),
                     ),

@@ -159,6 +159,7 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
       enabled: !widget.isOnlyMode,
       borderRadius: BorderRadius.circular(12),
       margin: const EdgeInsets.symmetric(vertical: 3),
+      backgroundBorder: Border.all(color: amtBorderColor, width: 1.2),
       onDelete: widget.onDelete,
       child: Container(
         decoration: BoxDecoration(

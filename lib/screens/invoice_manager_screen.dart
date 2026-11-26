@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../models/invoice_model.dart';
 import '../services/google_sheets_service.dart';
+import '../services/invoice_extractor_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/swipe_to_delete_wrapper.dart';
 
@@ -342,6 +344,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
   List<String> _knownRecipients = ['Self'];
   bool _isLoading = false;
   bool _isSaving = false;
+  bool _isExtracting = false;
 
   final _currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
@@ -399,6 +402,271 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     if (targetDealer.isEmpty) return _dealerPrices;
     final matching = _dealerPrices.where((dp) => dp.dealer.trim().toLowerCase() == targetDealer).toList();
     return matching.isNotEmpty ? matching : _dealerPrices;
+  }
+
+  Future<void> _extractFromInvoicePhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            const Text('Extract Invoice Using AI', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFFFF7A5C)),
+              title: const Text('Take Photo (Camera)'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF4ECDC4)),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1800,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _isExtracting = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final extracted = await InvoiceExtractorService.instance.extractFromImages([bytes]);
+      if (!mounted) return;
+      setState(() => _isExtracting = false);
+
+      if (extracted.items.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No items detected in the invoice image.', textAlign: TextAlign.center)),
+        );
+        return;
+      }
+
+      // Fuzzy-match extracted dealer against known dealers
+      String mappedDealer = extracted.dealerName;
+      if (mappedDealer.isNotEmpty) {
+        final lower = mappedDealer.toLowerCase();
+        for (final known in _knownDealers) {
+          final kl = known.toLowerCase();
+          if (kl == lower || kl.contains(lower) || lower.contains(kl)) {
+            mappedDealer = known;
+            break;
+          }
+        }
+      }
+
+      final dealerCtrl = TextEditingController(text: mappedDealer);
+      final recipientOptions = <String>{'Self', ..._knownRecipients}.toList();
+      final assignments = List<String>.filled(extracted.items.length, 'Self');
+
+      final apply = await showDialog<bool>(
+        context: context,
+        builder: (dlgCtx) => StatefulBuilder(
+          builder: (ctx, setDlgState) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            title: Row(
+              children: [
+                const Icon(Icons.receipt_long_rounded, color: Color(0xFFFF7A5C), size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Map Extracted Invoice', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text(
+                        'via ${extracted.usedProvider}',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: dealerCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Dealer Name (Mapped)',
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  if (_knownDealers.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 30,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: _knownDealers.take(10).map((d) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ActionChip(
+                              label: Text(d, style: const TextStyle(fontSize: 11)),
+                              padding: EdgeInsets.zero,
+                              onPressed: () => setDlgState(() => dealerCtrl.text = d),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Items (${extracted.items.length})', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                      TextButton(
+                        onPressed: () => setDlgState(() {
+                          for (int i = 0; i < assignments.length; i++) {
+                            assignments[i] = 'Self';
+                          }
+                        }),
+                        style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                        child: const Text('All Self', style: TextStyle(fontSize: 11.5)),
+                      ),
+                    ],
+                  ),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 280),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: extracted.items.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (_, idx) {
+                        final item = extracted.items[idx];
+                        final lineTotal = item.quantity * item.unitPrice;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                    ),
+                                    Text(
+                                      'Qty ${item.quantity} × ₹${item.unitPrice.toStringAsFixed(2)} = ₹${lineTotal.toStringAsFixed(2)}',
+                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 112,
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: assignments[idx],
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  items: recipientOptions
+                                      .map((r) => DropdownMenuItem(
+                                            value: r,
+                                            child: Text(r, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                                          ))
+                                      .toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setDlgState(() => assignments[idx] = val);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('Cancel')),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF7A5C)),
+                onPressed: () => Navigator.pop(dlgCtx, true),
+                child: const Text('Apply to Invoice'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (apply == true && mounted) {
+        final grouped = <String, List<_InvoiceItemDraft>>{};
+        for (int i = 0; i < extracted.items.length; i++) {
+          final it = extracted.items[i];
+          final recip = assignments[i];
+          final draft = _InvoiceItemDraft(
+            name: it.name,
+            qty: it.quantity,
+            price: it.unitPrice,
+          );
+          grouped.putIfAbsent(recip, () => []).add(draft);
+        }
+
+        setState(() {
+          _dealerController.text = dealerCtrl.text.trim();
+          for (final g in _draftRecipients) {
+            for (final it in g.items) {
+              it.dispose();
+            }
+          }
+          _draftRecipients.clear();
+          if (grouped.containsKey('Self')) {
+            _draftRecipients.add(_InvoiceRecipientDraft(recipient: 'Self', items: grouped.remove('Self')!));
+          } else {
+            _draftRecipients.add(_InvoiceRecipientDraft(recipient: 'Self', items: []));
+          }
+          for (final entry in grouped.entries) {
+            _draftRecipients.add(_InvoiceRecipientDraft(recipient: entry.key, items: entry.value));
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Extracted ${extracted.items.length} items from invoice!', textAlign: TextAlign.center),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      }
+      dealerCtrl.dispose();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isExtracting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Extraction failed: $e', textAlign: TextAlign.center),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadData({bool forceRefresh = false}) async {
@@ -911,6 +1179,25 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // AI Invoice Extractor Button
+          OutlinedButton.icon(
+            onPressed: _isExtracting ? null : _extractFromInvoicePhoto,
+            icon: _isExtracting
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.document_scanner_rounded, size: 20),
+            label: Text(
+              _isExtracting ? 'Extracting Invoice...' : '📷 Extract Dealer & Items from Bill Photo',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: primary,
+              side: BorderSide(color: primary.withValues(alpha: 0.6), width: 1.2),
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
+          const SizedBox(height: 14),
+
           // Row 1: Date & Invoice No
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
