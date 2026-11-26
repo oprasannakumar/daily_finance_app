@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/transaction_model.dart';
+import '../services/quick_nav_controller.dart';
 import '../services/storage_service.dart';
 import '../utils/currency_formatter.dart';
 import '../widgets/borrower_export_dialog.dart';
@@ -294,10 +295,39 @@ class _BorrowerDetailScreenState extends State<BorrowerDetailScreen> {
           // 2. Quick Actions Row
           Row(
             children: [
+              if (net.abs() > 0.01) ...[
+                Expanded(
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.check_circle_outline_rounded, size: 17),
+                    label: const Text('Settle Up'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      final isReceivable = net > 0;
+                      QuickNavController.instance.openEntryWithDraft(
+                        EntryDraft(
+                          flow: isReceivable ? 'Deposit' : 'Withdraw',
+                          purpose: isReceivable ? 'Loan Repayment Received' : 'Loan Settlement',
+                          spentFor: 'Split',
+                          amount: net.abs(),
+                          narration: isReceivable
+                              ? 'Settlement from ${widget.borrowerName}'
+                              : 'Settlement to ${widget.borrowerName}',
+                          splitBorrower: widget.borrowerName,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.copy_rounded, size: 17),
-                  label: const Text('Copy Summary'),
+                  label: const Text('Copy'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: accent,
                     side: BorderSide(color: accent.withValues(alpha: 0.45)),
@@ -307,11 +337,11 @@ class _BorrowerDetailScreenState extends State<BorrowerDetailScreen> {
                   onPressed: () => _copyStatementSummary(totalGiven, totalReceived, net),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: FilledButton.icon(
                   icon: const Icon(Icons.picture_as_pdf_outlined, size: 17),
-                  label: const Text('Export PDF'),
+                  label: const Text('PDF'),
                   style: FilledButton.styleFrom(
                     backgroundColor: accent,
                     padding: const EdgeInsets.symmetric(vertical: 11),

@@ -4,6 +4,7 @@ import 'services/quick_actions_service.dart';
 import 'services/quick_nav_controller.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme_colors.dart';
+import 'widgets/app_lock_gate.dart';
 import 'widgets/quick_switch_overlay.dart';
 
 void main() async {
@@ -191,7 +192,9 @@ class DailyFinanceApp extends StatelessWidget {
                   }
                 }
               },
-              child: QuickSwitchOverlay(child: child ?? const SizedBox.shrink()),
+              child: AppLockGate(
+                child: QuickSwitchOverlay(child: child ?? const SizedBox.shrink()),
+              ),
             );
           },
           home: const TransactionFormScreen(),

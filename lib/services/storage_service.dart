@@ -27,6 +27,8 @@ class StorageService {
   static const String _keyCachedInvoices = 'cached_grocery_invoices_v2';
   static const String _keyCachedDealerPrices = 'cached_dealer_prices_v1';
   static const String _keyCachedEmiPlans = 'cached_active_emi_plans_v1';
+  static const String _keyMonthlyBudgets = 'monthly_purpose_budgets_v1';
+  static const String _keyAppLockPin = 'app_lock_pin_v1';
 
   List<InvoiceItemRecord>? _cachedInvoices;
   List<DealerPriceItem>? _cachedDealerPrices;
@@ -1471,6 +1473,59 @@ class StorageService {
     } finally {
       _isSyncQueueRunning = false;
     }
+  }
+
+  // Monthly Category Budgets
+  Future<Map<String, double>> getMonthlyBudgets() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keyMonthlyBudgets);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return decoded.map((k, v) => MapEntry(k, (v as num).toDouble()));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> saveMonthlyBudgets(Map<String, double> budgets) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cleaned = <String, double>{};
+    budgets.forEach((k, v) {
+      if (k.trim().isNotEmpty && v > 0) cleaned[k.trim()] = v;
+    });
+    await prefs.setString(_keyMonthlyBudgets, jsonEncode(cleaned));
+  }
+
+  // App PIN Lock
+  Future<String?> getAppLockPin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pin = prefs.getString(_keyAppLockPin);
+    return (pin != null && pin.length == 4) ? pin : null;
+  }
+
+  Future<void> setAppLockPin(String? pin) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (pin == null || pin.isEmpty) {
+      await prefs.remove(_keyAppLockPin);
+    } else {
+      await prefs.setString(_keyAppLockPin, pin);
+    }
+  }
+
+  // Pending Sync Queue Details & Manual Trigger
+  Future<({List<FinanceTransaction> saves, List<String> deletes})> getPendingSyncDetails() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saves = await _getPendingSaves(prefs);
+    final deletes = await _getPendingDeletes(prefs);
+    return (saves: saves, deletes: deletes);
+  }
+
+  Future<bool> syncPendingNow() async {
+    if (!await hasNetworkConnection()) return false;
+    await _resumePendingSyncQueue();
+    final details = await getPendingSyncDetails();
+    return details.saves.isEmpty && details.deletes.isEmpty;
   }
 
   // Templates

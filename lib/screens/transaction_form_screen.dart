@@ -132,10 +132,108 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
     StorageService.instance.recurringNotifier.addListener(_loadRecurringTransactions);
     StorageService.instance.balanceConfigNotifier.addListener(_loadBalancesSummary);
     StorageService.instance.transactionsNotifier.addListener(_refreshFloatingStats);
+    QuickNavController.instance.pendingEntryDraft.addListener(_onPendingEntryDraft);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _handleStartupFlow();
       _checkDueEmiInstallmentsOnStartup();
+      _checkUpcomingDueReminders();
+      _onPendingEntryDraft();
     });
+  }
+
+  void _onPendingEntryDraft() {
+    final draft = QuickNavController.instance.pendingEntryDraft.value;
+    if (draft == null || !mounted) return;
+    QuickNavController.instance.pendingEntryDraft.value = null;
+
+    setState(() {
+      _resetEntireForm();
+      _isSelfTransferMode = draft.isSelfTransfer;
+      if (draft.flow != null) _flow = draft.flow;
+      if (draft.purpose != null && draft.purpose!.isNotEmpty) {
+        if (!_purposes.contains(draft.purpose)) {
+          _purposes.add(draft.purpose!);
+        }
+        _selectedPurpose = draft.purpose;
+      }
+      if (draft.spentFor != null) {
+        _selectedSpentFor = draft.spentFor;
+      }
+      if (draft.narration != null) {
+        _narrationController.text = draft.narration!;
+      }
+      final amt = draft.amount ?? 0.0;
+      if (amt > 0) {
+        _breakdowns
+          ..clear()
+          ..add(PaymentBreakdown(amount: amt));
+      }
+      if (draft.isSelfTransfer && draft.toAccount != null) {
+        _toBreakdowns
+          ..clear()
+          ..add(PaymentBreakdown(
+            paymentType: draft.toPaymentType ?? 'Credit',
+            account: draft.toAccount!,
+            amount: amt,
+          ));
+      }
+      if (draft.splitBorrower != null && draft.splitBorrower!.isNotEmpty) {
+        _isSplitModeEnabled = true;
+        _selectedSpentFor = 'Split';
+        _splitRecipients
+          ..clear()
+          ..add(SplitRecipient(
+            name: draft.splitBorrower!,
+            amount: amt,
+            percentage: 100.0,
+            isPersonal: false,
+          ));
+      }
+    });
+  }
+
+  bool _shownDueReminderThisSession = false;
+  Future<void> _checkUpcomingDueReminders() async {
+    final isTesting = WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    if (isTesting || _shownDueReminderThisSession) return;
+    _shownDueReminderThisSession = true;
+    try {
+      final summary = await _storage.getLiveAccountBalances();
+      final recurrings = await _storage.getRecurringTransactions();
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final dueSoon = <String>[];
+      for (final b in summary.dueBills) {
+        if (b.daysUntilDue <= 3) {
+          dueSoon.add('${b.cardName} (₹${IndianCurrency.format(b.remainingDue)})');
+        }
+      }
+      for (final r in recurrings) {
+        if (r.isPaused) continue;
+        final days = r.nextDueDate.difference(today).inDays;
+        if (days <= 3) {
+          final label = r.narration.trim().isNotEmpty ? r.narration.trim() : r.purpose;
+          dueSoon.add('$label (₹${IndianCurrency.format(r.totalAmount)})');
+        }
+      }
+      if (dueSoon.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF1E293B),
+            duration: const Duration(seconds: 5),
+            content: Text(
+              'Due within 3 days: ${dueSoon.take(2).join(' • ')}',
+              style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+            ),
+            action: SnackBarAction(
+              label: 'Dashboard',
+              textColor: const Color(0xFFA78BFA),
+              onPressed: () => QuickNavController.instance.navigateTo('Dashboard'),
+            ),
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkDueEmiInstallmentsOnStartup() async {
@@ -552,6 +650,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
     StorageService.instance.recurringNotifier.removeListener(_loadRecurringTransactions);
     StorageService.instance.balanceConfigNotifier.removeListener(_loadBalancesSummary);
     StorageService.instance.transactionsNotifier.removeListener(_refreshFloatingStats);
+    QuickNavController.instance.pendingEntryDraft.removeListener(_onPendingEntryDraft);
     _referenceIdController.dispose();
     _narrationController.removeListener(_onNarrationChanged);
     _narrationController.dispose();
@@ -3772,6 +3871,48 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                           Row(
                             children: [
                               Expanded(
+                                child: ValueListenableBuilder<int>(
+                                  valueListenable: StorageService.instance.pendingSyncNotifier,
+                                  builder: (_, pendingCount, _) {
+                                    return OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 11),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                      ),
+                                      onPressed: () => _openPendingSyncSheet(sheetCtx),
+                                      icon: Icon(
+                                        pendingCount > 0 ? Icons.cloud_upload_outlined : Icons.cloud_done_outlined,
+                                        size: 18,
+                                      ),
+                                      label: Text(
+                                        pendingCount > 0 ? 'Queue ($pendingCount)' : 'Sync Queue',
+                                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 11),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                  onPressed: () => _openAppLockSetupDialog(sheetCtx),
+                                  icon: const Icon(Icons.lock_outline_rounded, size: 18),
+                                  label: const Text(
+                                    'PIN Lock',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
                                 child: OutlinedButton.icon(
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: const Color(0xFF10B981),
@@ -6533,4 +6674,152 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
     ),
   );
 }
+
+  Future<void> _openPendingSyncSheet(BuildContext sheetCtx) async {
+    final details = await _storage.getPendingSyncDetails();
+    final isOnline = await _storage.hasNetworkConnection();
+    if (!sheetCtx.mounted) return;
+    final isDark = Theme.of(sheetCtx).brightness == Brightness.dark;
+
+    await showModalBottomSheet<void>(
+      context: sheetCtx,
+      backgroundColor: isDark ? const Color(0xFF151932) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final total = details.saves.length + details.deletes.length;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(ctx).padding.bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                    size: 18,
+                    color: isOnline ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Pending Sync Queue ($total)',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
+                  if (total > 0)
+                    FilledButton(
+                      onPressed: () async {
+                        final ok = await _storage.syncPendingNow();
+                        if (!ctx.mounted) return;
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(sheetCtx).showSnackBar(
+                          SnackBar(
+                            content: Text(ok
+                                ? 'All queued items synced!'
+                                : 'Offline or server unreachable — kept in queue.'),
+                          ),
+                        );
+                      },
+                      child: const Text('Sync Now'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (total == 0)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 18),
+                  child: Center(
+                    child: Text('All local entries are synced with Google Sheets.'),
+                  ),
+                )
+              else
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 260),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      ...details.saves.map((tx) => ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.upload_rounded, color: Color(0xFF6366F1)),
+                            title: Text(
+                              tx.narration.isNotEmpty ? tx.narration : tx.purpose,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text('${tx.referenceId} · ₹${IndianCurrency.format(tx.totalAmount)}'),
+                          )),
+                      ...details.deletes.map((ref) => ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+                            title: Text('Pending Delete: $ref'),
+                          )),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openAppLockSetupDialog(BuildContext sheetCtx) async {
+    final existing = await _storage.getAppLockPin();
+    if (!sheetCtx.mounted) return;
+    final ctrl = TextEditingController();
+
+    await showDialog<void>(
+      context: sheetCtx,
+      builder: (dlgCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Text(existing != null ? 'Update / Disable PIN Lock' : 'Set 4-Digit App PIN'),
+          content: TextField(
+            controller: ctrl,
+            maxLength: 4,
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            decoration: const InputDecoration(
+              hintText: 'Enter 4-digit PIN',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            if (existing != null)
+              TextButton(
+                onPressed: () async {
+                  await _storage.setAppLockPin(null);
+                  if (!dlgCtx.mounted) return;
+                  Navigator.of(dlgCtx).pop();
+                  ScaffoldMessenger.of(sheetCtx).showSnackBar(
+                    const SnackBar(content: Text('App PIN Lock disabled.')),
+                  );
+                },
+                child: const Text('Disable PIN', style: TextStyle(color: Color(0xFFEF4444))),
+              ),
+            TextButton(
+              onPressed: () => Navigator.of(dlgCtx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final pin = ctrl.text.trim();
+                if (pin.length != 4 || int.tryParse(pin) == null) return;
+                await _storage.setAppLockPin(pin);
+                if (!dlgCtx.mounted) return;
+                Navigator.of(dlgCtx).pop();
+                ScaffoldMessenger.of(sheetCtx).showSnackBar(
+                  const SnackBar(content: Text('App PIN Lock enabled!')),
+                );
+              },
+              child: const Text('Save PIN'),
+            ),
+          ],
+        );
+      },
+    );
+    ctrl.dispose();
+  }
 }

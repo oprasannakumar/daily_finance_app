@@ -2,6 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'quick_actions_service.dart';
 
+class EntryDraft {
+  final String? flow;
+  final String? purpose;
+  final String? spentFor;
+  final String? narration;
+  final double? amount;
+  final bool isSelfTransfer;
+  final String? toAccount;
+  final String? toPaymentType;
+  final String? splitBorrower;
+
+  const EntryDraft({
+    this.flow,
+    this.purpose,
+    this.spentFor,
+    this.narration,
+    this.amount,
+    this.isSelfTransfer = false,
+    this.toAccount,
+    this.toPaymentType,
+    this.splitBorrower,
+  });
+}
+
 /// Tracks the active top-level screen and modal state so the universal
 /// bottom Quick-Switch pill can jump between any screen in one gesture.
 class QuickNavController extends ChangeNotifier {
@@ -42,6 +66,13 @@ class QuickNavController extends ChangeNotifier {
 
   bool _isQuickSheetOpen = false;
   bool get isQuickSheetOpen => _isQuickSheetOpen;
+
+  final ValueNotifier<EntryDraft?> pendingEntryDraft = ValueNotifier<EntryDraft?>(null);
+
+  void openEntryWithDraft(EntryDraft draft) {
+    pendingEntryDraft.value = draft;
+    navigateTo('Entry');
+  }
 
   void Function(String label)? _rootNavigationHandler;
 

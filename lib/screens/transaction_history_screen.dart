@@ -16,12 +16,20 @@ class TransactionHistoryScreen extends StatefulWidget {
   final Listenable? refreshListenable;
   final String? initialSearchQuery;
   final String? initialAccountFilter;
+  final String? initialPurposeFilter;
+  final String? initialPaymentTypeFilter;
+  final DateTime? initialStartDate;
+  final DateTime? initialEndDate;
 
   const TransactionHistoryScreen({
     super.key,
     this.refreshListenable,
     this.initialSearchQuery,
     this.initialAccountFilter,
+    this.initialPurposeFilter,
+    this.initialPaymentTypeFilter,
+    this.initialStartDate,
+    this.initialEndDate,
   });
 
   @override
@@ -68,6 +76,19 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     final initialAccount = widget.initialAccountFilter?.trim();
     if (initialAccount != null && initialAccount.isNotEmpty) {
       _filterCriteria.selectedAccounts.add(initialAccount);
+    }
+    final initialPurpose = widget.initialPurposeFilter?.trim();
+    if (initialPurpose != null && initialPurpose.isNotEmpty) {
+      _filterCriteria.selectedPurposes.add(initialPurpose);
+    }
+    final initialPaymentType = widget.initialPaymentTypeFilter?.trim();
+    if (initialPaymentType != null && initialPaymentType.isNotEmpty) {
+      _filterCriteria.selectedPaymentTypes.add(initialPaymentType);
+    }
+    if (widget.initialStartDate != null && widget.initialEndDate != null) {
+      _filterCriteria.startDate = widget.initialStartDate;
+      _filterCriteria.endDate = widget.initialEndDate;
+      _filterCriteria.datePreset = 'Custom';
     }
     final warm = _storage.cachedTransactionsSync;
     if (warm != null && warm.isNotEmpty) {

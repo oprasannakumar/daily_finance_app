@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/account_balance_model.dart';
 import '../models/transaction_model.dart';
+import '../services/quick_nav_controller.dart';
 import '../services/storage_service.dart';
 import '../utils/currency_formatter.dart';
 import 'emi_manager_screen.dart';
@@ -1543,6 +1544,51 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                               ),
                           ],
                         ),
+                      ),
+                    ],
+                    if (dueBill != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Bill Due: ₹${IndianCurrency.format(dueBill.remainingDue)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFEF4444),
+                            ),
+                          ),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
+                              QuickNavController.instance.openEntryWithDraft(
+                                EntryDraft(
+                                  isSelfTransfer: true,
+                                  toAccount: card,
+                                  toPaymentType: 'Credit',
+                                  amount: dueBill.remainingDue,
+                                  narration: 'Credit Card Bill Payment: $card',
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: primaryColor.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Pay Bill →',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: primaryColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
 
