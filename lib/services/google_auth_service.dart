@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
 import 'storage_service.dart';
 import 'google_sheets_service.dart';
 
@@ -10,12 +12,14 @@ class GoogleUserProfile {
   final String email;
   final String? displayName;
   final String? photoUrl;
+  final Uint8List? photoBytes;
 
   GoogleUserProfile({
     required this.id,
     required this.email,
     this.displayName,
     this.photoUrl,
+    this.photoBytes,
   });
 }
 
@@ -67,7 +71,15 @@ class GoogleAuthService {
       final savedEmail = await StorageService.instance.getString('google_user_email');
       final savedName = await StorageService.instance.getString('google_user_name');
       final savedPhoto = await StorageService.instance.getString('google_user_photo');
+      final savedPhotoB64 = await StorageService.instance.getString('google_user_photo_b64');
       final savedId = await StorageService.instance.getString('google_user_id');
+
+      Uint8List? cachedBytes;
+      if (savedPhotoB64 != null && savedPhotoB64.isNotEmpty) {
+        try {
+          cachedBytes = base64Decode(savedPhotoB64);
+        } catch (_) {}
+      }
 
       if (savedEmail != null && savedEmail.isNotEmpty) {
         currentUserNotifier.value = GoogleUserProfile(
@@ -75,7 +87,11 @@ class GoogleAuthService {
           email: savedEmail,
           displayName: savedName,
           photoUrl: savedPhoto,
+          photoBytes: cachedBytes,
         );
+        if (savedPhoto != null && savedPhoto.isNotEmpty && cachedBytes == null) {
+          unawaited(_cachePhotoBytes(savedPhoto));
+        }
       }
 
       _accountSubscription = _googleSignIn.onCurrentUserChanged.listen(
@@ -106,13 +122,35 @@ class GoogleAuthService {
     }
   }
 
+  Future<void> _cachePhotoBytes(String photoUrl) async {
+    try {
+      if (!await StorageService.instance.hasNetworkConnection()) return;
+      final res = await http.get(Uri.parse(photoUrl)).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+        await StorageService.instance.setString('google_user_photo_b64', base64Encode(res.bodyBytes));
+        final curr = currentUserNotifier.value;
+        if (curr != null && curr.photoUrl == photoUrl) {
+          currentUserNotifier.value = GoogleUserProfile(
+            id: curr.id,
+            email: curr.email,
+            displayName: curr.displayName,
+            photoUrl: curr.photoUrl,
+            photoBytes: res.bodyBytes,
+          );
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> _updateUser(GoogleSignInAccount user) async {
     _currentAccount = user;
+    final existingBytes = currentUserNotifier.value?.photoBytes;
     final profile = GoogleUserProfile(
       id: user.id,
       email: user.email,
       displayName: user.displayName,
       photoUrl: user.photoUrl,
+      photoBytes: existingBytes,
     );
     currentUserNotifier.value = profile;
     errorMessageNotifier.value = null;
@@ -123,6 +161,7 @@ class GoogleAuthService {
     }
     if (user.photoUrl != null) {
       await StorageService.instance.setString('google_user_photo', user.photoUrl!);
+      unawaited(_cachePhotoBytes(user.photoUrl!));
     }
     await StorageService.instance.setString('google_user_id', user.id);
   }
@@ -133,6 +172,7 @@ class GoogleAuthService {
     await StorageService.instance.remove('google_user_email');
     await StorageService.instance.remove('google_user_name');
     await StorageService.instance.remove('google_user_photo');
+    await StorageService.instance.remove('google_user_photo_b64');
     await StorageService.instance.remove('google_user_id');
     await GoogleSheetsService.instance.clearActiveSpreadsheetInfo();
   }

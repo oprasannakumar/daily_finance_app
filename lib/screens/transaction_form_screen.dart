@@ -3656,8 +3656,10 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                 CircleAvatar(
                                   radius: 28,
                                   backgroundColor: const Color(0xFF4285F4).withValues(alpha: 0.2),
-                                  backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
-                                  child: user.photoUrl == null
+                                  backgroundImage: user.photoBytes != null
+                                      ? MemoryImage(user.photoBytes!)
+                                      : (user.photoUrl != null ? NetworkImage(user.photoUrl!) : null),
+                                  child: (user.photoBytes == null && user.photoUrl == null)
                                       ? Text(
                                           (user.displayName != null && user.displayName!.isNotEmpty)
                                               ? user.displayName![0].toUpperCase()
@@ -4927,24 +4929,30 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                           ),
                                         ),
                                         clipBehavior: Clip.antiAlias,
-                                        child: gUser?.photoUrl != null
-                                            ? Image.network(
-                                                gUser!.photoUrl!,
+                                        child: gUser?.photoBytes != null
+                                            ? Image.memory(
+                                                gUser!.photoBytes!,
                                                 fit: BoxFit.cover,
                                                 errorBuilder: (_, _, _) => _buildGoogleFallbackAvatar(gUser),
                                               )
-                                            : (gUser != null
-                                                ? _buildGoogleFallbackAvatar(gUser)
-                                                : const Center(
-                                                    child: Text(
-                                                      'G',
-                                                      style: TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 16,
-                                                        color: Color(0xFF4285F4),
-                                                      ),
-                                                    ),
-                                                  )),
+                                            : (gUser?.photoUrl != null
+                                                ? Image.network(
+                                                    gUser!.photoUrl!,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (_, _, _) => _buildGoogleFallbackAvatar(gUser),
+                                                  )
+                                                : (gUser != null
+                                                    ? _buildGoogleFallbackAvatar(gUser)
+                                                    : const Center(
+                                                        child: Text(
+                                                          'G',
+                                                          style: TextStyle(
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: 16,
+                                                            color: Color(0xFF4285F4),
+                                                          ),
+                                                        ),
+                                                      ))),
                                       ),
                                     );
                                   },
