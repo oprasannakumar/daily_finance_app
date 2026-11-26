@@ -38,7 +38,7 @@ class SwipeToDeleteWrapper extends StatefulWidget {
 
 class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
     with SingleTickerProviderStateMixin {
-  static const double _revealWidth = 104.0;
+  static const double _revealWidth = 114.0;
 
   late final AnimationController _controller;
   double _dragOffset = 0.0;

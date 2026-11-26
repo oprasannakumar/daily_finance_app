@@ -1,6 +1,10 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 import '../models/invoice_model.dart';
 import '../services/google_sheets_service.dart';
 import '../services/invoice_extractor_service.dart';
@@ -405,7 +409,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
   }
 
   Future<void> _extractFromInvoicePhoto() async {
-    final source = await showModalBottomSheet<ImageSource>(
+    final mode = await showModalBottomSheet<String>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -420,37 +424,80 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
             ListTile(
               leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFFFF7A5C)),
               title: const Text('Take Photo (Camera)'),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              onTap: () => Navigator.pop(ctx, 'camera'),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF4ECDC4)),
-              title: const Text('Choose from Gallery'),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              title: const Text('Choose Image from Gallery'),
+              onTap: () => Navigator.pop(ctx, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF8B5CF6)),
+              title: const Text('Choose PDF Document'),
+              onTap: () => Navigator.pop(ctx, 'pdf'),
             ),
             const SizedBox(height: 8),
           ],
         ),
       ),
     );
-    if (source == null) return;
+    if (mode == null) return;
 
-    final picked = await ImagePicker().pickImage(
-      source: source,
-      imageQuality: 85,
-      maxWidth: 1800,
-    );
-    if (picked == null || !mounted) return;
+    final pages = <Uint8List>[];
+    String mimeType = 'image/jpeg';
 
-    setState(() => _isExtracting = true);
+    if (mode == 'pdf') {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+      if (result.isEmpty || !mounted) return;
+      final file = result.first;
+      final pdfBytes = file.path != null ? await File(file.path!).readAsBytes() : null;
+      if (pdfBytes == null || pdfBytes.isEmpty) return;
+
+      setState(() => _isExtracting = true);
+      try {
+        int count = 0;
+        await for (final raster in Printing.raster(pdfBytes, dpi: 150)) {
+          pages.add(await raster.toPng());
+          count++;
+          if (count >= 4) break;
+        }
+        mimeType = 'image/png';
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isExtracting = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to read PDF: $e', textAlign: TextAlign.center)),
+          );
+        }
+        return;
+      }
+    } else {
+      final picked = await ImagePicker().pickImage(
+        source: mode == 'camera' ? ImageSource.camera : ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1800,
+      );
+      if (picked == null || !mounted) return;
+      setState(() => _isExtracting = true);
+      pages.add(await picked.readAsBytes());
+    }
+
+    if (pages.isEmpty || !mounted) {
+      setState(() => _isExtracting = false);
+      return;
+    }
+
     try {
-      final bytes = await picked.readAsBytes();
-      final extracted = await InvoiceExtractorService.instance.extractFromImages([bytes]);
+      final extracted = await InvoiceExtractorService.instance.extractFromImages(pages, mimeType: mimeType);
       if (!mounted) return;
       setState(() => _isExtracting = false);
 
       if (extracted.items.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No items detected in the invoice image.', textAlign: TextAlign.center)),
+          const SnackBar(content: Text('No items detected in the invoice.', textAlign: TextAlign.center)),
         );
         return;
       }
@@ -469,6 +516,9 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       }
 
       final dealerCtrl = TextEditingController(text: mappedDealer);
+      final billNoCtrl = TextEditingController(
+        text: extracted.billNumber.isNotEmpty ? extracted.billNumber : _billNoController.text.trim(),
+      );
       final recipientOptions = <String>{'Self', ..._knownRecipients}.toList();
       final assignments = List<String>.filled(extracted.items.length, 'Self');
 
@@ -501,6 +551,15 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  TextField(
+                    controller: billNoCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Invoice / Bill No',
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   TextField(
                     controller: dealerCtrl,
                     decoration: InputDecoration(
@@ -631,6 +690,9 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
         }
 
         setState(() {
+          if (billNoCtrl.text.trim().isNotEmpty) {
+            _billNoController.text = billNoCtrl.text.trim();
+          }
           _dealerController.text = dealerCtrl.text.trim();
           for (final g in _draftRecipients) {
             for (final it in g.items) {
@@ -656,6 +718,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
         );
       }
       dealerCtrl.dispose();
+      billNoCtrl.dispose();
     } catch (e) {
       if (mounted) {
         setState(() => _isExtracting = false);
@@ -1186,7 +1249,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.document_scanner_rounded, size: 20),
             label: Text(
-              _isExtracting ? 'Extracting Invoice...' : '📷 Extract Dealer & Items from Bill Photo',
+              _isExtracting ? 'Extracting Invoice...' : '📷 Extract from Bill Photo / PDF',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
             style: OutlinedButton.styleFrom(

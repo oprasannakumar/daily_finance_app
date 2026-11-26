@@ -6151,7 +6151,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                                 fillColor: inputBg,
                                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                                 enabledBorder: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(10),
+                                                  borderRadius: BorderRadius.circular(12),
                                                   borderSide: BorderSide(color: inputBorder, width: 1.2),
                                                 ),
                                               ),
@@ -6178,8 +6178,11 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                     borderRadius: BorderRadius.circular(12),
                                     margin: const EdgeInsets.symmetric(vertical: 3),
                                     onDelete: () => _removeSplitRecipient(idx),
-                                    child: ColoredBox(
-                                      color: isDark ? const Color(0xFF151932) : Colors.white,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF151932) : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
                                       child: rowWidget,
                                     ),
                                   );

@@ -29,12 +29,14 @@ class ExtractedInvoiceItem {
 
 class ExtractedInvoiceData {
   final String dealerName;
+  final String billNumber;
   final String currency;
   final List<ExtractedInvoiceItem> items;
   final String usedProvider;
 
   ExtractedInvoiceData({
     required this.dealerName,
+    this.billNumber = '',
     required this.currency,
     required this.items,
     required this.usedProvider,
@@ -54,6 +56,7 @@ You are an expert invoice data extraction assistant.
 Analyze the provided invoice page image(s) and extract the following fields strictly as valid JSON:
 {
   "dealer_name": "Name of the dealer, vendor, store, or seller issuing the invoice",
+  "bill_number": "Invoice number, bill number, or receipt number if visible, otherwise empty string",
   "currency": "Currency symbol or 3-letter ISO code if visible (e.g., ₹, INR, \$, USD), otherwise empty string",
   "items": [
     {
@@ -72,7 +75,10 @@ Rules:
 - Return ONLY the JSON object, with no extra commentary or markdown.
 ''';
 
-  Future<ExtractedInvoiceData> extractFromImages(List<Uint8List> imageBytesList) async {
+  Future<ExtractedInvoiceData> extractFromImages(
+    List<Uint8List> imageBytesList, {
+    String mimeType = 'image/jpeg',
+  }) async {
     if (imageBytesList.isEmpty) {
       throw Exception('No invoice image provided.');
     }
@@ -89,7 +95,7 @@ Rules:
 
     if (grokKey.isNotEmpty) {
       try {
-        return await _extractWithGrok(grokKey, base64Pages);
+        return await _extractWithGrok(grokKey, base64Pages, mimeType);
       } catch (e) {
         primaryError = e.toString();
       }
@@ -99,7 +105,7 @@ Rules:
 
     if (geminiKey.isNotEmpty) {
       try {
-        return await _extractWithGemini(geminiKey, base64Pages);
+        return await _extractWithGemini(geminiKey, base64Pages, mimeType);
       } catch (e) {
         throw Exception('Both models failed.\n• Grok: $primaryError\n• Gemini: $e');
       }
@@ -108,13 +114,13 @@ Rules:
     throw Exception('Grok extraction failed: $primaryError');
   }
 
-  Future<ExtractedInvoiceData> _extractWithGrok(String apiKey, List<String> base64Pages) async {
+  Future<ExtractedInvoiceData> _extractWithGrok(String apiKey, List<String> base64Pages, String mimeType) async {
     final contentParts = <Map<String, dynamic>>[
       {'type': 'text', 'text': _extractionPrompt.trim()},
       for (final b64 in base64Pages)
         {
           'type': 'image_url',
-          'image_url': {'url': 'data:image/jpeg;base64,$b64'},
+          'image_url': {'url': 'data:$mimeType;base64,$b64'},
         },
     ];
 
@@ -149,13 +155,13 @@ Rules:
     return _parseInvoiceJson(content, 'Grok ($_grokModel)');
   }
 
-  Future<ExtractedInvoiceData> _extractWithGemini(String apiKey, List<String> base64Pages) async {
+  Future<ExtractedInvoiceData> _extractWithGemini(String apiKey, List<String> base64Pages, String mimeType) async {
     final parts = <Map<String, dynamic>>[
       {'text': _extractionPrompt.trim()},
       for (final b64 in base64Pages)
         {
           'inline_data': {
-            'mime_type': 'image/jpeg',
+            'mime_type': mimeType,
             'data': b64,
           },
         },
@@ -217,6 +223,7 @@ Rules:
 
     return ExtractedInvoiceData(
       dealerName: (map['dealer_name'] ?? '').toString().trim(),
+      billNumber: (map['bill_number'] ?? '').toString().trim(),
       currency: (map['currency'] ?? '').toString().trim(),
       items: items,
       usedProvider: provider,
