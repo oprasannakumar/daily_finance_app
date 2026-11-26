@@ -434,7 +434,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
         });
         try {
           int count = 0;
-          await for (final raster in Printing.raster(fileBytes, dpi: 150)) {
+          await for (final raster in Printing.raster(fileBytes, dpi: 200)) {
             pages.add(await raster.toPng());
             count++;
             if (count >= 5) break;
@@ -500,7 +500,30 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
       if (extracted.items.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No items detected in the invoice.', textAlign: TextAlign.center)),
+          SnackBar(
+            content: Text('No items detected (${extracted.usedProvider}).', textAlign: TextAlign.center),
+            duration: const Duration(seconds: 6),
+            action: ocrText.isNotEmpty
+                ? SnackBarAction(
+                    label: 'View OCR',
+                    onPressed: () {
+                      if (!mounted) return;
+                      showDialog(
+                        context: context,
+                        builder: (dCtx) => AlertDialog(
+                          title: const Text('Extracted OCR Text'),
+                          content: SingleChildScrollView(
+                            child: SelectableText(ocrText, style: const TextStyle(fontSize: 12)),
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Close')),
+                          ],
+                        ),
+                      );
+                    },
+                  )
+                : null,
+          ),
         );
         return;
       }
@@ -759,19 +782,97 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
           _isExtracting = false;
           _extractionStatus = null;
         });
+        final msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Extraction failed: ${e.toString().split('\n').first}',
-              maxLines: 3,
+              'Extraction failed:\n$msg',
+              maxLines: 6,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
             ),
+            duration: const Duration(seconds: 6),
             backgroundColor: const Color(0xFFEF4444),
+            action: SnackBarAction(
+              label: 'API Keys',
+              textColor: Colors.white,
+              onPressed: _showApiKeysQuickDialog,
+            ),
           ),
         );
       }
     }
+  }
+
+  Future<void> _showApiKeysQuickDialog() async {
+    final currentGrok = (await StorageService.instance.getGrokApiKey()) ?? '';
+    final currentGemini = (await StorageService.instance.getGeminiApiKey()) ?? '';
+    if (!mounted) return;
+    final grokCtrl = TextEditingController(text: currentGrok);
+    final geminiCtrl = TextEditingController(text: currentGemini);
+    bool obscureGrok = true;
+    bool obscureGemini = true;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (c, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Text('AI API Keys', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Supports Groq (gsk_...), OpenRouter (sk-or-...), xAI Grok (xai-...), and Gemini (AIza...).',
+                style: TextStyle(fontSize: 11.5, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: grokCtrl,
+                obscureText: obscureGrok,
+                decoration: InputDecoration(
+                  labelText: 'Grok / Groq / OpenRouter Key',
+                  isDense: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscureGrok ? Icons.visibility_off : Icons.visibility, size: 18),
+                    onPressed: () => setDlgState(() => obscureGrok = !obscureGrok),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: geminiCtrl,
+                obscureText: obscureGemini,
+                decoration: InputDecoration(
+                  labelText: 'Gemini Key (Fallback)',
+                  isDense: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscureGemini ? Icons.visibility_off : Icons.visibility, size: 18),
+                    onPressed: () => setDlgState(() => obscureGemini = !obscureGemini),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                await StorageService.instance.setGrokApiKey(grokCtrl.text.trim());
+                await StorageService.instance.setGeminiApiKey(geminiCtrl.text.trim());
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    grokCtrl.dispose();
+    geminiCtrl.dispose();
   }
 
   Future<void> _loadData({bool forceRefresh = false}) async {
@@ -1244,6 +1345,11 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.vpn_key_outlined),
+            tooltip: 'AI API Keys',
+            onPressed: _showApiKeysQuickDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh from Google Sheets',
