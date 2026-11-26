@@ -1196,6 +1196,81 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
           ),
           const SizedBox(height: 8),
 
+          // Best Card to Use Today Optimizer Banner
+          if (_liveSummary != null && ccList.isNotEmpty)
+            () {
+              final candidates = ccList
+                  .map((c) => _liveSummary!.creditCardSummaries[c])
+                  .whereType<LiveCreditCardSummary>()
+                  .where((s) => s.interestFreeDays != null && s.availableLimit > 0)
+                  .toList();
+              if (candidates.isEmpty) return const SizedBox.shrink();
+              candidates.sort((a, b) {
+                final aLowUtil = a.totalLimit > 0 ? (a.usedLimit / a.totalLimit) < 0.5 : true;
+                final bLowUtil = b.totalLimit > 0 ? (b.usedLimit / b.totalLimit) < 0.5 : true;
+                if (aLowUtil != bLowUtil) return aLowUtil ? -1 : 1;
+                return (b.interestFreeDays ?? 0).compareTo(a.interestFreeDays ?? 0);
+              });
+              final best = candidates.first;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [const Color(0xFF1E1B4B), const Color(0xFF312E81)]
+                        : [const Color(0xFFEEF2FF), const Color(0xFFE0E7FF)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.16),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF6366F1), size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'BEST CARD TO SWIPE TODAY',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4338CA),
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${best.cardName} · ${best.interestFreeDays}d interest-free',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'Avail: ₹${IndianCurrency.format(best.availableLimit)} · Bill Day ${best.billDay}',
+                            style: TextStyle(fontSize: 11, color: textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }(),
+
           if (ccList.isEmpty)
             Container(
               padding: const EdgeInsets.all(24),
@@ -1403,6 +1478,38 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                               color: Color(0xFF6366F1),
                             ),
                           ),
+                        ],
+                      ),
+                    ],
+
+                    // Billed vs Unbilled vs Blocked EMI Split & Interest-Free Days
+                    if (liveSummary != null &&
+                        (individualUsedLimit > 0.01 || liveSummary.interestFreeDays != null)) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          if (liveSummary.billedDueAmount > 0.01)
+                            _buildCardSplitPill(
+                              'Billed: ₹${IndianCurrency.format(liveSummary.billedDueAmount)}',
+                              const Color(0xFFEF4444),
+                            ),
+                          if (liveSummary.unbilledSpendAmount > 0.01)
+                            _buildCardSplitPill(
+                              'Unbilled: ₹${IndianCurrency.format(liveSummary.unbilledSpendAmount)}',
+                              const Color(0xFFF59E0B),
+                            ),
+                          if (liveSummary.blockedEmiPrincipal > 0.01)
+                            _buildCardSplitPill(
+                              'EMI: ₹${IndianCurrency.format(liveSummary.blockedEmiPrincipal)}',
+                              const Color(0xFF6366F1),
+                            ),
+                          if (liveSummary.interestFreeDays != null)
+                            _buildCardSplitPill(
+                              '${liveSummary.interestFreeDays}d interest-free',
+                              const Color(0xFF10B981),
+                            ),
                         ],
                       ),
                     ],
@@ -3058,6 +3165,25 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                     elevation: 2,
                   ),
                 ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardSplitPill(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.11),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          color: color,
         ),
       ),
     );

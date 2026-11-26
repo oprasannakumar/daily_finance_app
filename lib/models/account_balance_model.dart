@@ -273,6 +273,30 @@ class LiveCreditCardSummary {
     this.nextEmiDueDate,
     this.nextEmiAmount,
   });
+
+  double get billedDueAmount => dueBill?.remainingDue ?? 0.0;
+  double get blockedEmiPrincipal => unbilledEmiPrincipal;
+  double get unbilledSpendAmount =>
+      (usedLimit - billedDueAmount - blockedEmiPrincipal).clamp(0.0, double.infinity);
+
+  /// Estimated interest-free credit days for a purchase made today.
+  int? get interestFreeDays {
+    if (nextBillDate == null) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final bill = DateTime(nextBillDate!.year, nextBillDate!.month, nextBillDate!.day);
+
+    DateTime dueForNextBill;
+    if (dueDay != null && billDay != null) {
+      final targetMonth = dueDay! > billDay! ? bill.month : bill.month + 1;
+      final daysInTargetMonth = DateTime(bill.year, targetMonth + 1, 0).day;
+      dueForNextBill = DateTime(bill.year, targetMonth, dueDay!.clamp(1, daysInTargetMonth));
+    } else {
+      dueForNextBill = bill.add(const Duration(days: 20));
+    }
+
+    return dueForNextBill.difference(today).inDays.clamp(0, 62);
+  }
 }
 
 class LiveAccountBalanceSummary {

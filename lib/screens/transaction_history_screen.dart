@@ -69,6 +69,11 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     if (initialAccount != null && initialAccount.isNotEmpty) {
       _filterCriteria.selectedAccounts.add(initialAccount);
     }
+    final warm = _storage.cachedTransactionsSync;
+    if (warm != null && warm.isNotEmpty) {
+      _transactions = List<FinanceTransaction>.from(warm);
+      _isLoading = false;
+    }
     widget.refreshListenable?.addListener(_onRefreshNotified);
     StorageService.instance.transactionsNotifier.addListener(_loadTransactions);
     StorageService.instance.balanceConfigNotifier.addListener(_loadTransactions);
@@ -81,7 +86,12 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshListenable != widget.refreshListenable) {
       oldWidget.refreshListenable?.removeListener(_onRefreshNotified);
-      widget.refreshListenable?.addListener(_onRefreshNotified);
+      final warm = _storage.cachedTransactionsSync;
+    if (warm != null && warm.isNotEmpty) {
+      _transactions = List<FinanceTransaction>.from(warm);
+      _isLoading = false;
+    }
+    widget.refreshListenable?.addListener(_onRefreshNotified);
     }
   }
 
@@ -121,9 +131,25 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   }
 
   Future<void> _loadTransactions({bool forceRefresh = false}) async {
-    if (forceRefresh && mounted) setState(() => _isLoading = true);
+    bool effectiveForceRefresh = forceRefresh;
+    if (forceRefresh) {
+      final online = await _storage.hasNetworkConnection();
+      if (!online) {
+        effectiveForceRefresh = false;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Offline — showing saved local history. Server refresh paused.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else if (mounted) {
+        setState(() => _isLoading = true);
+      }
+    }
     try {
-      final list = await _storage.getTransactions(forceRefresh: forceRefresh);
+      final list = await _storage.getTransactions(forceRefresh: effectiveForceRefresh);
       if (mounted) {
         setState(() {
           _transactions = list;

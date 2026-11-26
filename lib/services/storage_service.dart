@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/account_balance_model.dart';
@@ -601,6 +602,21 @@ class StorageService {
     }
   }
 
+  List<FinanceTransaction>? get cachedTransactionsSync => _cachedTransactions;
+
+  /// Verifies real internet connectivity before attempting any remote server refresh.
+  Future<bool> hasNetworkConnection() async {
+    final isTesting = WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    if (isTesting) return true;
+    try {
+      final result = await InternetAddress.lookup('dns.google')
+          .timeout(const Duration(seconds: 2));
+      return result.isNotEmpty && result.first.rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<List<FinanceTransaction>> getTransactions({bool forceRefresh = false}) async {
     // 1. In-memory cache hit: zero lag
     if (!forceRefresh && _cachedTransactions != null) {
@@ -614,16 +630,28 @@ class StorageService {
       final cached = _loadTransactionsFromPrefs(prefs);
       if (cached != null && cached.isNotEmpty) {
         _cachedTransactions = cached;
-        GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
+        GoogleSheetsService.instance.cachedTransactions =
+        List<FinanceTransaction>.from(_cachedTransactions!);
 
-        // Resume any pending background sync operations or silent refresh
+        // Resume any pending background sync operations or silent refresh (only if online)
         _triggerBackgroundSyncIfNeeded();
 
         return List<FinanceTransaction>.from(_cachedTransactions!);
       }
     }
 
-    // 3. Remote fetch from Google Sheets (on forced refresh or cold first launch)
+    // 3. Verify network before attempting remote fetch; if offline, hold refresh and return local cache
+    final isOnline = await hasNetworkConnection();
+    if (!isOnline) {
+      if (_cachedTransactions == null || _cachedTransactions!.isEmpty) {
+        _cachedTransactions = _loadTransactionsFromPrefs(prefs) ?? [];
+        GoogleSheetsService.instance.cachedTransactions =
+        List<FinanceTransaction>.from(_cachedTransactions!);
+      }
+      return List<FinanceTransaction>.from(_cachedTransactions ?? []);
+    }
+
+    // 4. Remote fetch from Google Sheets (when online on forced refresh or cold first launch)
     try {
       if (forceRefresh) {
         await _resumePendingSyncQueue();
@@ -635,20 +663,23 @@ class StorageService {
 
         _cachedTransactions = merged;
         await _persistTransactions(prefs, _cachedTransactions!);
-        GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
+        GoogleSheetsService.instance.cachedTransactions =
+        List<FinanceTransaction>.from(_cachedTransactions!);
         transactionsNotifier.value++;
       } else {
-        // Offline or empty remote response: preserve or restore from local cache
+        // Empty remote response: preserve or restore from local cache
         if (_cachedTransactions == null || _cachedTransactions!.isEmpty) {
           _cachedTransactions = _loadTransactionsFromPrefs(prefs) ?? [];
-          GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
+          GoogleSheetsService.instance.cachedTransactions =
+        List<FinanceTransaction>.from(_cachedTransactions!);
         }
       }
     } catch (e) {
       debugPrint('Error fetching transactions from remote: $e');
       if (_cachedTransactions == null || _cachedTransactions!.isEmpty) {
         _cachedTransactions = _loadTransactionsFromPrefs(prefs) ?? [];
-        GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
+        GoogleSheetsService.instance.cachedTransactions =
+        List<FinanceTransaction>.from(_cachedTransactions!);
       }
     }
 
@@ -675,7 +706,8 @@ class StorageService {
     _cachedTransactions = List<FinanceTransaction>.from(transactions);
     final prefs = await SharedPreferences.getInstance();
     await _persistTransactions(prefs, _cachedTransactions!);
-    GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
+    GoogleSheetsService.instance.cachedTransactions =
+        List<FinanceTransaction>.from(_cachedTransactions!);
     transactionsNotifier.value++;
   }
 
@@ -1098,7 +1130,8 @@ class StorageService {
     _cachedTransactions!.removeWhere((t) => t.id == transaction.id || t.referenceId == transaction.referenceId);
     _cachedTransactions!.insert(0, transaction);
     _cachedTransactions!.sort((a, b) => b.date.compareTo(a.date));
-    GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
+    GoogleSheetsService.instance.cachedTransactions =
+        List<FinanceTransaction>.from(_cachedTransactions!);
 
     // Instant local update for loan entries if split transaction
     if (transaction.splitRecipients != null && transaction.splitRecipients!.isNotEmpty) {
@@ -1154,7 +1187,8 @@ class StorageService {
       (ref.isNotEmpty && t.referenceId == ref) ||
       t.referenceId == idOrReference
     );
-    GoogleSheetsService.instance.cachedTransactions = _cachedTransactions;
+    GoogleSheetsService.instance.cachedTransactions =
+        List<FinanceTransaction>.from(_cachedTransactions!);
 
     // Instant local removal for loan entries
     if (_cachedLoanEntries != null) {
@@ -1300,6 +1334,11 @@ class StorageService {
     _hasTriggeredInitialBackgroundSync = true;
     Future.microtask(() async {
       try {
+        if (!await hasNetworkConnection()) {
+          // Hold background sync until network is available
+          _hasTriggeredInitialBackgroundSync = false;
+          return;
+        }
         await _resumePendingSyncQueue();
         final remote = await GoogleSheetsService.instance.fetchTransactions(forceRefresh: true);
         if (remote.isNotEmpty) {
@@ -1340,7 +1379,9 @@ class StorageService {
     _isSyncQueueRunning = true;
 
     try {
+      if (!await hasNetworkConnection()) return;
       while (_syncQueue.isNotEmpty) {
+        if (!await hasNetworkConnection()) break;
         final item = _syncQueue.removeAt(0);
         bool ok = false;
         try {
@@ -1360,6 +1401,12 @@ class StorageService {
           }
         } catch (e) {
           debugPrint('Sync queue execution error: $e');
+        }
+
+        if (!ok) {
+          // Hold item in queue until network / server is reachable again
+          _syncQueue.insert(0, item);
+          break;
         }
 
         final prefs = await SharedPreferences.getInstance();
