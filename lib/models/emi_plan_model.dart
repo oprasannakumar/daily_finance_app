@@ -114,6 +114,7 @@ class EmiPlan {
   final String? linkedTransactionRef;
   final String? reversalTransactionRef;
   final String? feeTransactionRef;
+  final Map<String, String> taggedTransactions; // refId -> tagLabel
 
   EmiPlan({
     required this.id,
@@ -134,7 +135,29 @@ class EmiPlan {
     this.linkedTransactionRef,
     this.reversalTransactionRef,
     this.feeTransactionRef,
+    this.taggedTransactions = const {},
   });
+
+  /// Aggregates all automatically linked and manually tagged EMI transaction refs.
+  Map<String, String> get effectiveTaggedTransactions {
+    final map = <String, String>{};
+    if (linkedTransactionRef != null && linkedTransactionRef!.isNotEmpty) {
+      map[linkedTransactionRef!] = 'Main Swiped Amount';
+    }
+    if (reversalTransactionRef != null && reversalTransactionRef!.isNotEmpty) {
+      map[reversalTransactionRef!] = 'Conversion Reversal';
+    }
+    if (feeTransactionRef != null && feeTransactionRef!.isNotEmpty) {
+      map[feeTransactionRef!] = 'Processing Fee + GST';
+    }
+    for (final inst in installments) {
+      if (inst.paymentReference != null && inst.paymentReference!.isNotEmpty) {
+        map[inst.paymentReference!] = 'EMI #${inst.installmentNumber} (Prin + Int + GST)';
+      }
+    }
+    map.addAll(taggedTransactions);
+    return map;
+  }
 
   /// The non-converted swipe amount that remains on the regular credit card statement.
   double get nonEmiBalance => max(0.0, totalTransactionAmount - bookingPrincipal);
@@ -256,6 +279,7 @@ class EmiPlan {
     String? linkedTransactionRef,
     String? reversalTransactionRef,
     String? feeTransactionRef,
+    Map<String, String>? taggedTransactions,
   }) {
     return EmiPlan(
       id: id ?? this.id,
@@ -276,6 +300,7 @@ class EmiPlan {
       linkedTransactionRef: linkedTransactionRef ?? this.linkedTransactionRef,
       reversalTransactionRef: reversalTransactionRef ?? this.reversalTransactionRef,
       feeTransactionRef: feeTransactionRef ?? this.feeTransactionRef,
+      taggedTransactions: taggedTransactions ?? Map<String, String>.from(this.taggedTransactions),
     );
   }
 
@@ -297,6 +322,7 @@ class EmiPlan {
         'linkedTransactionRef': linkedTransactionRef,
         'reversalTransactionRef': reversalTransactionRef,
         'feeTransactionRef': feeTransactionRef,
+        'taggedTransactions': taggedTransactions,
         'installments': installments.map((it) => it.toJson()).toList(),
       };
 
@@ -334,6 +360,9 @@ class EmiPlan {
       linkedTransactionRef: json['linkedTransactionRef'] as String?,
       reversalTransactionRef: json['reversalTransactionRef'] as String?,
       feeTransactionRef: json['feeTransactionRef'] as String?,
+      taggedTransactions: (json['taggedTransactions'] as Map<String, dynamic>?)
+              ?.map((k, v) => MapEntry(k, v.toString())) ??
+          const {},
     );
   }
 

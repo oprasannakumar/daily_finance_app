@@ -173,6 +173,228 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
     _loadPlans(fromLocalOnly: true);
   }
 
+  Future<void> _openTagTransactionDialog(EmiPlan plan) async {
+    final txs = await _storage.getTransactions();
+    if (!mounted) return;
+    final candidates = txs
+        .where((t) =>
+            t.referenceId.isNotEmpty &&
+            (t.breakdowns.any((b) => b.account == plan.account) ||
+                t.flow == 'Withdraw' ||
+                t.purpose.toLowerCase().contains('emi') ||
+                t.purpose.toLowerCase().contains('fee') ||
+                t.purpose.toLowerCase().contains('interest')))
+        .take(40)
+        .toList();
+
+    if (candidates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No matching transactions found to tag', textAlign: TextAlign.center)),
+      );
+      return;
+    }
+
+    String selectedTag = 'Processing Fee + GST';
+    const tags = [
+      'Main Swiped Amount',
+      'Processing Fee + GST',
+      'Interest + GST',
+      'Conversion Reversal',
+      'EMI Installment',
+      'Other EMI Charge',
+    ];
+
+    final chosen = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Tag Related EMI Transaction', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: selectedTag,
+                  decoration: const InputDecoration(labelText: 'Component Tag'),
+                  items: tags.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))).toList(),
+                  onChanged: (v) {
+                    if (v != null) setDlgState(() => selectedTag = v);
+                  },
+                ),
+                const SizedBox(height: 12),
+                const Text('Tap a transaction to link:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: candidates.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (_, idx) {
+                      final tx = candidates[idx];
+                      return ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                        title: Text(
+                          tx.narration.isNotEmpty ? tx.narration : tx.purpose,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          '${FinanceTransaction.formatDate(tx.date)} • ${tx.referenceId}',
+                          style: const TextStyle(fontSize: 10.5),
+                        ),
+                        trailing: Text(
+                          '₹${IndianCurrency.formatSmart(tx.totalAmount)}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        onTap: () => Navigator.of(ctx).pop({
+                          'ref': tx.referenceId,
+                          'tag': selectedTag,
+                        }),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          ],
+        ),
+      ),
+    );
+
+    if (chosen != null) {
+      final updatedTags = Map<String, String>.from(plan.taggedTransactions);
+      updatedTags[chosen['ref']!] = chosen['tag']!;
+      final updatedPlan = plan.copyWith(taggedTransactions: updatedTags);
+      await _sheets.saveEmiPlan(updatedPlan);
+      await _loadPlans(fromLocalOnly: true);
+    }
+  }
+
+  Future<void> _removeManualTag(EmiPlan plan, String refId) async {
+    final updatedTags = Map<String, String>.from(plan.taggedTransactions)..remove(refId);
+    final updatedPlan = plan.copyWith(taggedTransactions: updatedTags);
+    await _sheets.saveEmiPlan(updatedPlan);
+    await _loadPlans(fromLocalOnly: true);
+  }
+
+  Widget _buildTaggedComponentsSection(
+    EmiPlan plan,
+    bool isDark,
+    Color borderColor,
+    Color textPrimary,
+    Color textSecondary,
+    Color coral,
+  ) {
+    final interestAndGst = plan.installments.fold<double>(0.0, (s, it) => s + it.interest + it.applicableTaxes);
+    final feeAndGst = plan.processingFee + plan.processingFeeGst;
+    final tagged = plan.effectiveTaggedTransactions;
+
+    Widget chip(String label, String value, Color color) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          '$label: $value',
+          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: color),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.03) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '🏷️ Tagged EMI Components',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: textPrimary),
+              ),
+              InkWell(
+                onTap: () => _openTagTransactionDialog(plan),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  child: Text(
+                    '+ Tag Tx',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: coral),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              chip('Main Swiped', '₹${IndianCurrency.formatSmart(plan.totalTransactionAmount)}', const Color(0xFF6366F1)),
+              chip('EMI Principal', '₹${IndianCurrency.formatSmart(plan.bookingPrincipal)}', const Color(0xFF0EA5E9)),
+              chip('Interest + GST', '₹${IndianCurrency.formatSmart(interestAndGst)}', const Color(0xFFF59E0B)),
+              chip('Proc. Fee + GST', '₹${IndianCurrency.formatSmart(feeAndGst)}', const Color(0xFFEC4899)),
+            ],
+          ),
+          if (tagged.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: tagged.entries.map((entry) {
+                final isManual = plan.taggedTransactions.containsKey(entry.key);
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E2448) : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${entry.value} • ${entry.key}',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: textSecondary),
+                      ),
+                      if (isManual) ...[
+                        const SizedBox(width: 4),
+                        InkWell(
+                          onTap: () => _removeManualTag(plan, entry.key),
+                          child: const Icon(Icons.close_rounded, size: 13, color: Color(0xFFEF4444)),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Future<void> _confirmDeletePlan(EmiPlan plan) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final confirm = await showDialog<bool>(
@@ -695,6 +917,8 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
           ),
           children: [
             const Divider(height: 12),
+
+            _buildTaggedComponentsSection(plan, isDark, borderColor, textPrimary, textSecondary, coral),
 
             // Amortization Schedule Table
             Container(

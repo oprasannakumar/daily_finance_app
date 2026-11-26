@@ -177,7 +177,7 @@ class DailyFinanceApp extends StatelessWidget {
           builder: (context, child) {
             final mq = MediaQuery.of(context);
             final visibleHeight = (mq.size.height - mq.viewInsets.bottom).clamp(240.0, 2000.0);
-            final centerBottomInset = (visibleHeight * 0.42).clamp(110.0, 460.0);
+            final centerBottomInset = (visibleHeight * 0.48).clamp(130.0, 540.0);
             final isDarkTheme = Theme.of(context).brightness == Brightness.dark;
 
             return Theme(
@@ -263,8 +263,10 @@ class _DynamicSnackBarMessengerState extends ScaffoldMessengerState {
       dismissDirection: snackBar.dismissDirection,
       onVisible: snackBar.onVisible,
       clipBehavior: Clip.none,
-      content: Center(
-        child: IntrinsicWidth(
+      content: IgnorePointer(
+        ignoring: snackBar.action == null,
+        child: Center(
+          child: IntrinsicWidth(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
             decoration: BoxDecoration(
@@ -306,6 +308,7 @@ class _DynamicSnackBarMessengerState extends ScaffoldMessengerState {
           ),
         ),
       ),
+    ),
     );
 
     return super.showSnackBar(

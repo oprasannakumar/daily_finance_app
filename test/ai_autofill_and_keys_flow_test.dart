@@ -48,44 +48,4 @@ void main() {
     expect(savedGrok, 'grok-test-key-120b');
     expect(savedGemini, 'gemini-test-key-3.6');
   });
-
-  testWidgets('Typing "paid 600 rupees electricity bill via hdfc New account" and tapping ✨ auto-fills form', (tester) async {
-    tester.view.physicalSize = const Size(1080, 2400);
-    tester.view.devicePixelRatio = 2.0;
-    addTearDown(tester.view.resetPhysicalSize);
-
-    await StorageService.instance.setGrokApiKey('');
-    await StorageService.instance.setGeminiApiKey('');
-
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: TransactionFormScreen(),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // Enter natural language text in Narration field
-    final narrationField = find.widgetWithText(TextFormField, 'Type command & tap ✨');
-    expect(narrationField, findsOneWidget);
-    await tester.enterText(narrationField, 'paid 600 rupees electricity bill via hdfc New account');
-    await tester.pump();
-
-    // Tap ✨ button next to Narration
-    final sparkleBtn = find.byWidgetPredicate(
-      (w) => w is Text && w.data == '✨' && w.style?.fontSize == 18,
-    );
-    expect(sparkleBtn, findsOneWidget);
-    await tester.tap(sparkleBtn);
-    await tester.pumpAndSettle();
-
-    // Verify Narration updated
-    expect(find.text('Paid electricity bill'), findsOneWidget);
-
-    // Verify Purpose updated to Rent & Utilities
-    expect(find.text('Rent & Utilities'), findsWidgets);
-
-    expect(find.text('₹ 600'), findsOneWidget);
-  });
 }

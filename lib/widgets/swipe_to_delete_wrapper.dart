@@ -207,7 +207,7 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
                         (_dragOffset <= -36 || (vx < -200 && _dragOffset < 0))) {
                       _animateTo(-_revealWidth);
                     } else if (widget.onSwipeRight != null &&
-                        (_dragOffset >= maxWidth * 0.35 || vx > 550)) {
+                        (_dragOffset >= 80 || vx > 300)) {
                       _animateTo(0.0);
                       widget.onSwipeRight!();
                     } else if (widget.onSwipeRight != null &&

@@ -5190,16 +5190,14 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                 ),
                                 const SizedBox(width: 6),
                                 _buildModeCard(
-                                  emoji: '☁️',
+                                  emoji: '🧾',
                                   isSelected: false,
                                   isDark: isDark,
                                   onTap: () {
-                                    setState(() => _selectedPurpose = 'Subscription');
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Purpose set to Cloud / Online', textAlign: TextAlign.center),
-                                        behavior: SnackBarBehavior.floating,
-                                        duration: Duration(milliseconds: 900),
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        settings: const RouteSettings(name: 'Invoices'),
+                                        builder: (_) => const InvoiceManagerScreen(),
                                       ),
                                     );
                                   },
@@ -5246,47 +5244,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                   onTap: () => _toggleSelfTransferMode(!_isSelfTransferMode),
                                 ),
                               ],
-                            ),
-                            const SizedBox(height: 12),
-
-                            // 3. ✨ Auto-Fill Button
-                            InkWell(
-                              onTap: _handleAutoFill,
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF1F1B36) : const Color(0xFFFFF8F6),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isDark ? const Color(0xFF4C3A6E) : const Color(0xFFFFC5B8),
-                                    width: 1.2,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        '✨',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: isDark ? const Color(0xFFA78BFA) : coralAccent,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Auto-Fill',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: isDark ? const Color(0xFFA78BFA) : coralAccent,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
                             ),
                             const SizedBox(height: 12),
 
@@ -5522,7 +5479,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                           },
                                           style: TextStyle(fontSize: 13, color: textPrimary),
                                           decoration: InputDecoration(
-                                            hintText: 'Type command & tap ✨',
+                                            hintText: 'Enter narration / description',
                                             hintStyle: TextStyle(
                                               fontSize: 12,
                                               color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
@@ -5542,81 +5499,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                               borderSide: BorderSide(color: isDark ? purpleAccent : cyanAccent, width: 1.8),
                                             ),
                                           ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // ✨ AI Auto-fill Button
-                                    InkWell(
-                                      onTap: () {
-                                        _aiAutoFillDebounce?.cancel();
-                                        if (_narrationController.text.trim().isNotEmpty) {
-                                          _processAiAutoFill(_narrationController.text.trim(), updateNarration: true, isSilent: false);
-                                        } else {
-                                          _handleAutoFill();
-                                        }
-                                      },
-                                      onLongPress: _showApiKeysDialog,
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Container(
-                                        width: 46,
-                                        height: 46,
-                                        decoration: BoxDecoration(
-                                          color: isDark ? const Color(0xFF261D4A) : const Color(0xFFF5F3FF),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: isDark ? const Color(0xFF7C3AED) : const Color(0xFFC084FC),
-                                            width: 1.3,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: _isAiProcessing
-                                              ? const SizedBox(
-                                                  width: 18,
-                                                  height: 18,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    color: Color(0xFFC084FC),
-                                                  ),
-                                                )
-                                              : const Text('✨', style: TextStyle(fontSize: 18)),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    // 🎤 Mic Voice Input Button
-                                    InkWell(
-                                      onTap: _toggleVoiceInput,
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 200),
-                                        width: 40,
-                                        height: 44,
-                                        decoration: BoxDecoration(
-                                          color: _isListening
-                                              ? const Color(0xFFEF4444)
-                                              : inputBg,
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(
-                                            color: _isListening
-                                                ? const Color(0xFFEF4444)
-                                                : inputBorder,
-                                            width: 1.2,
-                                          ),
-                                          boxShadow: _isListening
-                                              ? [
-                                                  BoxShadow(
-                                                    color: const Color(0xFFEF4444).withValues(alpha: 0.4),
-                                                    blurRadius: 8,
-                                                    spreadRadius: 1,
-                                                  ),
-                                                ]
-                                              : null,
-                                        ),
-                                        child: Center(
-                                          child: _isListening
-                                              ? const Icon(Icons.mic, size: 20, color: Colors.white)
-                                              : const Text('🎤', style: TextStyle(fontSize: 16)),
                                         ),
                                       ),
                                     ),
@@ -6293,10 +6175,18 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
 
                                   return SwipeToDeleteWrapper(
                                     key: ValueKey('split_dismiss_${recipient.id}'),
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(12),
                                     margin: const EdgeInsets.symmetric(vertical: 3),
+                                    border: Border.all(color: inputBorder, width: 1.2),
                                     onDelete: () => _removeSplitRecipient(idx),
-                                    child: rowWidget,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF151932) : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: rowWidget,
+                                    ),
                                   );
                                 }),
                               ],

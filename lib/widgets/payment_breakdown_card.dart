@@ -157,7 +157,6 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
     return SwipeToDeleteWrapper(
       key: ValueKey(widget.breakdown.id),
       enabled: !widget.isOnlyMode,
-      allowPartialReveal: false,
       borderRadius: BorderRadius.circular(12),
       margin: const EdgeInsets.symmetric(vertical: 3),
       onDelete: widget.onDelete,
