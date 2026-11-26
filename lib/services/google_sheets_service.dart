@@ -3649,8 +3649,19 @@ class GoogleSheetsService {
 
     try {
       final range = Uri.encodeComponent("$_groceryInvoiceTitle!A2:H");
-      final url = Uri.parse('https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/$range');
-      final res = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+      var activeSheetId = sheetId;
+      var url = Uri.parse('https://sheets.googleapis.com/v4/spreadsheets/$activeSheetId/values/$range');
+      var res = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+
+      if (res.statusCode == 404 || res.statusCode == 403) {
+        await StorageService.instance.saveGroceryDbId('');
+        final rediscovered = await findExistingGroceryDb(token);
+        if (rediscovered != null && rediscovered.isNotEmpty) {
+          activeSheetId = rediscovered;
+          url = Uri.parse('https://sheets.googleapis.com/v4/spreadsheets/$activeSheetId/values/$range');
+          res = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+        }
+      }
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
@@ -3699,8 +3710,19 @@ class GoogleSheetsService {
 
     try {
       final range = Uri.encodeComponent("$_groceryPricesTitle!A2:D");
-      final url = Uri.parse('https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/$range');
-      final res = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+      var activeSheetId = sheetId;
+      var url = Uri.parse('https://sheets.googleapis.com/v4/spreadsheets/$activeSheetId/values/$range');
+      var res = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+
+      if (res.statusCode == 404 || res.statusCode == 403) {
+        await StorageService.instance.saveGroceryDbId('');
+        final rediscovered = await findExistingGroceryDb(token);
+        if (rediscovered != null && rediscovered.isNotEmpty) {
+          activeSheetId = rediscovered;
+          url = Uri.parse('https://sheets.googleapis.com/v4/spreadsheets/$activeSheetId/values/$range');
+          res = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+        }
+      }
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);

@@ -157,15 +157,20 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
     return SwipeToDeleteWrapper(
       key: ValueKey(widget.breakdown.id),
       enabled: !widget.isOnlyMode,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(12),
       margin: const EdgeInsets.symmetric(vertical: 3),
       onDelete: widget.onDelete,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-              // Exact matching 44px height row for Type, Account, and Amount
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+              // Exact matching 46px height row for Type, Account, and Amount
               SizedBox(
-                height: 44,
+                height: 46,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -223,10 +228,10 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                     const SizedBox(width: 6),
                   ],
 
-                  // Amount block (Matching exact 44px height, identical to Type and Account)
+                  // Amount block (Matching exact 46px height, identical to Type and Account)
                   SizedBox(
                     width: isCash ? 100 : 92,
-                    height: 44,
+                    height: 46,
                     child: InkWell(
                       onTap: isCash ? null : _openCalculator,
                       borderRadius: BorderRadius.circular(12),
@@ -235,8 +240,8 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                           isDense: true,
                           filled: true,
                           fillColor: amtFillColor,
-                          constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          constraints: const BoxConstraints(minHeight: 46, maxHeight: 46),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(color: amtBorderColor, width: 1.2),
@@ -490,6 +495,7 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
             ],
           ],
         ),
+      ),
     );
   }
 }

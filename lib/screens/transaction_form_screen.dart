@@ -3863,6 +3863,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                       : () async {
                                           final messenger = ScaffoldMessenger.of(sheetCtx);
                                           final txs = await _storage.getTransactions(forceRefresh: true);
+                                          unawaited(GoogleSheetsService.instance.fetchDealerPrices(forceRefresh: true));
+                                          unawaited(GoogleSheetsService.instance.fetchInvoiceItems(forceRefresh: true));
                                           if (mounted) {
                                             _refreshFloatingStats();
                                           }
@@ -5963,7 +5965,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                       Expanded(
                                         flex: isOtherPurpose ? 5 : 10,
                                         child: SizedBox(
-                                          height: 44,
+                                          height: 46,
                                           child: PopupSelectField(
                                             key: ValueKey('purpose_${_selectedPurpose}_${_flow}_$_isSplitModeEnabled'),
                                             label: 'Purpose',
@@ -5981,7 +5983,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                         Expanded(
                                           flex: 5,
                                           child: SizedBox(
-                                            height: 44,
+                                            height: 46,
                                             child: TextFormField(
                                               controller: _customPurposeController,
                                               textAlignVertical: TextAlignVertical.center,
@@ -5989,8 +5991,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                               decoration: InputDecoration(
                                                 hintText: 'Enter Purpose',
                                                 isDense: true,
-                                                constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
-                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                constraints: const BoxConstraints(minHeight: 46, maxHeight: 46),
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
                                                 filled: true,
                                                 fillColor: inputBg,
                                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -6019,7 +6021,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                       Expanded(
                                         flex: isOtherSpentFor ? 4 : 10,
                                         child: SizedBox(
-                                          height: 44,
+                                          height: 46,
                                           child: PopupSelectField(
                                             key: ValueKey('spentFor_${_selectedSpentFor}_$_isSplitModeEnabled'),
                                             label: 'Spent For',
@@ -6037,7 +6039,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                         Expanded(
                                           flex: 6,
                                           child: SizedBox(
-                                            height: 44,
+                                            height: 46,
                                             child: TextFormField(
                                               controller: _customSpentForController,
                                               textAlignVertical: TextAlignVertical.center,
@@ -6045,8 +6047,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                               decoration: InputDecoration(
                                                 hintText: 'Name / Contact',
                                                 isDense: true,
-                                                constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
-                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                constraints: const BoxConstraints(minHeight: 46, maxHeight: 46),
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
                                                 filled: true,
                                                 fillColor: inputBg,
                                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -6054,11 +6056,11 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                                   borderRadius: BorderRadius.circular(12),
                                                   borderSide: BorderSide(color: inputBorder, width: 1.2),
                                                 ),
-                                                suffixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 44),
+                                                suffixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 46),
                                                 suffixIcon: IconButton(
                                                   icon: const Icon(Icons.contacts_rounded, size: 18, color: cyanAccent),
                                                   padding: EdgeInsets.zero,
-                                                  constraints: const BoxConstraints(minWidth: 38, minHeight: 44),
+                                                  constraints: const BoxConstraints(minWidth: 38, minHeight: 46),
                                                   tooltip: 'Pick Contact',
                                                   onPressed: _pickContactForSpentFor,
                                                 ),

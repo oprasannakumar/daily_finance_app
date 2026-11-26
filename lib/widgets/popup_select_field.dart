@@ -58,8 +58,8 @@ class PopupSelectField extends FormField<String> {
                   isDense: true,
                   filled: true,
                   fillColor: fillColor,
-                  constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  constraints: const BoxConstraints(minHeight: 46, maxHeight: 46),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: borderColor, width: 1.2),

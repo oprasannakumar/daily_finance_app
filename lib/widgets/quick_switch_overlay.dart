@@ -28,7 +28,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
 
   static const double _pillWidth = 22.0;
   static const double _pillHeight = 76.0;
-  static const double _dockWidth = 104.0;
+  static const double _dockWidth = 118.0;
 
   static const List<Map<String, dynamic>> _dockItems = [
     {'emoji': '✍️', 'label': 'Entry', 'color': Color(0xFF6366F1)},
@@ -44,7 +44,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
 
   double? _pillTop;
   bool _isRightEdge = true;
-  bool _isDragging = false;
+  final bool _isDragging = false;
   bool _isDockOpen = false;
   bool _isHoldSelecting = false;
   int? _hoveredDockIndex;
@@ -112,14 +112,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
         if (order != null && order.isNotEmpty) _orderedLabels = order;
       });
       _resetIdleTimer();
-    } catch (_) {}
-  }
-
-  Future<void> _savePosition() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (_pillTop != null) await prefs.setDouble(_prefKeyY, _pillTop!);
-      await prefs.setBool(_prefKeyIsRight, _isRightEdge);
     } catch (_) {}
   }
 
@@ -761,55 +753,31 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                               _hoveredDockIndex = null;
                             });
                           },
-                          onPanStart: (details) {
+                          onHorizontalDragStart: (details) {
                             _dragStartPos = details.globalPosition;
                             _swipedInward = false;
                             _resetIdleTimer();
                           },
-                          onPanUpdate: (details) {
+                          onHorizontalDragUpdate: (details) {
                             final start = _dragStartPos;
-                            if (start != null && !_isDragging && !_swipedInward) {
+                            if (start != null && !_swipedInward) {
                               final dx = details.globalPosition.dx - start.dx;
-                              final dy = (details.globalPosition.dy - start.dy).abs();
                               final inwardSwipe = _isRightEdge ? dx < -18.0 : dx > 18.0;
-                              if (inwardSwipe && dx.abs() > dy) {
+                              if (inwardSwipe) {
                                 _swipedInward = true;
                                 HapticFeedback.selectionClick();
                                 setState(() => _isDockOpen = true);
-                                return;
                               }
                             }
-                            if (!_swipedInward) {
-                              setState(() {
-                                _isDragging = true;
-                                _pillTop = _clampTop(
-                                  (_pillTop ?? effectiveTop) + details.delta.dy,
-                                  screenSize,
-                                  padding,
-                                );
-                                if (details.globalPosition.dx < screenSize.width * 0.25) {
-                                  _isRightEdge = false;
-                                } else if (details.globalPosition.dx > screenSize.width * 0.75) {
-                                  _isRightEdge = true;
-                                }
-                              });
-                            }
                           },
-                          onPanEnd: (_) {
+                          onHorizontalDragEnd: (_) {
                             _dragStartPos = null;
                             _swipedInward = false;
-                            if (_isDragging) {
-                              setState(() => _isDragging = false);
-                              unawaited(_savePosition());
-                            }
                             _resetIdleTimer();
                           },
-                          onPanCancel: () {
+                          onHorizontalDragCancel: () {
                             _dragStartPos = null;
                             _swipedInward = false;
-                            if (_isDragging) {
-                              setState(() => _isDragging = false);
-                            }
                             _resetIdleTimer();
                           },
                           child: Container(

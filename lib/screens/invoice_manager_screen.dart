@@ -400,11 +400,15 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     return matching.isNotEmpty ? matching : _dealerPrices;
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
     try {
-      final prices = await GoogleSheetsService.instance.fetchDealerPrices();
-      final invoices = await GoogleSheetsService.instance.fetchInvoiceItems();
+      var prices = await GoogleSheetsService.instance.fetchDealerPrices(forceRefresh: forceRefresh);
+      var invoices = await GoogleSheetsService.instance.fetchInvoiceItems(forceRefresh: forceRefresh);
+      if (!forceRefresh && (prices.isEmpty || invoices.isEmpty)) {
+        prices = await GoogleSheetsService.instance.fetchDealerPrices(forceRefresh: true);
+        invoices = await GoogleSheetsService.instance.fetchInvoiceItems(forceRefresh: true);
+      }
       final spentFors = await StorageService.instance.getSpentFors();
 
       final dealers = <String>{};
@@ -865,6 +869,13 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
           '🧾 Invoice Manager',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh from Google Sheets',
+            onPressed: _isLoading ? null : () => _loadData(forceRefresh: true),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: primaryColor,
