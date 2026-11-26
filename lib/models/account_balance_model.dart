@@ -59,6 +59,7 @@ class CreditCardLimit {
     int? dueDay,
     double? statementBilledAmount,
     String? manualPaidCycle,
+    bool clearManualPaidCycle = false,
   }) {
     return CreditCardLimit(
       totalLimit: totalLimit ?? this.totalLimit,
@@ -68,7 +69,7 @@ class CreditCardLimit {
       billDay: billDay ?? this.billDay,
       dueDay: dueDay ?? this.dueDay,
       statementBilledAmount: statementBilledAmount ?? this.statementBilledAmount,
-      manualPaidCycle: manualPaidCycle ?? this.manualPaidCycle,
+      manualPaidCycle: clearManualPaidCycle ? null : (manualPaidCycle ?? this.manualPaidCycle),
     );
   }
 }
@@ -253,6 +254,7 @@ class LiveCreditCardSummary {
   final int activeEmiPlansCount;
   final DateTime? nextEmiDueDate;
   final double? nextEmiAmount;
+  final bool isManuallyPaid;
 
   LiveCreditCardSummary({
     this.cardName = '',
@@ -272,6 +274,7 @@ class LiveCreditCardSummary {
     this.activeEmiPlansCount = 0,
     this.nextEmiDueDate,
     this.nextEmiAmount,
+    this.isManuallyPaid = false,
   });
 
   double get billedDueAmount => dueBill?.remainingDue ?? 0.0;
@@ -558,6 +561,7 @@ class LiveAccountBalanceSummary {
       DateTime? nextBillDate;
       DateTime? nextDueDate;
       CreditCardDueBill? cardDueBill;
+      bool cardIsManuallyPaid = false;
 
       if (card.billDay != null && card.dueDay != null) {
         final bDay = card.billDay!.clamp(1, 31);
@@ -654,6 +658,7 @@ class LiveAccountBalanceSummary {
             ? (billedAmt - paidInCycle).clamp(0.0, double.infinity)
             : (cardUsed - unbilledSpendsSinceBillDate).clamp(0.0, double.infinity);
         final isManuallyPaid = card.manualPaidCycle == cycleKey;
+        cardIsManuallyPaid = isManuallyPaid;
 
         // If remaining > 0, bill is active and not manually marked paid
         if (billedAmt > 0 && remaining > 0.01 && !isManuallyPaid) {
@@ -721,6 +726,7 @@ class LiveAccountBalanceSummary {
         activeEmiPlansCount: activeEmiPlansCount,
         nextEmiDueDate: nextEmiDueDate,
         nextEmiAmount: nextEmiAmount,
+        isManuallyPaid: cardIsManuallyPaid,
       );
     }
 

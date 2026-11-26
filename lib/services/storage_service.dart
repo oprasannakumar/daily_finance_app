@@ -462,6 +462,17 @@ class StorageService {
     }
   }
 
+  Future<void> markCreditCardBillUnpaid(String cardName) async {
+    final config = await getAccountBalanceConfig();
+    final ccLimits = Map<String, CreditCardLimit>.from(config.creditCardLimits);
+    final card = ccLimits[cardName];
+    if (card != null) {
+      ccLimits[cardName] = card.copyWith(clearManualPaidCycle: true);
+      final updated = config.copyWith(creditCardLimits: ccLimits);
+      await saveAccountBalanceConfig(updated);
+    }
+  }
+
   Future<void> updateCreditCardBilledAmount(String cardName, double amount) async {
     final config = await getAccountBalanceConfig();
     final ccLimits = Map<String, CreditCardLimit>.from(config.creditCardLimits);

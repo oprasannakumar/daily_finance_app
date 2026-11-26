@@ -1559,31 +1559,96 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                               color: Color(0xFFEF4444),
                             ),
                           ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () async {
+                                  await _storage.markCreditCardBillPaid(card, dueBill.cycleKey);
+                                  await _loadInitialData();
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'Mark Paid',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF059669),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () {
+                                  QuickNavController.instance.openEntryWithDraft(
+                                    EntryDraft(
+                                      isSelfTransfer: true,
+                                      toAccount: card,
+                                      toPaymentType: 'Credit',
+                                      amount: dueBill.remainingDue,
+                                      narration: 'Credit Card Bill Payment: $card',
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: primaryColor.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    'Pay Bill →',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ] else if (liveSummary?.isManuallyPaid == true) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Bill Marked Paid',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF059669),
+                            ),
+                          ),
                           InkWell(
                             borderRadius: BorderRadius.circular(8),
-                            onTap: () {
-                              QuickNavController.instance.openEntryWithDraft(
-                                EntryDraft(
-                                  isSelfTransfer: true,
-                                  toAccount: card,
-                                  toPaymentType: 'Credit',
-                                  amount: dueBill.remainingDue,
-                                  narration: 'Credit Card Bill Payment: $card',
-                                ),
-                              );
+                            onTap: () async {
+                              await _storage.markCreditCardBillUnpaid(card);
+                              await _loadInitialData();
                             },
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                               decoration: BoxDecoration(
-                                color: primaryColor.withValues(alpha: 0.14),
+                                color: const Color(0xFFF59E0B).withValues(alpha: 0.14),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Text(
-                                'Pay Bill →',
+                              child: const Text(
+                                'Mark Unpaid',
                                 style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: primaryColor,
+                                  color: Color(0xFFD97706),
                                 ),
                               ),
                             ),

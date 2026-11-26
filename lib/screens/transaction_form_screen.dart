@@ -3363,7 +3363,16 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                                       content: Text('✅ Marked ${bill.cardName} bill as paid', textAlign: TextAlign.center),
                                                       backgroundColor: const Color(0xFF10B981),
                                                       behavior: SnackBarBehavior.floating,
-                                                      duration: const Duration(seconds: 2),
+                                                      duration: const Duration(seconds: 4),
+                                                      action: SnackBarAction(
+                                                        label: 'Undo',
+                                                        textColor: Colors.white,
+                                                        onPressed: () async {
+                                                          await _storage.markCreditCardBillUnpaid(bill.cardName);
+                                                          await _loadBalancesSummary();
+                                                          if (mounted) setState(() {});
+                                                        },
+                                                      ),
                                                     ),
                                                   );
                                                 }
