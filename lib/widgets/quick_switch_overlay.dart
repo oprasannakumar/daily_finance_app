@@ -6,8 +6,9 @@ import '../services/quick_actions_service.dart';
 import '../services/quick_nav_controller.dart';
 
 /// Universal movable translucent trackball with:
-/// - Tap to open a compact floating Quick-Jump menu anchored right next to the ball
-/// - Long-press (or Settings button in menu) to open Trackball Settings
+/// - Tap or Slide-to-Pick to open a compact 3×3 Quick-Jump grid of all 9 menus on the safe side
+/// - Slide onto any tile and release to jump immediately (works from any edge or corner)
+/// - Hold & drag to reposition the ball anywhere on screen
 /// - Configurable Single-Tap, Double-Tap, Auto-Hide, and Transparency
 /// - 5-second Screenshot Hide mode
 class QuickSwitchOverlay extends StatefulWidget {
@@ -26,24 +27,21 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   static const String _prefKeyAutoHide = 'quick_switch_trackball_autohide';
   static const String _prefKeySingleTap = 'quick_switch_trackball_single_tap';
   static const String _prefKeyDoubleTap = 'quick_switch_trackball_double_tap';
-  static const String _prefKeySwipeUp = 'quick_switch_trackball_swipe_up';
-  static const String _prefKeySwipeDown = 'quick_switch_trackball_swipe_down';
-  static const String _prefKeySwipeLeft = 'quick_switch_trackball_swipe_left';
-  static const String _prefKeySwipeRight = 'quick_switch_trackball_swipe_right';
 
   static const double _ballSize = 46.0;
-  static const double _menuWidth = 228.0;
-  static const double _menuHeight = 232.0;
+  static const double _menuWidth = 264.0;
+  static const double _menuHeight = 236.0;
 
   static const List<Map<String, String>> _menuItems = [
-    {'emoji': '📊', 'label': 'Dashboard'},
-    {'emoji': '🔑', 'label': 'API Keys'},
-    {'emoji': '🤝', 'label': 'Borrowers'},
-    {'emoji': '💳', 'label': 'EMIs'},
-    {'emoji': '⚙️', 'label': 'Masters'},
+    {'emoji': '✍️', 'label': 'Entry'},
+    {'emoji': '📜', 'label': 'History'},
     {'emoji': '💰', 'label': 'Balances'},
+    {'emoji': '📊', 'label': 'Dashboard'},
+    {'emoji': '💳', 'label': 'EMIs'},
+    {'emoji': '🤝', 'label': 'Borrowers'},
     {'emoji': '🧾', 'label': 'Invoices'},
-    {'emoji': '🔄', 'label': 'Entry ↔ History'},
+    {'emoji': '⚙️', 'label': 'Masters'},
+    {'emoji': '🔑', 'label': 'API Keys'},
   ];
 
   static const List<String> _actionOptions = [
@@ -66,24 +64,20 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   bool _isDragging = false;
   bool _isMenuOpen = false;
 
-  // Swipe / hold-to-move pointer tracking
+  // Slide-to-Pick & hold-to-move pointer tracking
   int? _activePointerId;
   Offset? _pointerDownPos;
   Offset? _lastPointerPos;
-  Offset _swipeDelta = Offset.zero;
-  bool _isSwiping = false;
-  String? _activeSwipeDir;
+  bool _isSlidePicking = false;
+  int? _hoveredMenuIndex;
   Timer? _holdToMoveTimer;
+  final List<GlobalKey> _tileKeys = List.generate(9, (_) => GlobalKey());
 
   // Customization state
   double _opacity = 0.40;
   bool _autoHide = false;
   String _singleTapAction = 'Quick Menu';
   String _doubleTapAction = 'None';
-  String _swipeUpAction = 'Dashboard';
-  String _swipeDownAction = 'Balances';
-  String _swipeLeftAction = 'Entry ↔ History';
-  String _swipeRightAction = 'EMIs';
 
   // Auto-hide & screenshot hide timers
   bool _isIdleFaded = false;
@@ -114,10 +108,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
       final autoHide = prefs.getBool(_prefKeyAutoHide);
       final singleTap = prefs.getString(_prefKeySingleTap);
       final doubleTap = prefs.getString(_prefKeyDoubleTap);
-      final swipeUp = prefs.getString(_prefKeySwipeUp);
-      final swipeDown = prefs.getString(_prefKeySwipeDown);
-      final swipeLeft = prefs.getString(_prefKeySwipeLeft);
-      final swipeRight = prefs.getString(_prefKeySwipeRight);
 
       if (!mounted) return;
       setState(() {
@@ -129,18 +119,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
         }
         if (doubleTap != null && _actionOptions.contains(doubleTap)) {
           _doubleTapAction = doubleTap;
-        }
-        if (swipeUp != null && _actionOptions.contains(swipeUp)) {
-          _swipeUpAction = swipeUp;
-        }
-        if (swipeDown != null && _actionOptions.contains(swipeDown)) {
-          _swipeDownAction = swipeDown;
-        }
-        if (swipeLeft != null && _actionOptions.contains(swipeLeft)) {
-          _swipeLeftAction = swipeLeft;
-        }
-        if (swipeRight != null && _actionOptions.contains(swipeRight)) {
-          _swipeRightAction = swipeRight;
         }
       });
       _resetIdleTimer();
@@ -162,10 +140,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
       await prefs.setBool(_prefKeyAutoHide, _autoHide);
       await prefs.setString(_prefKeySingleTap, _singleTapAction);
       await prefs.setString(_prefKeyDoubleTap, _doubleTapAction);
-      await prefs.setString(_prefKeySwipeUp, _swipeUpAction);
-      await prefs.setString(_prefKeySwipeDown, _swipeDownAction);
-      await prefs.setString(_prefKeySwipeLeft, _swipeLeftAction);
-      await prefs.setString(_prefKeySwipeRight, _swipeRightAction);
     } catch (_) {}
   }
 
@@ -227,34 +201,19 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
     return Offset(left, top);
   }
 
-  String _actionForSwipeDir(String dir) {
-    switch (dir) {
-      case 'up':
-        return _swipeUpAction;
-      case 'down':
-        return _swipeDownAction;
-      case 'left':
-        return _swipeLeftAction;
-      case 'right':
-        return _swipeRightAction;
-      default:
-        return 'None';
+  int? _hitTestMenuTile(Offset globalPosition) {
+    for (int i = 0; i < _tileKeys.length; i++) {
+      final ctx = _tileKeys[i].currentContext;
+      if (ctx == null) continue;
+      final box = ctx.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) continue;
+      final topLeft = box.localToGlobal(Offset.zero);
+      final rect = topLeft & box.size;
+      if (rect.contains(globalPosition)) {
+        return i;
+      }
     }
-  }
-
-  String _swipeArrow(String dir) {
-    switch (dir) {
-      case 'up':
-        return '↑';
-      case 'down':
-        return '↓';
-      case 'left':
-        return '←';
-      case 'right':
-        return '→';
-      default:
-        return '';
-    }
+    return null;
   }
 
   void _executeAction(String action) {
@@ -660,33 +619,9 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                     _doubleTapAction,
                     (v) => _doubleTapAction = v,
                   ),
-                  const SizedBox(height: 8),
-                  buildDropdownRow(
-                    'Swipe Up ↑',
-                    _swipeUpAction,
-                    (v) => _swipeUpAction = v,
-                  ),
-                  const SizedBox(height: 8),
-                  buildDropdownRow(
-                    'Swipe Down ↓',
-                    _swipeDownAction,
-                    (v) => _swipeDownAction = v,
-                  ),
-                  const SizedBox(height: 8),
-                  buildDropdownRow(
-                    'Swipe Left ←',
-                    _swipeLeftAction,
-                    (v) => _swipeLeftAction = v,
-                  ),
-                  const SizedBox(height: 8),
-                  buildDropdownRow(
-                    'Swipe Right →',
-                    _swipeRightAction,
-                    (v) => _swipeRightAction = v,
-                  ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
-                    'Tip: Tap for Quick Menu • Quick flick Up/Down/Left/Right for shortcuts • Hold & drag to move ball',
+                    'Tip: Tap or slide inward from the ball for 9-menu Quick Jump • Hold & drag to move ball',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 11, color: textSecondary),
                   ),
@@ -803,56 +738,70 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                for (int row = 0; row < (_menuItems.length / 2).ceil(); row++) ...[
+                for (int row = 0; row < 3; row++) ...[
                   if (row > 0) const SizedBox(height: 6),
                   Row(
                     children: [
-                      for (int col = 0; col < 2; col++) ...[
+                      for (int col = 0; col < 3; col++) ...[
                         if (col > 0) const SizedBox(width: 6),
                         Expanded(
                           child: () {
-                            final idx = row * 2 + col;
-                            if (idx >= _menuItems.length) {
-                              return const SizedBox.shrink();
-                            }
+                            final idx = row * 3 + col;
                             final item = _menuItems[idx];
                             final label = item['label']!;
                             final isActive = controller.currentScreen == label;
+                            final isHovered = _hoveredMenuIndex == idx;
                             return InkWell(
-                              borderRadius: BorderRadius.circular(11),
+                              key: _tileKeys[idx],
+                              borderRadius: BorderRadius.circular(12),
                               onTap: () => _executeAction(label),
-                              child: Container(
-                                height: 38,
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 90),
+                                height: 54,
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: isActive ? accent.withValues(alpha: 0.16) : tileBg,
-                                  borderRadius: BorderRadius.circular(11),
+                                  color: isHovered
+                                      ? accent
+                                      : (isActive ? accent.withValues(alpha: 0.16) : tileBg),
+                                  borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isActive ? accent : borderColor,
-                                    width: isActive ? 1.3 : 1.0,
+                                    color: isHovered
+                                        ? Colors.white
+                                        : (isActive ? accent : borderColor),
+                                    width: (isHovered || isActive) ? 1.5 : 1.0,
                                   ),
+                                  boxShadow: isHovered
+                                      ? [
+                                          BoxShadow(
+                                            color: accent.withValues(alpha: 0.35),
+                                            blurRadius: 8,
+                                          ),
+                                        ]
+                                      : null,
                                 ),
-                                child: Row(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
                                       item['emoji']!,
                                       style: const TextStyle(
-                                        fontSize: 14,
+                                        fontSize: 16,
                                         decoration: TextDecoration.none,
                                       ),
                                     ),
-                                    const SizedBox(width: 5),
-                                    Expanded(
-                                      child: Text(
-                                        label,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: isActive ? accent : textPrimary,
-                                          decoration: TextDecoration.none,
-                                        ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: isHovered
+                                            ? Colors.white
+                                            : (isActive ? accent : textPrimary),
+                                        decoration: TextDecoration.none,
                                       ),
                                     ),
                                   ],
@@ -904,27 +853,14 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
             final isDark = Theme.of(context).brightness == Brightness.dark;
             final accent = isDark ? const Color(0xFFA78BFA) : const Color(0xFFFF5C38);
             final outerBg = isDark ? const Color(0xFF151932) : Colors.white;
-            final borderColor = _isDragging || _isMenuOpen || _isSwiping
+            final borderColor = _isDragging || _isMenuOpen || _isSlidePicking
                 ? accent
                 : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1));
-            final displayOpacity = _isDragging || _isMenuOpen || _isSwiping
+            final displayOpacity = _isDragging || _isMenuOpen || _isSlidePicking
                 ? 0.95
                 : (_isIdleFaded && _autoHide ? 0.14 : _opacity);
 
             final menuOrigin = _computeMenuOrigin(effectivePos, screenSize, padding);
-            final swipeAction = _activeSwipeDir != null ? _actionForSwipeDir(_activeSwipeDir!) : null;
-            final dotOffset = _isSwiping && _swipeDelta.distance > 0
-                ? Offset(
-                    (_swipeDelta.dx / _swipeDelta.distance) *
-                        _swipeDelta.distance.clamp(0.0, 28.0) /
-                        28.0 *
-                        7.0,
-                    (_swipeDelta.dy / _swipeDelta.distance) *
-                        _swipeDelta.distance.clamp(0.0, 28.0) /
-                        28.0 *
-                        7.0,
-                  )
-                : Offset.zero;
 
             return Stack(
               children: [
@@ -932,7 +868,10 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                   Positioned.fill(
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onTap: () => setState(() => _isMenuOpen = false),
+                      onTap: () => setState(() {
+                        _isMenuOpen = false;
+                        _hoveredMenuIndex = null;
+                      }),
                       child: Container(
                         color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.10),
                       ),
@@ -940,44 +879,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                   ),
                   _buildFloatingMenu(context, controller, menuOrigin, isDark, accent),
                 ],
-                if (_isSwiping && _activeSwipeDir != null)
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    top: (effectivePos.dy - 48.0 >= padding.top + 8.0)
-                        ? effectivePos.dy - 48.0
-                        : (effectivePos.dy + _ballSize + 10.0),
-                    child: IgnorePointer(
-                      child: Center(
-                        child: Material(
-                          type: MaterialType.transparency,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1B2042) : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: accent, width: 1.4),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.2),
-                                  blurRadius: 10,
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              '${_swipeArrow(_activeSwipeDir!)} $swipeAction',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.bold,
-                                color: accent,
-                                decoration: TextDecoration.none,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
                 Positioned(
                   left: effectivePos.dx,
                   top: effectivePos.dy,
@@ -992,16 +893,16 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                           _activePointerId = event.pointer;
                           _pointerDownPos = event.position;
                           _lastPointerPos = event.position;
-                          _swipeDelta = Offset.zero;
-                          _activeSwipeDir = null;
+                          _hoveredMenuIndex = null;
                           _resetIdleTimer();
                           _holdToMoveTimer?.cancel();
-                          _holdToMoveTimer = Timer(const Duration(milliseconds: 260), () {
-                            if (!mounted || _activePointerId == null || _isSwiping) return;
+                          _holdToMoveTimer = Timer(const Duration(milliseconds: 280), () {
+                            if (!mounted || _activePointerId == null || _isSlidePicking) return;
                             HapticFeedback.mediumImpact();
                             setState(() {
                               _isDragging = true;
                               _isMenuOpen = false;
+                              _hoveredMenuIndex = null;
                               _position ??= effectivePos;
                             });
                           });
@@ -1020,30 +921,22 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                             return;
                           }
 
-                          if (!_isSwiping && totalDelta.distance > 14.0) {
+                          if (!_isSlidePicking && totalDelta.distance > 14.0) {
                             _holdToMoveTimer?.cancel();
+                            HapticFeedback.selectionClick();
                             setState(() {
-                              _isSwiping = true;
-                              _isMenuOpen = false;
+                              _isSlidePicking = true;
+                              _isMenuOpen = true;
+                              _hoveredMenuIndex = null;
                             });
                           }
 
-                          if (_isSwiping) {
-                            String? dir;
-                            if (totalDelta.distance >= 22.0) {
-                              if (totalDelta.dx.abs() >= totalDelta.dy.abs()) {
-                                dir = totalDelta.dx < 0 ? 'left' : 'right';
-                              } else {
-                                dir = totalDelta.dy < 0 ? 'up' : 'down';
-                              }
+                          if (_isSlidePicking) {
+                            final hit = _hitTestMenuTile(event.position);
+                            if (hit != _hoveredMenuIndex) {
+                              if (hit != null) HapticFeedback.selectionClick();
+                              setState(() => _hoveredMenuIndex = hit);
                             }
-                            if (dir != _activeSwipeDir && dir != null) {
-                              HapticFeedback.selectionClick();
-                            }
-                            setState(() {
-                              _swipeDelta = totalDelta;
-                              _activeSwipeDir = dir;
-                            });
                           }
                         },
                         onPointerUp: (event) {
@@ -1062,20 +955,19 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                             return;
                           }
 
-                          if (_isSwiping) {
-                            final dir = _activeSwipeDir;
+                          if (_isSlidePicking) {
+                            final pickedIdx = _hoveredMenuIndex;
                             setState(() {
-                              _isSwiping = false;
-                              _swipeDelta = Offset.zero;
-                              _activeSwipeDir = null;
+                              _isSlidePicking = false;
+                              _hoveredMenuIndex = null;
+                              if (pickedIdx != null) {
+                                _isMenuOpen = false;
+                              }
                             });
                             _resetIdleTimer();
-                            if (dir != null) {
-                              final action = _actionForSwipeDir(dir);
-                              if (action != 'None') {
-                                HapticFeedback.lightImpact();
-                                _executeAction(action);
-                              }
+                            if (pickedIdx != null) {
+                              HapticFeedback.lightImpact();
+                              _executeAction(_menuItems[pickedIdx]['label']!);
                             }
                           }
                         },
@@ -1085,12 +977,11 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                           _activePointerId = null;
                           _pointerDownPos = null;
                           _lastPointerPos = null;
-                          if (_isDragging || _isSwiping) {
+                          if (_isDragging || _isSlidePicking) {
                             setState(() {
                               _isDragging = false;
-                              _isSwiping = false;
-                              _swipeDelta = Offset.zero;
-                              _activeSwipeDir = null;
+                              _isSlidePicking = false;
+                              _hoveredMenuIndex = null;
                             });
                           }
                           _resetIdleTimer();
@@ -1098,17 +989,17 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                         child: GestureDetector(
                           key: const Key('quick_switch_trackball'),
                           onTap: () {
-                            if (_isDragging || _isSwiping) return;
+                            if (_isDragging || _isSlidePicking) return;
                             _executeAction(_singleTapAction);
                           },
                           onDoubleTap: _doubleTapAction == 'None'
                               ? null
                               : () {
-                                  if (_isDragging || _isSwiping) return;
+                                  if (_isDragging || _isSlidePicking) return;
                                   _executeAction(_doubleTapAction);
                                 },
                           child: AnimatedScale(
-                            scale: _isDragging || _isMenuOpen || _isSwiping ? 1.10 : 1.0,
+                            scale: _isDragging || _isMenuOpen || _isSlidePicking ? 1.10 : 1.0,
                             duration: const Duration(milliseconds: 120),
                             child: Container(
                               width: _ballSize,
@@ -1118,7 +1009,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                                 shape: BoxShape.circle,
                                 border: Border.all(
                                   color: borderColor,
-                                  width: _isDragging || _isMenuOpen || _isSwiping ? 2.0 : 1.3,
+                                  width: _isDragging || _isMenuOpen || _isSlidePicking ? 2.0 : 1.3,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -1129,27 +1020,24 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                                 ],
                               ),
                               child: Center(
-                                child: Transform.translate(
-                                  offset: dotOffset,
-                                  child: Container(
-                                    width: 22,
-                                    height: 22,
-                                    decoration: BoxDecoration(
-                                      color: accent.withValues(alpha: 0.18),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: accent.withValues(alpha: 0.55),
-                                        width: 1.2,
-                                      ),
+                                child: Container(
+                                  width: 22,
+                                  height: 22,
+                                  decoration: BoxDecoration(
+                                    color: accent.withValues(alpha: 0.18),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: accent.withValues(alpha: 0.55),
+                                      width: 1.2,
                                     ),
-                                    child: Center(
-                                      child: Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: BoxDecoration(
-                                          color: accent,
-                                          shape: BoxShape.circle,
-                                        ),
+                                  ),
+                                  child: Center(
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: accent,
+                                        shape: BoxShape.circle,
                                       ),
                                     ),
                                   ),
