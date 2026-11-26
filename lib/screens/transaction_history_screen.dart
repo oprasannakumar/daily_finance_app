@@ -122,45 +122,58 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
   Future<void> _loadTransactions({bool forceRefresh = false}) async {
     if (forceRefresh && mounted) setState(() => _isLoading = true);
-    final list = await _storage.getTransactions(forceRefresh: forceRefresh);
-    final live = await _storage.getLiveAccountBalances();
-    final emiPlans = await _storage.getCachedEmiPlans();
-    final linkedRefs = <String>{};
-    final linkedIds = <String>{};
-    final planById = <String, EmiPlan>{};
-    final planByRef = <String, EmiPlan>{};
-    for (final p in emiPlans) {
-      if (p.linkedTransactionRef != null && p.linkedTransactionRef!.isNotEmpty) {
-        linkedRefs.add(p.linkedTransactionRef!);
-        planByRef[p.linkedTransactionRef!] = p;
+    try {
+      final list = await _storage.getTransactions(forceRefresh: forceRefresh);
+      if (mounted) {
+        setState(() {
+          _transactions = list;
+          _isLoading = false;
+          _selectedIds.removeWhere((id) => !_transactions.any((t) => t.id == id));
+        });
       }
-      if (p.linkedTransactionId != null && p.linkedTransactionId!.isNotEmpty) {
-        linkedIds.add(p.linkedTransactionId!);
-        planById[p.linkedTransactionId!] = p;
-      }
-    }
-    final categories = await _storage.getCategoryAccounts();
-    final ccFromCats = categories['Credit Cards'] ?? [];
-    final balanceConfig = await _storage.getAccountBalanceConfig();
-    final ccFromConfig = balanceConfig.creditCardLimits.keys.toList();
-    final knownCreditCards = <String>{
-      ...ccFromCats.map((c) => c.trim()).where((c) => c.isNotEmpty && c != 'Other'),
-      ...ccFromConfig.map((c) => c.trim()).where((c) => c.isNotEmpty),
-    };
 
-    if (mounted) {
-      setState(() {
-        _transactions = list;
-        _liveSummary = live;
-        _emiLinkedRefs = linkedRefs;
-        _emiLinkedIds = linkedIds;
-        _emiPlanById = planById;
-        _emiPlanByRef = planByRef;
-        _knownCreditCards = knownCreditCards;
-        _isLoading = false;
-        // Clean up selected IDs that no longer exist
-        _selectedIds.removeWhere((id) => !_transactions.any((t) => t.id == id));
-      });
+      final live = await _storage.getLiveAccountBalances();
+      final emiPlans = await _storage.getCachedEmiPlans();
+      final linkedRefs = <String>{};
+      final linkedIds = <String>{};
+      final planById = <String, EmiPlan>{};
+      final planByRef = <String, EmiPlan>{};
+      for (final p in emiPlans) {
+        if (p.linkedTransactionRef != null && p.linkedTransactionRef!.isNotEmpty) {
+          linkedRefs.add(p.linkedTransactionRef!);
+          planByRef[p.linkedTransactionRef!] = p;
+        }
+        if (p.linkedTransactionId != null && p.linkedTransactionId!.isNotEmpty) {
+          linkedIds.add(p.linkedTransactionId!);
+          planById[p.linkedTransactionId!] = p;
+        }
+      }
+      final categories = await _storage.getCategoryAccounts();
+      final ccFromCats = categories['Credit Cards'] ?? [];
+      final balanceConfig = await _storage.getAccountBalanceConfig();
+      final ccFromConfig = balanceConfig.creditCardLimits.keys.toList();
+      final knownCreditCards = <String>{
+        ...ccFromCats.map((c) => c.trim()).where((c) => c.isNotEmpty && c != 'Other'),
+        ...ccFromConfig.map((c) => c.trim()).where((c) => c.isNotEmpty),
+      };
+
+      if (mounted) {
+        setState(() {
+          _liveSummary = live;
+          _emiLinkedRefs = linkedRefs;
+          _emiLinkedIds = linkedIds;
+          _emiPlanById = planById;
+          _emiPlanByRef = planByRef;
+          _knownCreditCards = knownCreditCards;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading history: $e');
+    } finally {
+      if (mounted && _isLoading) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

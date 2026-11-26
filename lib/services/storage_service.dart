@@ -625,18 +625,13 @@ class StorageService {
 
     // 3. Remote fetch from Google Sheets (on forced refresh or cold first launch)
     try {
+      if (forceRefresh) {
+        await _resumePendingSyncQueue();
+      }
       final remoteList = await GoogleSheetsService.instance.fetchTransactions(forceRefresh: forceRefresh);
       if (remoteList.isNotEmpty) {
         // Merge with local un-synced items
-        final merged = List<FinanceTransaction>.from(remoteList);
-        final pendingSaves = await _getPendingSaves(prefs);
-        for (final p in pendingSaves) {
-          merged.removeWhere((t) => t.id == p.id || t.referenceId == p.referenceId);
-          merged.insert(0, p);
-        }
-        final pendingDeletes = await _getPendingDeletes(prefs);
-        merged.removeWhere((t) => pendingDeletes.contains(t.id) || pendingDeletes.contains(t.referenceId));
-        merged.sort((a, b) => b.date.compareTo(a.date));
+        final merged = await _mergeWithPendingLocal(prefs, remoteList);
 
         _cachedTransactions = merged;
         await _persistTransactions(prefs, _cachedTransactions!);
@@ -657,7 +652,23 @@ class StorageService {
       }
     }
 
-    return List<FinanceTransaction>.from(_cachedTransactions!);
+    return List<FinanceTransaction>.from(_cachedTransactions ?? []);
+  }
+
+  Future<List<FinanceTransaction>> _mergeWithPendingLocal(
+    SharedPreferences prefs,
+    List<FinanceTransaction> remoteList,
+  ) async {
+    final merged = List<FinanceTransaction>.from(remoteList);
+    final pendingSaves = await _getPendingSaves(prefs);
+    for (final p in pendingSaves) {
+      merged.removeWhere((t) => t.id == p.id || t.referenceId == p.referenceId);
+      merged.insert(0, p);
+    }
+    final pendingDeletes = await _getPendingDeletes(prefs);
+    merged.removeWhere((t) => pendingDeletes.contains(t.id) || pendingDeletes.contains(t.referenceId));
+    merged.sort((a, b) => b.date.compareTo(a.date));
+    return merged;
   }
 
   Future<void> saveAllTransactions(List<FinanceTransaction> transactions) async {
@@ -1080,8 +1091,10 @@ class StorageService {
   /// Instantly stores or updates the transaction in the mobile device and immediately
   /// returns so the UI resets without any delay, and syncs to Google Sheets in the background.
   Future<void> saveTransaction(FinanceTransaction transaction) async {
-    // 1. Instant in-memory update (< 1ms)
-    _cachedTransactions ??= [];
+    final prefs = await SharedPreferences.getInstance();
+
+    // Hydrate from SharedPreferences first if memory cache is cold so existing offline history is never wiped
+    _cachedTransactions ??= _loadTransactionsFromPrefs(prefs) ?? [];
     _cachedTransactions!.removeWhere((t) => t.id == transaction.id || t.referenceId == transaction.referenceId);
     _cachedTransactions!.insert(0, transaction);
     _cachedTransactions!.sort((a, b) => b.date.compareTo(a.date));
@@ -1100,7 +1113,6 @@ class StorageService {
     }
 
     // 2. Instant local device storage write (< 5ms)
-    final prefs = await SharedPreferences.getInstance();
     await _persistTransactions(prefs, _cachedTransactions!);
 
     // 3. Register in pending sync queue & notify UI
@@ -1119,6 +1131,8 @@ class StorageService {
   /// Instantly deletes the transaction from the mobile device and immediately
   /// returns so the UI updates without any delay, and syncs deletion in the background.
   Future<void> deleteTransaction(String idOrReference, {String? referenceId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    _cachedTransactions ??= _loadTransactionsFromPrefs(prefs) ?? [];
     // 0. Resolve both id and referenceId from current cached transactions
     String ref = referenceId ?? '';
     String tid = idOrReference;
@@ -1153,7 +1167,6 @@ class StorageService {
     }
 
     // 2. Instant local device storage write (< 5ms)
-    final prefs = await SharedPreferences.getInstance();
     await _persistTransactions(prefs, _cachedTransactions!);
 
     // 3. Register in pending deletes & notify UI
@@ -1285,14 +1298,16 @@ class StorageService {
   void _triggerBackgroundSyncIfNeeded() {
     if (_hasTriggeredInitialBackgroundSync) return;
     _hasTriggeredInitialBackgroundSync = true;
-    _resumePendingSyncQueue();
     Future.microtask(() async {
       try {
+        await _resumePendingSyncQueue();
         final remote = await GoogleSheetsService.instance.fetchTransactions(forceRefresh: true);
         if (remote.isNotEmpty) {
           final prefs = await SharedPreferences.getInstance();
-          _cachedTransactions = remote;
-          await _persistTransactions(prefs, remote);
+          final merged = await _mergeWithPendingLocal(prefs, remote);
+          _cachedTransactions = merged;
+          await _persistTransactions(prefs, merged);
+          GoogleSheetsService.instance.cachedTransactions = merged;
           transactionsNotifier.value++;
         }
       } catch (_) {}
