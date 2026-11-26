@@ -197,17 +197,17 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
                   },
                   onHorizontalDragEnd: (details) {
                     final vx = details.primaryVelocity ?? 0.0;
-                    if (_dragOffset <= -maxWidth * 0.55 || vx < -900) {
+                    if (_dragOffset <= -maxWidth * 0.35 || vx < -550) {
                       _animateTo(-maxWidth);
                       _triggerDelete();
-                    } else if (_dragOffset <= -42 || (vx < -250 && _dragOffset < 0)) {
+                    } else if (_dragOffset <= -36 || (vx < -200 && _dragOffset < 0)) {
                       _animateTo(-_revealWidth);
                     } else if (widget.onSwipeRight != null &&
-                        (_dragOffset >= maxWidth * 0.45 || vx > 700)) {
+                        (_dragOffset >= maxWidth * 0.35 || vx > 550)) {
                       _animateTo(0.0);
                       widget.onSwipeRight!();
                     } else if (widget.onSwipeRight != null &&
-                        (_dragOffset >= 42 || (vx > 250 && _dragOffset > 0))) {
+                        (_dragOffset >= 36 || (vx > 200 && _dragOffset > 0))) {
                       _animateTo(_revealWidth);
                     } else {
                       _animateTo(0.0);

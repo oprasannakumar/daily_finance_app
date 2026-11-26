@@ -236,21 +236,14 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                     child: InkWell(
                       onTap: isCash ? null : _openCalculator,
                       borderRadius: BorderRadius.circular(12),
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          isDense: true,
-                          filled: true,
-                          fillColor: amtFillColor,
-                          constraints: const BoxConstraints(minHeight: 46, maxHeight: 46),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: amtBorderColor, width: 1.2),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: amtBorderColor, width: 1.2),
-                          ),
+                      child: Container(
+                        height: 46,
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: amtFillColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: amtBorderColor, width: 1.2),
                         ),
                         child: Text(
                           _amountController.text.isNotEmpty && _amountController.text != '0' && _amountController.text != '0.00'
@@ -261,8 +254,7 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 13,
-                            height: 1.15,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.bold,
                             color: amtTextColor,
                           ),

@@ -5850,56 +5850,44 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                       children: [
                                         _buildFieldLabel('🧾 INVOICE (OPT)', color: textSecondary),
                                         SizedBox(
-                                          height: 44,
+                                          height: 46,
                                           child: InkWell(
                                             onTap: _showInvoicePickerBottomSheet,
                                             borderRadius: BorderRadius.circular(12),
-                                            child: InputDecorator(
-                                              decoration: InputDecoration(
-                                                isDense: true,
-                                                filled: true,
-                                                fillColor: isDark ? const Color(0xFF1B2042) : Colors.white,
-                                                constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
-                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                                border: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  borderSide: BorderSide(
-                                                    color: isDark ? const Color(0xFF2C3360) : const Color(0xFFCBD5E1),
-                                                    width: 1.2,
-                                                  ),
-                                                ),
-                                                enabledBorder: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  borderSide: BorderSide(
-                                                    color: isDark ? const Color(0xFF2C3360) : const Color(0xFFCBD5E1),
-                                                    width: 1.2,
-                                                  ),
-                                                ),
-                                                focusedBorder: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  borderSide: BorderSide(
-                                                    color: isDark ? const Color(0xFFA78BFA) : const Color(0xFFFF5C38),
-                                                    width: 1.8,
-                                                  ),
-                                                ),
-                                                suffixIconConstraints: const BoxConstraints(minWidth: 26, minHeight: 26, maxWidth: 26, maxHeight: 26),
-                                                suffixIcon: Icon(
-                                                  Icons.arrow_drop_down,
-                                                  size: 20,
-                                                  color: isDark ? const Color(0xFF818CF8) : const Color(0xFF64748B),
+                                            child: Container(
+                                              height: 46,
+                                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                                              decoration: BoxDecoration(
+                                                color: isDark ? const Color(0xFF1B2042) : Colors.white,
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: isDark ? const Color(0xFF2C3360) : const Color(0xFFCBD5E1),
+                                                  width: 1.2,
                                                 ),
                                               ),
-                                              child: Text(
-                                                _invoiceController.text.isNotEmpty ? _invoiceController.text : 'Select invoice',
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  height: 1.15,
-                                                  fontWeight: _invoiceController.text.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
-                                                  color: _invoiceController.text.isNotEmpty
-                                                      ? (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B))
-                                                      : (isDark ? const Color(0xFF8E9AC2) : const Color(0xFF94A3B8)),
-                                                ),
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      _invoiceController.text.isNotEmpty ? _invoiceController.text : 'Select invoice',
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize: 13.5,
+                                                        fontWeight: _invoiceController.text.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
+                                                        color: _invoiceController.text.isNotEmpty
+                                                            ? (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B))
+                                                            : (isDark ? const Color(0xFF8E9AC2) : const Color(0xFF94A3B8)),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Icon(
+                                                    Icons.arrow_drop_down,
+                                                    size: 20,
+                                                    color: isDark ? const Color(0xFF818CF8) : const Color(0xFF64748B),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           ),
