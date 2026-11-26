@@ -72,10 +72,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Verify screen title and loan entries rendered
+      // Verify screen title and borrower dashboard cards rendered
       expect(find.text('🤝 Borrowers Ledger'), findsOneWidget);
       expect(find.text('Alice'), findsWidgets);
       expect(find.text('Bob'), findsWidgets);
+
+      // Switch to All Entries ledger view to test badges and faceted filters
+      await tester.tap(find.textContaining('All Entries'));
+      await tester.pumpAndSettle();
 
       // Verify Given and Received badges
       expect(find.text('GIVEN'), findsWidgets);

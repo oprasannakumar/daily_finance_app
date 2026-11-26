@@ -7,6 +7,7 @@ import '../utils/currency_formatter.dart';
 import '../widgets/borrower_faceted_filter_sheet.dart';
 import '../widgets/transaction_details_dialog.dart';
 import '../widgets/borrower_export_dialog.dart';
+import 'borrower_detail_screen.dart';
 
 class BorrowersLedgerScreen extends StatefulWidget {
   final String? initialBorrowerName;
@@ -26,6 +27,10 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
 
   // Quick Type Filter (All, Given, Received)
   String _quickType = 'All';
+
+  // Dashboard vs Ledger View Toggle
+  bool _showDashboardView = true;
+  String _dashboardStatusFilter = 'All'; // All, Pending, Settled
 
   // Search Query
   String _searchQuery = '';
@@ -251,6 +256,66 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
                 onRefresh: () => _loadEntries(forceRefresh: true),
                 child: Column(
                   children: [
+                    // Mode Switcher: Dashboard vs Ledger
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(9),
+                                onTap: () => setState(() => _showDashboardView = true),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 7),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: _showDashboardView ? cardBg : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(9),
+                                  ),
+                                  child: Text(
+                                    '📊 Dashboard',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: _showDashboardView ? primaryColor : textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(9),
+                                onTap: () => setState(() => _showDashboardView = false),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 7),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: !_showDashboardView ? cardBg : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(9),
+                                  ),
+                                  child: Text(
+                                    '📜 All Entries (${filtered.length})',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: !_showDashboardView ? primaryColor : textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
                     // Search Bar
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -291,6 +356,19 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
                       ),
                     ),
 
+                  if (_showDashboardView)
+                    Expanded(
+                      child: _buildBorrowerDashboard(
+                        context,
+                        isDark: isDark,
+                        cardBg: cardBg,
+                        borderColor: borderColor,
+                        textPrimary: textPrimary,
+                        textSecondary: textSecondary,
+                        primaryColor: primaryColor,
+                      ),
+                    )
+                  else ...[
                   // Filter Action Bar: Filters trigger button + Type quick chips
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
@@ -475,10 +553,305 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
                             },
                           ),
                   ),
+                  ],
                 ],
               ),
             ),
           ),
+    );
+  }
+
+  Widget _buildBorrowerDashboard(
+    BuildContext context, {
+    required bool isDark,
+    required Color cardBg,
+    required Color borderColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color primaryColor,
+  }) {
+    final Map<String, ({String name, double given, double received, int count, DateTime lastDate})> byPerson = {};
+    for (final e in _entries) {
+      final rawName = e.borrower.trim();
+      if (rawName.isEmpty) continue;
+      final key = rawName.toLowerCase();
+      final prev = byPerson[key];
+      final latestDate = prev == null || e.date.isAfter(prev.lastDate) ? e.date : prev.lastDate;
+      byPerson[key] = (
+        name: prev?.name ?? rawName,
+        given: (prev?.given ?? 0.0) + e.givenAmount,
+        received: (prev?.received ?? 0.0) + e.receivedAmount,
+        count: (prev?.count ?? 0) + 1,
+        lastDate: latestDate,
+      );
+    }
+
+    double portfolioReceivable = 0.0;
+    double portfolioPayable = 0.0;
+    double portfolioGiven = 0.0;
+    double portfolioReceived = 0.0;
+    int activePeople = 0;
+
+    for (final p in byPerson.values) {
+      portfolioGiven += p.given;
+      portfolioReceived += p.received;
+      final net = p.given - p.received;
+      if (net > 0.01) {
+        portfolioReceivable += net;
+        activePeople++;
+      } else if (net < -0.01) {
+        portfolioPayable += net.abs();
+        activePeople++;
+      }
+    }
+
+    final overallRecovery = portfolioGiven > 0
+        ? ((portfolioReceived / portfolioGiven) * 100).clamp(0.0, 100.0)
+        : 0.0;
+
+    final q = _searchQuery.toLowerCase();
+    final peopleList = byPerson.values.where((p) {
+      if (q.isNotEmpty && !p.name.toLowerCase().contains(q)) return false;
+      final net = (p.given - p.received).abs();
+      if (_dashboardStatusFilter == 'Pending') return net > 0.01;
+      if (_dashboardStatusFilter == 'Settled') return net <= 0.01;
+      return true;
+    }).toList()
+      ..sort((a, b) {
+        final netA = (a.given - a.received).abs();
+        final netB = (b.given - b.received).abs();
+        final cmp = netB.compareTo(netA);
+        if (cmp != 0) return cmp;
+        return b.lastDate.compareTo(a.lastDate);
+      });
+
+    return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
+      children: [
+        // Portfolio Hero Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDark
+                  ? [const Color(0xFF1E1B4B), const Color(0xFF312E81)]
+                  : [const Color(0xFF4F46E5), const Color(0xFF6366F1)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TOTAL RECEIVABLE',
+                        style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '₹${IndianCurrency.format(portfolioReceivable)}',
+                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'TOTAL PAYABLE',
+                        style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '₹${IndianCurrency.format(portfolioPayable)}',
+                        style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: LinearProgressIndicator(
+                  value: (overallRecovery / 100).clamp(0.0, 1.0),
+                  minHeight: 6,
+                  backgroundColor: Colors.white.withValues(alpha: 0.22),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF34D399)),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '$activePeople active · ${byPerson.length} total borrowers',
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                  Text(
+                    '${overallRecovery.toStringAsFixed(0)}% recovered',
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Quick Status Filter Chips
+        Row(
+          children: ['All', 'Pending', 'Settled'].map((status) {
+            final selected = _dashboardStatusFilter == status;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(status),
+                selected: selected,
+                selectedColor: primaryColor.withValues(alpha: 0.16),
+                labelStyle: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: selected ? primaryColor : textSecondary,
+                ),
+                onSelected: (_) => setState(() => _dashboardStatusFilter = status),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 8),
+
+        if (peopleList.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 48),
+            child: Center(
+              child: Text(
+                'No matching borrowers found',
+                style: TextStyle(fontSize: 13.5, color: textSecondary),
+              ),
+            ),
+          )
+        else
+          ...peopleList.map((p) {
+            final net = p.given - p.received;
+            final isReceivable = net > 0.01;
+            final isPayable = net < -0.01;
+            final recPct = p.given > 0 ? ((p.received / p.given) * 100).clamp(0.0, 100.0) : 0.0;
+            final daysPending = DateTime.now().difference(p.lastDate).inDays;
+            final netColor = isReceivable
+                ? const Color(0xFF10B981)
+                : (isPayable ? const Color(0xFFEF4444) : textSecondary);
+
+            return InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => BorrowerDetailScreen(
+                      borrowerName: p.name,
+                      initialEntries: _entries,
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: primaryColor.withValues(alpha: 0.14),
+                          child: Text(
+                            p.name.substring(0, 1).toUpperCase(),
+                            style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                p.name,
+                                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: textPrimary),
+                              ),
+                              Text(
+                                '${p.count} entries · Last ${DateFormat('dd MMM yy').format(p.lastDate)}',
+                                style: TextStyle(fontSize: 11, color: textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              isReceivable
+                                  ? 'Gets ₹${IndianCurrency.format(net)}'
+                                  : (isPayable ? 'Owes ₹${IndianCurrency.format(net.abs())}' : 'Settled'),
+                              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: netColor),
+                            ),
+                            if ((isReceivable || isPayable) && daysPending > 0)
+                              Text(
+                                '${daysPending}d pending',
+                                style: TextStyle(fontSize: 10, color: textSecondary),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.chevron_right_rounded, size: 18, color: textSecondary),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: (recPct / 100).clamp(0.0, 1.0),
+                        minHeight: 5,
+                        backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          recPct >= 99.9 ? const Color(0xFF10B981) : primaryColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Given: ₹${IndianCurrency.format(p.given)}',
+                          style: TextStyle(fontSize: 11, color: textSecondary),
+                        ),
+                        Text(
+                          'Received: ₹${IndianCurrency.format(p.received)} (${recPct.toStringAsFixed(0)}%)',
+                          style: TextStyle(fontSize: 11, color: textSecondary),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+      ],
     );
   }
 

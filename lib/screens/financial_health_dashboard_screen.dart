@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../models/account_balance_model.dart';
 import '../models/financial_health_model.dart';
 import '../models/transaction_model.dart';
 import '../services/storage_service.dart';
@@ -16,7 +17,9 @@ class FinancialHealthDashboardScreen extends StatefulWidget {
 class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboardScreen> {
   bool _isLoading = true;
   FinancialHealthSummary? _healthSummary;
+  LiveAccountBalanceSummary? _balanceSummary;
   List<FinanceTransaction> _transactions = [];
+  DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
 
   @override
   void initState() {
@@ -33,14 +36,106 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
     final health = FinancialHealthSummary.calculate(
       balanceSummary: balanceSummary,
       transactions: txs,
+      selectedMonth: _selectedMonth,
     );
 
     if (mounted) {
       setState(() {
+        _balanceSummary = balanceSummary;
         _healthSummary = health;
         _transactions = txs;
         _isLoading = false;
       });
+    }
+  }
+
+  void _changeMonth(DateTime targetMonth) {
+    final normalized = DateTime(targetMonth.year, targetMonth.month, 1);
+    final nowMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
+    if (normalized.isAfter(nowMonth)) return;
+
+    setState(() {
+      _selectedMonth = normalized;
+      if (_balanceSummary != null) {
+        _healthSummary = FinancialHealthSummary.calculate(
+          balanceSummary: _balanceSummary!,
+          transactions: _transactions,
+          selectedMonth: _selectedMonth,
+        );
+      }
+    });
+  }
+
+  Future<void> _pickMonthDialog(bool isDark) async {
+    final now = DateTime.now();
+    int year = _selectedMonth.year;
+    final picked = await showDialog<DateTime>(
+      context: context,
+      builder: (dlgCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setDlgState) {
+            return AlertDialog(
+              backgroundColor: isDark ? const Color(0xFF151932) : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left_rounded),
+                    onPressed: () => setDlgState(() => year--),
+                  ),
+                  Text('$year', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right_rounded),
+                    onPressed: year >= now.year ? null : () => setDlgState(() => year++),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 280,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: List.generate(12, (idx) {
+                    final m = idx + 1;
+                    final candidate = DateTime(year, m, 1);
+                    final isFuture = year > now.year || (year == now.year && m > now.month);
+                    final isSel = year == _selectedMonth.year && m == _selectedMonth.month;
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: isFuture ? null : () => Navigator.of(dlgCtx).pop(candidate),
+                      child: Container(
+                        width: 62,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: isSel
+                              ? const Color(0xFF6366F1)
+                              : (isDark ? const Color(0xFF1E2448) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          DateFormat('MMM').format(candidate),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: isFuture
+                                ? Colors.grey.withValues(alpha: 0.4)
+                                : (isSel ? Colors.white : null),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (picked != null) {
+      _changeMonth(picked);
     }
   }
 
@@ -93,31 +188,41 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. Net Liquidity Hero Card
-                    _buildNetLiquidityCard(isDark),
-                    const SizedBox(height: 16),
+                    // 0. Month-wise Switcher Bar
+                    _buildMonthSwitcherBar(isDark),
+                    const SizedBox(height: 14),
 
-                    // 2. Credit Health & Utilization Card
-                    _buildCreditUtilizationCard(isDark),
-                    const SizedBox(height: 16),
-
-                    // 3. Cash Flow & Burn Rate Grid
+                    // 1. Month Cash Flow & Velocity Grid (with MoM deltas)
                     _buildCashFlowGrid(isDark),
                     const SizedBox(height: 16),
 
-                    // 4. Asset Allocation Breakdown
+                    // 2. 6-Month Trend Chart (tap any bar to switch month)
+                    _buildMonthlyTrendCard(isDark),
+                    const SizedBox(height: 16),
+
+                    // 3. Selected Month Top Spending Categories & Payment Modes
+                    _buildTopSpendingPurposesCard(isDark),
+                    const SizedBox(height: 16),
+                    _buildMonthlyPaymentModesCard(isDark),
+                    const SizedBox(height: 16),
+
+                    // 4. Net Liquidity Hero Card (Live Today)
+                    _buildNetLiquidityCard(isDark),
+                    const SizedBox(height: 16),
+
+                    // 5. Credit Health & Utilization Card
+                    _buildCreditUtilizationCard(isDark),
+                    const SizedBox(height: 16),
+
+                    // 6. Asset Allocation Breakdown
                     _buildAssetAllocationCard(isDark),
                     const SizedBox(height: 16),
 
-                    // 5. Monthly Top Spending Categories
-                    _buildTopSpendingPurposesCard(isDark),
-                    const SizedBox(height: 16),
-
-                    // 6. Credit Cards & Dues Status Matrix
+                    // 7. Credit Cards & Dues Status Matrix
                     _buildCreditCardsStatusCard(isDark),
                     const SizedBox(height: 24),
 
-                    // 7. Statement Export Action Bar
+                    // 8. Statement Export Action Bar
                     _buildExportBanner(isDark),
                     const SizedBox(height: 24),
                   ],
@@ -368,12 +473,101 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
   }
 
   // =========================================================================
+  // 0. MONTH SWITCHER BAR
+  // =========================================================================
+  Widget _buildMonthSwitcherBar(bool isDark) {
+    final nowMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
+    final isCurrent = _selectedMonth.year == nowMonth.year && _selectedMonth.month == nowMonth.month;
+    final prevMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1, 1);
+    final nextMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
+    final h = _healthSummary!;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => _changeMonth(prevMonth),
+          ),
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => _pickMonthDialog(isDark),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFF6366F1)),
+                        const SizedBox(width: 6),
+                        Text(
+                          DateFormat('MMMM yyyy').format(_selectedMonth),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Colors.grey),
+                      ],
+                    ),
+                    Text(
+                      '${h.selectedMonthTxCount} transactions',
+                      style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (!isCurrent)
+            TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () => _changeMonth(nowMonth),
+              child: const Text(
+                'Today',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF6366F1)),
+              ),
+            ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.chevron_right_rounded),
+            onPressed: isCurrent ? null : () => _changeMonth(nextMonth),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _momDeltaText(double current, double previous) {
+    if (previous.abs() < 0.01) return null;
+    final pct = ((current - previous) / previous.abs()) * 100;
+    final sign = pct >= 0 ? '▲' : '▼';
+    return '$sign ${pct.abs().toStringAsFixed(0)}% vs prev';
+  }
+
+  Color _momDeltaColor(double current, double previous, {bool invertGood = false}) {
+    final isUp = current >= previous;
+    final isGood = invertGood ? !isUp : isUp;
+    return isGood ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+  }
+
+  // =========================================================================
   // 3. CASH FLOW & BURN RATE GRID
   // =========================================================================
   Widget _buildCashFlowGrid(bool isDark) {
     final h = _healthSummary!;
-    final now = DateTime.now();
-    final monthName = DateFormat('MMMM').format(now);
+    final monthName = DateFormat('MMMM yyyy').format(h.selectedMonth);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,6 +587,8 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
                 title: 'MONTH INFLOW',
                 amount: '₹${IndianCurrency.format(h.currentMonthInflow)}',
                 subtitle: 'Total Deposits',
+                deltaText: _momDeltaText(h.currentMonthInflow, h.prevMonthInflow),
+                deltaColor: _momDeltaColor(h.currentMonthInflow, h.prevMonthInflow),
               ),
             ),
             const SizedBox(width: 12),
@@ -404,6 +600,8 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
                 title: 'MONTH OUTFLOW',
                 amount: '₹${IndianCurrency.format(h.currentMonthOutflow)}',
                 subtitle: 'Total Expenses',
+                deltaText: _momDeltaText(h.currentMonthOutflow, h.prevMonthOutflow),
+                deltaColor: _momDeltaColor(h.currentMonthOutflow, h.prevMonthOutflow, invertGood: true),
               ),
             ),
           ],
@@ -419,6 +617,8 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
                 title: 'NET SAVINGS',
                 amount: '₹${IndianCurrency.format(h.netMonthlySavings)}',
                 subtitle: '${h.monthlySavingsRatePercent.toStringAsFixed(1)}% savings rate',
+                deltaText: _momDeltaText(h.netMonthlySavings, h.prevMonthSavings),
+                deltaColor: _momDeltaColor(h.netMonthlySavings, h.prevMonthSavings),
               ),
             ),
             const SizedBox(width: 12),
@@ -429,12 +629,188 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
                 iconColor: const Color(0xFFF59E0B),
                 title: 'DAILY BURN RATE',
                 amount: '₹${IndianCurrency.format(h.averageDailySpend)}/day',
-                subtitle: 'Proj: ₹${IndianCurrency.format(h.projectedMonthlySpend)}',
+                subtitle: h.isCurrentMonth
+                    ? 'Proj: ₹${IndianCurrency.format(h.projectedMonthlySpend)}'
+                    : 'Actual: ₹${IndianCurrency.format(h.currentMonthOutflow)}',
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildMonthlyTrendCard(bool isDark) {
+    final h = _healthSummary!;
+    final trends = h.monthlyTrends;
+    double maxVal = 1.0;
+    for (final pt in trends) {
+      if (pt.inflow > maxVal) maxVal = pt.inflow;
+      if (pt.outflow > maxVal) maxVal = pt.outflow;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                '6-Month Cash Flow Trend',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 4),
+              const Text('Inflow', style: TextStyle(fontSize: 10, color: Colors.grey)),
+              const SizedBox(width: 10),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 4),
+              const Text('Outflow', style: TextStyle(fontSize: 10, color: Colors.grey)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 120,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: trends.map((pt) {
+                final isSelected = pt.monthDate.year == h.selectedMonth.year &&
+                    pt.monthDate.month == h.selectedMonth.month;
+                final inFrac = (pt.inflow / maxVal).clamp(0.04, 1.0);
+                final outFrac = (pt.outflow / maxVal).clamp(0.04, 1.0);
+                return Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => _changeMonth(pt.monthDate),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF6366F1).withValues(alpha: 0.10)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: isSelected
+                            ? Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.45))
+                            : null,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Container(
+                                  width: 10,
+                                  height: 78 * inFrac,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                const SizedBox(width: 3),
+                                Container(
+                                  width: 10,
+                                  height: 78 * outFrac,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEF4444),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            DateFormat('MMM').format(pt.monthDate),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              color: isSelected ? const Color(0xFF6366F1) : Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMonthlyPaymentModesCard(bool isDark) {
+    final h = _healthSummary!;
+    if (h.monthlyPaymentModes.isEmpty) return const SizedBox.shrink();
+    final total = h.monthlyPaymentModes.values.fold(0.0, (s, v) => s + v);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Payment Modes (${DateFormat('MMM yyyy').format(h.selectedMonth)})',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: h.monthlyPaymentModes.entries.map((e) {
+              final pct = total > 0 ? ((e.value / total) * 100).toStringAsFixed(0) : '0';
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF151932) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.18)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${e.key} ($pct%)',
+                      style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '₹${IndianCurrency.format(e.value)}',
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -445,6 +821,8 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
     required String title,
     required String amount,
     required String subtitle,
+    String? deltaText,
+    Color? deltaColor,
   }) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -467,9 +845,13 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
                 child: Icon(icon, color: iconColor, size: 16),
               ),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+                ),
               ),
             ],
           ),
@@ -483,6 +865,17 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
             subtitle,
             style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
           ),
+          if (deltaText != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              deltaText,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: deltaColor ?? Colors.grey,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -622,9 +1015,9 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Top Spending Categories (This Month)',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              Text(
+                'Top Spending Categories (${DateFormat('MMM yyyy').format(h.selectedMonth)})',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
               Text(
                 '₹${IndianCurrency.format(totalOutflow)}',
