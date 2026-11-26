@@ -129,14 +129,8 @@ class _SearchableDropdownFieldState extends State<SearchableDropdownField> {
   void initState() {
     super.initState();
     _focusNode.addListener(() {
-      if (_focusNode.hasFocus) {
+      if (_focusNode.hasFocus && !_isOpen) {
         setState(() => _isOpen = true);
-      } else {
-        Future.delayed(const Duration(milliseconds: 250), () {
-          if (mounted && !_focusNode.hasFocus) {
-            setState(() => _isOpen = false);
-          }
-        });
       }
     });
   }
@@ -159,9 +153,15 @@ class _SearchableDropdownFieldState extends State<SearchableDropdownField> {
       return opt.toLowerCase().contains(filterText);
     }).toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    return TapRegion(
+      onTapOutside: (_) {
+        if (_isOpen && mounted) {
+          setState(() => _isOpen = false);
+        }
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
       children: [
         if (widget.label.isNotEmpty) ...[
           Row(
@@ -322,6 +322,7 @@ class _SearchableDropdownFieldState extends State<SearchableDropdownField> {
           ),
         ],
       ],
+      ),
     );
   }
 }

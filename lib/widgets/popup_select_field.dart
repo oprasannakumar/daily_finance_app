@@ -53,44 +53,38 @@ class PopupSelectField extends FormField<String> {
                 }
               },
               borderRadius: BorderRadius.circular(12),
-              child: InputDecorator(
-                decoration: InputDecoration(
-                  isDense: true,
-                  filled: true,
-                  fillColor: fillColor,
-                  constraints: const BoxConstraints(minHeight: 46, maxHeight: 46),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: borderColor, width: 1.2),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: state.hasError ? const Color(0xFFEF4444) : borderColor,
-                      width: 1.2,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: activeBorderColor, width: 1.8),
-                  ),
-                  suffixIconConstraints: const BoxConstraints(minWidth: 26, minHeight: 26, maxWidth: 26, maxHeight: 26),
-                  suffixIcon: Icon(
-                    Icons.arrow_drop_down,
-                    size: 20,
-                    color: isDark ? const Color(0xFF818CF8) : const Color(0xFF64748B),
+              child: Container(
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: fillColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: state.hasError ? const Color(0xFFEF4444) : borderColor,
+                    width: 1.2,
                   ),
                 ),
-                child: Text(
-                  displayValue,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1.15,
-                    fontWeight: hasValue ? FontWeight.w600 : FontWeight.normal,
-                    color: textColor,
-                  ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        displayValue,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: hasValue ? FontWeight.w600 : FontWeight.normal,
+                          color: textColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      size: 20,
+                      color: isDark ? const Color(0xFF818CF8) : const Color(0xFF64748B),
+                    ),
+                  ],
                 ),
               ),
             );

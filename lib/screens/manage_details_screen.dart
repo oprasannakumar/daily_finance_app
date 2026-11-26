@@ -550,67 +550,21 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
             itemBuilder: (context, index) {
         final t = _templates[index];
 
-        return Padding(
+        return SwipeToDeleteWrapper(
           key: ValueKey('template_box_${t.id}'),
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          rightLabel: 'LOAD',
+          onSwipeRight: () {
+            widget.onEditTemplate?.call(t);
+            if (mounted) Navigator.of(context).pop();
+          },
+          onDelete: () => _onSwipeDeleteTemplate(t),
+          child: Material(
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            child: Dismissible(
-            key: ValueKey('template_dismiss_${t.id}'),
-            direction: DismissDirection.horizontal,
-            background: Container(
-              padding: const EdgeInsets.only(left: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F766E),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.centerLeft,
-              child: const Row(
-                children: [
-                  Icon(Icons.edit_note_rounded, color: Colors.white, size: 24),
-                  SizedBox(width: 8),
-                  Text(
-                    'Load in Form',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-            secondaryBackground: Container(
-              padding: const EdgeInsets.only(right: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEF4444),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.centerRight,
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    'Delete',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 24),
-                ],
-              ),
-            ),
-            confirmDismiss: (direction) async => true,
-            onDismissed: (direction) {
-              if (direction == DismissDirection.startToEnd) {
-                widget.onEditTemplate?.call(t);
-                if (mounted) Navigator.of(context).pop();
-              } else if (direction == DismissDirection.endToStart) {
-                _onSwipeDeleteTemplate(t);
-              }
-            },
-            child: Material(
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Color(0xFFE2E8F0)),
-              ),
-              child: ListTile(
+            child: ListTile(
                 dense: true,
                 onTap: () {
                   if (widget.onSelectTemplate != null) {
@@ -651,8 +605,6 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
                 ),
               ),
             ),
-          ),
-          ),
         );
     },
   ),
@@ -716,73 +668,31 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
         final r = _recurring[index];
         final isDue = !r.isPaused && !r.nextDueDate.isAfter(endOfToday);
 
-        return Padding(
+        final recBorder = Border.all(
+          color: isDue
+              ? const Color(0xFFF59E0B)
+              : (r.isPaused ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
+          width: isDue ? 1.5 : 1.0,
+        );
+
+        return SwipeToDeleteWrapper(
           key: ValueKey('recurring_box_${r.id}'),
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          border: recBorder,
+          rightLabel: 'EDIT',
+          onSwipeRight: () {
+            widget.onEditRecurring?.call(r);
+            if (mounted) Navigator.of(context).pop();
+          },
+          onDelete: () async {
+            await _storage.deleteRecurringTransaction(r.id);
+            await _loadData();
+          },
+          child: Material(
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            child: Dismissible(
-            key: ValueKey('recurring_dismiss_${r.id}'),
-            direction: DismissDirection.horizontal,
-            background: Container(
-              padding: const EdgeInsets.only(left: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F766E),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.centerLeft,
-              child: const Row(
-                children: [
-                  Icon(Icons.edit_note_rounded, color: Colors.white, size: 24),
-                  SizedBox(width: 8),
-                  Text(
-                    'Edit in Form',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-            secondaryBackground: Container(
-              padding: const EdgeInsets.only(right: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEF4444),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.centerRight,
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    'Delete',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 24),
-                ],
-              ),
-            ),
-            confirmDismiss: (direction) async => true,
-            onDismissed: (direction) async {
-              if (direction == DismissDirection.startToEnd) {
-                widget.onEditRecurring?.call(r);
-                if (mounted) Navigator.of(context).pop();
-              } else if (direction == DismissDirection.endToStart) {
-                await _storage.deleteRecurringTransaction(r.id);
-                await _loadData();
-              }
-            },
-            child: Material(
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(
-                  color: isDue
-                      ? const Color(0xFFF59E0B)
-                      : (r.isPaused ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
-                  width: isDue ? 1.5 : 1.0,
-                ),
-              ),
-              child: ListTile(
+            child: ListTile(
                 dense: true,
                 onTap: () {
                   if (widget.onSelectRecurring != null) {
@@ -873,8 +783,6 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
                 ),
               ),
             ),
-          ),
-          ),
         );
       },
     ),

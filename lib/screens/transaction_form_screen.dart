@@ -3481,73 +3481,38 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                           final r = currentDue[idx];
                           final isDue = !r.nextDueDate.isAfter(endOfToday);
 
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Dismissible(
-                                key: ValueKey('recurring_${r.id}'),
-                                direction: DismissDirection.horizontal,
-                                background: Container(
-                                  padding: const EdgeInsets.only(left: 16),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF0F766E),
-                                  ),
-                                  alignment: Alignment.centerLeft,
-                                  child: const Row(
-                                    children: [
-                                      Icon(Icons.edit_note_rounded, color: Colors.white, size: 22),
-                                      SizedBox(width: 6),
-                                      Text(
-                                        'Edit Recurrence',
-                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                secondaryBackground: Container(
-                                  padding: const EdgeInsets.only(right: 16),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFEF4444),
-                                  ),
-                              alignment: Alignment.centerRight,
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'Delete',
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                                  ),
-                                  SizedBox(width: 6),
-                                  Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 22),
-                                ],
-                              ),
-                            ),
-                            confirmDismiss: (direction) async {
-                              if (direction == DismissDirection.startToEnd) {
-                                Navigator.of(ctx).pop();
-                                _loadRecurringIntoForm(r, isEdit: true);
-                                return false;
-                              }
-                              return true;
+                          final recBorder = Border.all(
+                            color: isDue
+                                ? (isDarkInner ? const Color(0xFFF59E0B) : const Color(0xFFFCD34D))
+                                : (isDarkInner ? const Color(0xFF2C3360) : const Color(0xFFE2E8F0)),
+                            width: isDue ? 1.5 : 1.0,
+                          );
+
+                          return SwipeToDeleteWrapper(
+                            key: ValueKey('recurring_${r.id}'),
+                            borderRadius: BorderRadius.circular(12),
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            border: recBorder,
+                            rightLabel: 'EDIT',
+                            onSwipeRight: () {
+                              Navigator.of(ctx).pop();
+                              _loadRecurringIntoForm(r, isEdit: true);
                             },
-                            onDismissed: (direction) async {
-                              if (direction == DismissDirection.endToStart) {
-                                await _storage.deleteRecurringTransaction(r.id);
-                                setState(() {
-                                  _recurringTransactions.removeWhere((item) => item.id == r.id);
-                                });
-                                setSheetState(() {});
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Deleted recurrence: "${r.narration}"', textAlign: TextAlign.center),
-                                      backgroundColor: const Color(0xFFEF4444),
-                                      behavior: SnackBarBehavior.floating,
-                                      duration: const Duration(seconds: 1),
-                                    ),
-                                  );
-                                }
+                            onDelete: () async {
+                              await _storage.deleteRecurringTransaction(r.id);
+                              setState(() {
+                                _recurringTransactions.removeWhere((item) => item.id == r.id);
+                              });
+                              setSheetState(() {});
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Deleted recurrence: "${r.narration}"', textAlign: TextAlign.center),
+                                    backgroundColor: const Color(0xFFEF4444),
+                                    behavior: SnackBarBehavior.floating,
+                                    duration: const Duration(seconds: 1),
+                                  ),
+                                );
                               }
                             },
                             child: InkWell(
@@ -3557,19 +3522,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                               },
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
-                                margin: const EdgeInsets.symmetric(vertical: 4),
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                 decoration: BoxDecoration(
                                   color: isDarkInner
                                       ? (isDue ? const Color(0xFF262C54) : const Color(0xFF1E2442))
                                       : (isDue ? const Color(0xFFFEF3C7).withValues(alpha: 0.5) : Colors.white),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isDue
-                                        ? (isDarkInner ? const Color(0xFFF59E0B) : const Color(0xFFFCD34D))
-                                        : (isDarkInner ? const Color(0xFF2C3360) : const Color(0xFFE2E8F0)),
-                                    width: isDue ? 1.5 : 1.0,
-                                  ),
                                 ),
                                 child: Row(
                                   children: [
@@ -3642,8 +3600,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                     ),
                                   ],
                                 ),
-                              ),
-                            ),
                               ),
                             ),
                           );
@@ -5982,26 +5938,26 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                         const SizedBox(width: 8),
                                         Expanded(
                                           flex: 5,
-                                          child: SizedBox(
+                                          child: Container(
                                             height: 46,
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(
+                                              color: inputBg,
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: inputBorder, width: 1.2),
+                                            ),
                                             child: TextFormField(
                                               controller: _customPurposeController,
                                               textAlignVertical: TextAlignVertical.center,
-                                              style: TextStyle(fontSize: 13, color: textPrimary),
-                                              decoration: InputDecoration(
+                                              style: TextStyle(fontSize: 13.5, color: textPrimary),
+                                              decoration: const InputDecoration(
                                                 hintText: 'Enter Purpose',
                                                 isDense: true,
-                                                constraints: const BoxConstraints(minHeight: 46, maxHeight: 46),
-                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                                suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 46),
-                                                suffixIcon: const SizedBox(width: 0, height: 46),
-                                                filled: true,
-                                                fillColor: inputBg,
-                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                                enabledBorder: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  borderSide: BorderSide(color: inputBorder, width: 1.2),
-                                                ),
+                                                filled: false,
+                                                border: InputBorder.none,
+                                                enabledBorder: InputBorder.none,
+                                                focusedBorder: InputBorder.none,
+                                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                               ),
                                             ),
                                           ),
@@ -6040,33 +5996,40 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                         const SizedBox(width: 6),
                                         Expanded(
                                           flex: 6,
-                                          child: SizedBox(
+                                          child: Container(
                                             height: 46,
-                                            child: TextFormField(
-                                              controller: _customSpentForController,
-                                              textAlignVertical: TextAlignVertical.center,
-                                              style: TextStyle(fontSize: 13, color: textPrimary),
-                                              decoration: InputDecoration(
-                                                hintText: 'Name / Contact',
-                                                isDense: true,
-                                                constraints: const BoxConstraints(minHeight: 46, maxHeight: 46),
-                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                                filled: true,
-                                                fillColor: inputBg,
-                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                                enabledBorder: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  borderSide: BorderSide(color: inputBorder, width: 1.2),
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(
+                                              color: inputBg,
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: inputBorder, width: 1.2),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: TextFormField(
+                                                    controller: _customSpentForController,
+                                                    textAlignVertical: TextAlignVertical.center,
+                                                    style: TextStyle(fontSize: 13.5, color: textPrimary),
+                                                    decoration: const InputDecoration(
+                                                      hintText: 'Name / Contact',
+                                                      isDense: true,
+                                                      filled: false,
+                                                      border: InputBorder.none,
+                                                      enabledBorder: InputBorder.none,
+                                                      focusedBorder: InputBorder.none,
+                                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                    ),
+                                                  ),
                                                 ),
-                                                suffixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 46),
-                                                suffixIcon: IconButton(
+                                                IconButton(
                                                   icon: const Icon(Icons.contacts_rounded, size: 18, color: cyanAccent),
                                                   padding: EdgeInsets.zero,
-                                                  constraints: const BoxConstraints(minWidth: 38, minHeight: 46),
+                                                  constraints: const BoxConstraints(minWidth: 38, minHeight: 44),
                                                   tooltip: 'Pick Contact',
                                                   onPressed: _pickContactForSpentFor,
                                                 ),
-                                              ),
+                                              ],
                                             ),
                                           ),
                                         ),

@@ -6,20 +6,28 @@ class SwipeToDeleteWrapper extends StatefulWidget {
   final Widget child;
   final VoidCallback onDelete;
   final Future<bool> Function()? confirmDelete;
+  final VoidCallback? onSwipeRight;
+  final String rightLabel;
+  final IconData rightIcon;
   final BorderRadius borderRadius;
   final EdgeInsetsGeometry margin;
   final bool enabled;
   final BoxBorder? border;
+  final BoxBorder? backgroundBorder;
 
   const SwipeToDeleteWrapper({
     super.key,
     required this.child,
     required this.onDelete,
     this.confirmDelete,
+    this.onSwipeRight,
+    this.rightLabel = 'LOAD',
+    this.rightIcon = Icons.edit_note_rounded,
     this.borderRadius = const BorderRadius.all(Radius.circular(14)),
     this.margin = EdgeInsets.zero,
     this.enabled = true,
     this.border,
+    this.backgroundBorder,
   });
 
   @override
@@ -98,6 +106,46 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
             borderRadius: widget.borderRadius,
             child: Stack(
               children: [
+                if (_dragOffset > 0.5 && widget.onSwipeRight != null)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: _dragOffset > 20 ? () {
+                        _animateTo(0.0);
+                        widget.onSwipeRight?.call();
+                      } : null,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                        ),
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.rightIcon,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              widget.rightLabel,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                                letterSpacing: 0.7,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 if (_dragOffset < -0.5)
                   Positioned.fill(
                     child: GestureDetector(
@@ -137,12 +185,14 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
                   ),
                 GestureDetector(
                   behavior: HitTestBehavior.translucent,
-                  onTap: _dragOffset < -10 ? () => _animateTo(0.0) : null,
+                  onTap: _dragOffset.abs() > 10 ? () => _animateTo(0.0) : null,
                   onHorizontalDragStart: (_) => _controller.stop(),
                   onHorizontalDragUpdate: (details) {
+                    final minDrag = -maxWidth;
+                    final maxDrag = widget.onSwipeRight != null ? maxWidth : 0.0;
                     setState(() {
                       _dragOffset =
-                          (_dragOffset + details.delta.dx).clamp(-maxWidth, 0.0);
+                          (_dragOffset + details.delta.dx).clamp(minDrag, maxDrag);
                     });
                   },
                   onHorizontalDragEnd: (details) {
@@ -150,8 +200,15 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
                     if (_dragOffset <= -maxWidth * 0.55 || vx < -900) {
                       _animateTo(-maxWidth);
                       _triggerDelete();
-                    } else if (_dragOffset <= -42 || vx < -250) {
+                    } else if (_dragOffset <= -42 || (vx < -250 && _dragOffset < 0)) {
                       _animateTo(-_revealWidth);
+                    } else if (widget.onSwipeRight != null &&
+                        (_dragOffset >= maxWidth * 0.45 || vx > 700)) {
+                      _animateTo(0.0);
+                      widget.onSwipeRight!();
+                    } else if (widget.onSwipeRight != null &&
+                        (_dragOffset >= 42 || (vx > 250 && _dragOffset > 0))) {
+                      _animateTo(_revealWidth);
                     } else {
                       _animateTo(0.0);
                     }
@@ -161,13 +218,13 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
                     child: widget.child,
                   ),
                 ),
-                if (widget.border != null)
+                if (widget.border != null || (widget.backgroundBorder != null && _dragOffset.abs() > 0.5))
                   Positioned.fill(
                     child: IgnorePointer(
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: widget.borderRadius,
-                          border: widget.border,
+                          border: widget.border ?? widget.backgroundBorder,
                         ),
                       ),
                     ),
