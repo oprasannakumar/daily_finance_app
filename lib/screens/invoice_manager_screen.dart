@@ -413,7 +413,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
   Future<void> _extractFromSource(String mode) async {
     final pages = <Uint8List>[];
-    String mimeType = 'image/jpeg';
 
     if (mode == 'doc') {
       final result = await FilePicker.pickFiles(
@@ -440,7 +439,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
             count++;
             if (count >= 5) break;
           }
-          mimeType = 'image/png';
         } catch (e) {
           if (mounted) {
             setState(() {
@@ -763,7 +761,12 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Extraction failed: $e', textAlign: TextAlign.center),
+            content: Text(
+              'Extraction failed: ${e.toString().split('\n').first}',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
             backgroundColor: const Color(0xFFEF4444),
           ),
         );

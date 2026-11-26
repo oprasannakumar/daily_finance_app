@@ -52,9 +52,11 @@ class InvoiceExtractorService {
   InvoiceExtractorService._();
   static final InvoiceExtractorService instance = InvoiceExtractorService._();
 
-  static const String _grokEndpoint = 'https://openrouter.ai/api/v1/chat/completions';
-  static const String _grokModel = 'qwen/qwen3.8-27b';
-  static const String _geminiModel = 'gemini-3.6-flash';
+  static const String _groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
+  static const String _openRouterEndpoint = 'https://openrouter.ai/api/v1/chat/completions';
+  static const String _groqModel = 'llama-3.3-70b-versatile';
+  static const String _openRouterModel = 'qwen/qwen3.8-27b';
+  static const List<String> _geminiModels = ['gemini-3.6-flash', 'gemini-2.5-flash'];
 
   static const String _extractionPrompt = '''
 You are an expert invoice data extraction assistant.
@@ -120,71 +122,73 @@ Rules:
     final grokKey = ((await StorageService.instance.getGrokApiKey()) ?? '').trim();
     final geminiKey = ((await StorageService.instance.getGeminiApiKey()) ?? '').trim();
 
-    if (grokKey.isEmpty && geminiKey.isEmpty) {
-      throw Exception('Please configure at least one API key (Grok or Gemini) in API Keys settings.');
-    }
-
-    String? primaryError;
-
     if (grokKey.isNotEmpty) {
       try {
         return await _extractTextWithGrok(grokKey, ocrText);
-      } catch (e) {
-        primaryError = e.toString();
-      }
-    } else {
-      primaryError = 'Grok API key not set.';
+      } catch (_) {}
     }
 
     if (geminiKey.isNotEmpty) {
-      try {
-        return await _extractTextWithGemini(geminiKey, ocrText);
-      } catch (e) {
-        throw Exception('Both models failed.\n• Grok: $primaryError\n• Gemini: $e');
+      for (final model in _geminiModels) {
+        try {
+          return await _extractTextWithGemini(geminiKey, ocrText, model);
+        } catch (_) {}
       }
     }
 
-    throw Exception('Grok extraction failed: $primaryError');
+    // Fallback to offline OCR heuristic parser if API keys are missing or quota exceeded
+    return _parseOcrLocally(ocrText);
   }
 
   Future<ExtractedInvoiceData> _extractTextWithGrok(String apiKey, String ocrText) async {
-    final res = await http
-        .post(
-          Uri.parse(_grokEndpoint),
-          headers: {
-            'Authorization': 'Bearer $apiKey',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({
-            'model': _grokModel,
-            'temperature': 0.0,
-            'response_format': {'type': 'json_object'},
-            'messages': [
-              {
-                'role': 'user',
-                'content': '${_extractionPrompt.trim()}\n\nOCR TEXT:\n$ocrText',
+    final endpoints = apiKey.startsWith('gsk_')
+        ? [(_groqEndpoint, _groqModel), (_openRouterEndpoint, _openRouterModel)]
+        : [(_openRouterEndpoint, _openRouterModel), (_groqEndpoint, _groqModel)];
+
+    Exception? lastErr;
+    for (final (endpoint, model) in endpoints) {
+      try {
+        final res = await http
+            .post(
+              Uri.parse(endpoint),
+              headers: {
+                'Authorization': 'Bearer $apiKey',
+                'Content-Type': 'application/json',
               },
-            ],
-          }),
-        )
-        .timeout(const Duration(seconds: 60));
+              body: jsonEncode({
+                'model': model,
+                'temperature': 0.0,
+                'response_format': {'type': 'json_object'},
+                'messages': [
+                  {
+                    'role': 'user',
+                    'content': '${_extractionPrompt.trim()}\n\nOCR TEXT:\n$ocrText',
+                  },
+                ],
+              }),
+            )
+            .timeout(const Duration(seconds: 60));
 
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('HTTP ${res.statusCode}: ${res.body}');
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          final root = jsonDecode(res.body) as Map<String, dynamic>;
+          final choices = root['choices'] as List<dynamic>?;
+          if (choices == null || choices.isEmpty) {
+            throw Exception('Response missing choices.');
+          }
+          final content = (choices.first as Map<String, dynamic>)['message']?['content']?.toString() ?? '';
+          return _parseInvoiceJson(content, 'Grok ($model)');
+        }
+        lastErr = Exception('HTTP ${res.statusCode}');
+      } catch (e) {
+        lastErr = Exception(e.toString());
+      }
     }
-
-    final root = jsonDecode(res.body) as Map<String, dynamic>;
-    final choices = root['choices'] as List<dynamic>?;
-    if (choices == null || choices.isEmpty) {
-      throw Exception('Grok response missing choices.');
-    }
-    final content = (choices.first as Map<String, dynamic>)['message']?['content']?.toString() ?? '';
-    return _parseInvoiceJson(content, 'Grok ($_grokModel)');
+    throw lastErr ?? Exception('Grok extraction failed');
   }
 
-  Future<ExtractedInvoiceData> _extractTextWithGemini(String apiKey, String ocrText) async {
+  Future<ExtractedInvoiceData> _extractTextWithGemini(String apiKey, String ocrText, String model) async {
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/$_geminiModel:generateContent?key=$apiKey',
+      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
     );
     final res = await http
         .post(
@@ -207,16 +211,64 @@ Rules:
         .timeout(const Duration(seconds: 60));
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('HTTP ${res.statusCode}: ${res.body}');
+      throw Exception('HTTP ${res.statusCode}');
     }
 
     final root = jsonDecode(res.body) as Map<String, dynamic>;
-    final candidates = root['candidates']?.jsonArrayOrNull ?? root['candidates'] as List<dynamic>?;
+    final candidates = root['candidates'] as List<dynamic>?;
     if (candidates == null || candidates.isEmpty) {
       throw Exception('Gemini response missing candidates.');
     }
     final text = (candidates.first as Map<String, dynamic>)['content']?['parts']?[0]?['text']?.toString() ?? '';
-    return _parseInvoiceJson(text, 'Gemini ($_geminiModel)');
+    return _parseInvoiceJson(text, 'Gemini ($model)');
+  }
+
+  ExtractedInvoiceData _parseOcrLocally(String ocrText) {
+    final lines = ocrText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    final dealer = lines.isNotEmpty ? lines.first : '';
+    String billNo = '';
+    DateTime? date;
+    final items = <ExtractedInvoiceItem>[];
+
+    final billRx = RegExp(
+      r'(?:inv(?:oice)?|bill|receipt)\s*(?:no|#|number)?[:\s\-]*([A-Z0-9/\-]{3,})',
+      caseSensitive: false,
+    );
+    final dateRx = RegExp(r'(\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}|\d{4}[/\-]\d{1,2}[/\-]\d{1,2})');
+    final itemRx = RegExp(r'^(.{3,}?)\s+(?:(\d+(?:\.\d+)?)\s*[x×*]\s*)?(\d+(?:\.\d{1,2})?)$');
+
+    for (final line in lines) {
+      if (billNo.isEmpty) {
+        final bm = billRx.firstMatch(line);
+        if (bm != null) billNo = bm.group(1) ?? '';
+      }
+      if (date == null) {
+        final dm = dateRx.firstMatch(line);
+        if (dm != null) date = _parseInvoiceDate(dm.group(1)!);
+      }
+      final lower = line.toLowerCase();
+      if (lower.contains('total') || lower.contains('gst') || lower.contains('tax') || lower.contains('subtotal')) {
+        continue;
+      }
+      final im = itemRx.firstMatch(line);
+      if (im != null) {
+        final name = im.group(1)!.trim();
+        final qty = double.tryParse(im.group(2) ?? '1') ?? 1.0;
+        final price = double.tryParse(im.group(3) ?? '0') ?? 0.0;
+        if (price > 0 && name.length > 2) {
+          items.add(ExtractedInvoiceItem(name: name, quantity: qty, unitPrice: price));
+        }
+      }
+    }
+
+    return ExtractedInvoiceData(
+      dealerName: dealer,
+      billNumber: billNo,
+      invoiceDate: date,
+      currency: '₹',
+      items: items,
+      usedProvider: 'Offline OCR Parser',
+    );
   }
 
   DateTime? _parseInvoiceDate(String raw) {
@@ -224,7 +276,6 @@ Rules:
     if (s.isEmpty) return null;
     final iso = DateTime.tryParse(s);
     if (iso != null) return iso;
-    // Try DD/MM/YYYY or DD-MM-YYYY
     final m = RegExp(r'^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})$').firstMatch(s);
     if (m != null) {
       final d = int.parse(m.group(1)!);
@@ -269,8 +320,4 @@ Rules:
       usedProvider: provider,
     );
   }
-}
-
-extension on Object? {
-  List<dynamic>? get jsonArrayOrNull => this is List<dynamic> ? this as List<dynamic> : null;
 }
