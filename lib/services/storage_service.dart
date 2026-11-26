@@ -515,6 +515,7 @@ class StorageService {
     _backupDebounceTimer?.cancel();
     _backupDebounceTimer = Timer(const Duration(seconds: 4), () async {
       try {
+        if (!await hasNetworkConnection()) return;
         final email = await GoogleAuthService.instance.currentUserEmail;
         if (email != null && email.isNotEmpty) {
           await GoogleSheetsService.instance.backupAllConfigAndMasters();
@@ -569,6 +570,7 @@ class StorageService {
 
   Future<void> _syncAccountBalancesToSheet(AccountBalanceConfig config) async {
     try {
+      if (!await hasNetworkConnection()) return;
       final summary = await getLiveAccountBalances();
       await GoogleSheetsService.instance.syncAccountBalances(summary: summary, config: config);
     } catch (e) {
@@ -609,9 +611,13 @@ class StorageService {
     final isTesting = WidgetsBinding.instance.runtimeType.toString().contains('Test');
     if (isTesting) return true;
     try {
-      final result = await InternetAddress.lookup('dns.google')
-          .timeout(const Duration(seconds: 2));
-      return result.isNotEmpty && result.first.rawAddress.isNotEmpty;
+      final socket = await Socket.connect(
+        '8.8.8.8',
+        53,
+        timeout: const Duration(seconds: 2),
+      );
+      socket.destroy();
+      return true;
     } catch (_) {
       return false;
     }
@@ -1317,17 +1323,45 @@ class StorageService {
     pendingSyncNotifier.value = set.length;
   }
 
+  Timer? _offlineRetryTimer;
+
+  void _scheduleOfflineRetry() {
+    final isTesting = WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    if (isTesting) return;
+    if (_offlineRetryTimer?.isActive ?? false) return;
+    _offlineRetryTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+      if (_syncQueue.isEmpty && pendingSyncNotifier.value == 0) {
+        timer.cancel();
+        return;
+      }
+      if (await hasNetworkConnection()) {
+        timer.cancel();
+        await _resumePendingSyncQueue();
+        if (isBalanceConfigured() && _cachedBalanceConfig != null) {
+          unawaited(_syncAccountBalancesToSheet(_cachedBalanceConfig!));
+        }
+      }
+    });
+  }
+
   void _enqueueBackgroundSync(FinanceTransaction tx) {
+    _syncQueue.removeWhere((item) =>
+        item.isSave &&
+        item.transaction != null &&
+        ((tx.id.isNotEmpty && item.transaction!.id == tx.id) ||
+            (tx.referenceId.isNotEmpty && item.transaction!.referenceId == tx.referenceId)));
     _syncQueue.add(_SyncQueueItem.save(tx));
     final set = Set<String>.from(pendingSyncSetNotifier.value);
-    set.add(tx.referenceId);
-    set.add(tx.id);
+    if (tx.referenceId.isNotEmpty) set.add(tx.referenceId);
+    if (tx.id.isNotEmpty) set.add(tx.id);
     pendingSyncSetNotifier.value = set;
     pendingSyncNotifier.value = set.length;
     _processSyncQueue();
   }
 
   void _enqueueBackgroundDelete(String idOrRef) {
+    if (idOrRef.isEmpty) return;
+    _syncQueue.removeWhere((item) => !item.isSave && item.idOrReference == idOrRef);
     _syncQueue.add(_SyncQueueItem.delete(idOrRef));
     final set = Set<String>.from(pendingSyncSetNotifier.value);
     set.add(idOrRef);
@@ -1386,9 +1420,20 @@ class StorageService {
     _isSyncQueueRunning = true;
 
     try {
-      if (!await hasNetworkConnection()) return;
+      if (!await hasNetworkConnection()) {
+        GoogleSheetsService.instance.isSyncingNotifier.value = false;
+        if (_syncQueue.isNotEmpty) {
+          GoogleSheetsService.instance.syncStatusNotifier.value =
+              'Offline — ${_syncQueue.length} item(s) queued';
+          _scheduleOfflineRetry();
+        }
+        return;
+      }
       while (_syncQueue.isNotEmpty) {
-        if (!await hasNetworkConnection()) break;
+        if (!await hasNetworkConnection()) {
+          _scheduleOfflineRetry();
+          break;
+        }
         final item = _syncQueue.removeAt(0);
         bool ok = false;
         try {
@@ -1413,11 +1458,15 @@ class StorageService {
         if (!ok) {
           // Hold item in queue until network / server is reachable again
           _syncQueue.insert(0, item);
+          _scheduleOfflineRetry();
           break;
         }
 
         final prefs = await SharedPreferences.getInstance();
         _updatePendingSyncCount(prefs);
+      }
+      if (_syncQueue.isEmpty) {
+        _offlineRetryTimer?.cancel();
       }
     } finally {
       _isSyncQueueRunning = false;
