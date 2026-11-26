@@ -1072,11 +1072,11 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     final isSelf = group.recipient.toLowerCase() == 'self';
 
     final card = Card(
-      elevation: 2,
+      elevation: isSelf ? 2 : 0,
       margin: isSelf ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: purple.withValues(alpha: 0.3)),
+        side: isSelf ? BorderSide(color: purple.withValues(alpha: 0.3)) : BorderSide.none,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1150,6 +1150,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       key: ValueKey('recipient_${group.recipient}_${group.hashCode}'),
       borderRadius: BorderRadius.circular(16),
       margin: const EdgeInsets.only(bottom: 16),
+      border: Border.all(color: purple.withValues(alpha: 0.3)),
       confirmDelete: () async {
         final res = await showDialog<bool>(
           context: context,
@@ -1183,7 +1184,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       decoration: BoxDecoration(
         color: bgInput,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: secondary.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -1284,6 +1284,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       key: ValueKey('item_${group.recipient}_${item.hashCode}'),
       borderRadius: BorderRadius.circular(12),
       margin: const EdgeInsets.only(bottom: 10),
+      border: Border.all(color: secondary.withValues(alpha: 0.3)),
       onDelete: () => _removeItemFromRecipient(group, index),
       child: itemWidget,
     );

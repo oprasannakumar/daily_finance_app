@@ -969,12 +969,12 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
           enabled: _isEditMode,
           borderRadius: BorderRadius.circular(12),
           margin: const EdgeInsets.symmetric(vertical: 4),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
           onDelete: () => _onSwipeDelete(category, item),
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: ListTile(
               dense: true,

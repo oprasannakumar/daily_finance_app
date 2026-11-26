@@ -162,7 +162,7 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
       onDelete: widget.onDelete,
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(

@@ -9,6 +9,7 @@ class SwipeToDeleteWrapper extends StatefulWidget {
   final BorderRadius borderRadius;
   final EdgeInsetsGeometry margin;
   final bool enabled;
+  final BoxBorder? border;
 
   const SwipeToDeleteWrapper({
     super.key,
@@ -18,6 +19,7 @@ class SwipeToDeleteWrapper extends StatefulWidget {
     this.borderRadius = const BorderRadius.all(Radius.circular(14)),
     this.margin = EdgeInsets.zero,
     this.enabled = true,
+    this.border,
   });
 
   @override
@@ -96,42 +98,43 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
             borderRadius: widget.borderRadius,
             child: Stack(
               children: [
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: _dragOffset < -20 ? _triggerDelete : null,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFFB91C1C), Color(0xFFEF4444)],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
+                if (_dragOffset < -0.5)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: _dragOffset < -20 ? _triggerDelete : null,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFFB91C1C), Color(0xFFEF4444)],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
                         ),
-                      ),
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'DELETE',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12,
-                              letterSpacing: 0.7,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'DELETE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                                letterSpacing: 0.7,
+                              ),
                             ),
-                          ),
-                          SizedBox(width: 6),
-                          Icon(
-                            Icons.delete_outline_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ],
+                            SizedBox(width: 6),
+                            Icon(
+                              Icons.delete_outline_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
                 GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onTap: _dragOffset < -10 ? () => _animateTo(0.0) : null,
@@ -158,6 +161,17 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
                     child: widget.child,
                   ),
                 ),
+                if (widget.border != null)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: widget.borderRadius,
+                          border: widget.border,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           );

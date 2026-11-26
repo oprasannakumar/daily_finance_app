@@ -28,7 +28,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
 
   static const double _pillWidth = 22.0;
   static const double _pillHeight = 76.0;
-  static const double _dockWidth = 118.0;
+  static const double _dockWidth = 72.0;
 
   static const List<Map<String, dynamic>> _dockItems = [
     {'emoji': '✍️', 'label': 'Entry', 'color': Color(0xFF6366F1)},
@@ -76,10 +76,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   Timer? _idleTimer;
   bool _hiddenForScreenshot = false;
   Timer? _screenshotHideTimer;
-
-  // Drag / inward swipe tracking
-  Offset? _dragStartPos;
-  bool _swipedInward = false;
 
   @override
   void initState() {
@@ -546,31 +542,51 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Flexible(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: _orderedDockItems.asMap().entries.map((entry) {
-                          final idx = entry.key;
-                          final item = entry.value;
-                          final label = item['label'] as String;
-                          final emoji = item['emoji'] as String;
-                          final color = item['color'] as Color;
-                          final isActive = controller.currentScreen == label;
-                          final isHovered = _isHoldSelecting && _hoveredDockIndex == idx;
-                          final itemKey = _dockItemKeys.putIfAbsent(idx, () => GlobalKey());
-                          return Padding(
-                            key: itemKey,
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(14),
-                              onTap: () => _navigateTo(label),
-                              child: AnimatedScale(
-                                scale: isHovered ? 1.12 : 1.0,
-                                duration: const Duration(milliseconds: 90),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
+                    child: GestureDetector(
+                      onVerticalDragStart: (details) {
+                        setState(() => _isHoldSelecting = true);
+                        _updateHoveredDockIndex(details.globalPosition);
+                      },
+                      onVerticalDragUpdate: (details) {
+                        if (_isHoldSelecting) {
+                          _updateHoveredDockIndex(details.globalPosition);
+                        }
+                      },
+                      onVerticalDragEnd: (_) {
+                        final chosen = _hoveredDockIndex;
+                        final items = _orderedDockItems;
+                        setState(() {
+                          _isHoldSelecting = false;
+                          _hoveredDockIndex = null;
+                        });
+                        if (chosen != null && chosen >= 0 && chosen < items.length) {
+                          _navigateTo(items[chosen]['label'] as String);
+                        }
+                      },
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: _orderedDockItems.asMap().entries.map((entry) {
+                            final idx = entry.key;
+                            final item = entry.value;
+                            final label = item['label'] as String;
+                            final emoji = item['emoji'] as String;
+                            final color = item['color'] as Color;
+                            final isActive = controller.currentScreen == label;
+                            final isHovered = _isHoldSelecting && _hoveredDockIndex == idx;
+                            final itemKey = _dockItemKeys.putIfAbsent(idx, () => GlobalKey());
+                            return Padding(
+                              key: itemKey,
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Tooltip(
+                                message: label,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: () => _navigateTo(label),
+                                  child: AnimatedScale(
+                                    scale: isHovered ? 1.14 : 1.0,
+                                    duration: const Duration(milliseconds: 90),
+                                    child: Container(
                                       width: 46,
                                       height: 46,
                                       decoration: BoxDecoration(
@@ -591,24 +607,12 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      label,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: (isActive || isHovered) ? FontWeight.bold : FontWeight.w600,
-                                        color: (isActive || isHovered) ? accent : textPrimary,
-                                        decoration: TextDecoration.none,
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          );
-                        }).toList(),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
                   ),
@@ -752,33 +756,6 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                               _isHoldSelecting = false;
                               _hoveredDockIndex = null;
                             });
-                          },
-                          onHorizontalDragStart: (details) {
-                            _dragStartPos = details.globalPosition;
-                            _swipedInward = false;
-                            _resetIdleTimer();
-                          },
-                          onHorizontalDragUpdate: (details) {
-                            final start = _dragStartPos;
-                            if (start != null && !_swipedInward) {
-                              final dx = details.globalPosition.dx - start.dx;
-                              final inwardSwipe = _isRightEdge ? dx < -18.0 : dx > 18.0;
-                              if (inwardSwipe) {
-                                _swipedInward = true;
-                                HapticFeedback.selectionClick();
-                                setState(() => _isDockOpen = true);
-                              }
-                            }
-                          },
-                          onHorizontalDragEnd: (_) {
-                            _dragStartPos = null;
-                            _swipedInward = false;
-                            _resetIdleTimer();
-                          },
-                          onHorizontalDragCancel: () {
-                            _dragStartPos = null;
-                            _swipedInward = false;
-                            _resetIdleTimer();
                           },
                           child: Container(
                             width: _pillWidth,
