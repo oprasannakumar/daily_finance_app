@@ -175,25 +175,38 @@ class DailyFinanceApp extends StatelessWidget {
             ),
           ),
           builder: (context, child) {
-            return Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (PointerDownEvent event) {
-                final currentFocus = FocusManager.instance.primaryFocus;
-                if (currentFocus != null && currentFocus.hasFocus) {
-                  final renderObject = currentFocus.context?.findRenderObject();
-                  if (renderObject is RenderBox && renderObject.hasSize) {
-                    final pos = renderObject.localToGlobal(Offset.zero);
-                    final bounds = pos & renderObject.size;
-                    if (!bounds.contains(event.position)) {
+            final mq = MediaQuery.of(context);
+            final visibleHeight = (mq.size.height - mq.viewInsets.bottom).clamp(240.0, 2000.0);
+            final centerBottomInset = (visibleHeight * 0.42).clamp(110.0, 460.0);
+
+            return Theme(
+              data: Theme.of(context).copyWith(
+                snackBarTheme: Theme.of(context).snackBarTheme.copyWith(
+                  behavior: SnackBarBehavior.floating,
+                  insetPadding: EdgeInsets.fromLTRB(24, 16, 24, centerBottomInset),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                ),
+              ),
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (PointerDownEvent event) {
+                  final currentFocus = FocusManager.instance.primaryFocus;
+                  if (currentFocus != null && currentFocus.hasFocus) {
+                    final renderObject = currentFocus.context?.findRenderObject();
+                    if (renderObject is RenderBox && renderObject.hasSize) {
+                      final pos = renderObject.localToGlobal(Offset.zero);
+                      final bounds = pos & renderObject.size;
+                      if (!bounds.contains(event.position)) {
+                        currentFocus.unfocus();
+                      }
+                    } else {
                       currentFocus.unfocus();
                     }
-                  } else {
-                    currentFocus.unfocus();
                   }
-                }
-              },
-              child: AppLockGate(
-                child: QuickSwitchOverlay(child: child ?? const SizedBox.shrink()),
+                },
+                child: AppLockGate(
+                  child: QuickSwitchOverlay(child: child ?? const SizedBox.shrink()),
+                ),
               ),
             );
           },

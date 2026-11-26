@@ -877,11 +877,21 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
   }
 
   Future<void> _openBudgetEditorDialog(bool isDark) async {
+    bool isIncomePurpose(String p) {
+      final l = p.toLowerCase();
+      return l.contains('salary') ||
+          l.contains('income') ||
+          l.contains('repayment') ||
+          l.contains('refund') ||
+          l.contains('cashback') ||
+          l.contains('interest');
+    }
+
     final allPurposes = <String>{
       ..._purposes,
       ..._budgets.keys,
       ...(_healthSummary?.topExpensePurposes.keys ?? const <String>[]),
-    }.where((p) => p.trim().isNotEmpty).toList()
+    }.where((p) => p.trim().isNotEmpty && !isIncomePurpose(p)).toList()
       ..sort();
 
     final controllers = <String, TextEditingController>{

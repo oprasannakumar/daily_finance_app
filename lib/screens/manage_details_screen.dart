@@ -35,6 +35,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
   List<TransactionTemplate> _templates = [];
   List<RecurringTransaction> _recurring = [];
   bool _isLoading = true;
+  bool _isEditMode = false;
 
   // Categories: Bank Accounts is common for UPI, Debit cards, and Net banking
   final List<String> _categories = [
@@ -169,7 +170,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
                 decoration: InputDecoration(
                   labelText: 'Name(s)',
                   hintText: 'e.g. Item 1, Item 2, Item 3',
-                  helperText: 'Separate multiple items with a comma (,)',
+                  helperText: 'Use comma (,) for bulk add/insert of item',
                   helperMaxLines: 2,
                   isDense: false,
                   constraints: const BoxConstraints(),
@@ -509,17 +510,32 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
       );
     }
 
-    return ReorderableListView.builder(
-      buildDefaultDragHandles: false,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      itemCount: _templates.length,
-      onReorderItem: (int oldIndex, int newIndex) async {
-        final t = _templates.removeAt(oldIndex);
-        _templates.insert(newIndex, t);
-        await _storage.saveAllTemplates(_templates);
-        await _loadData();
-      },
-      itemBuilder: (context, index) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                'Swipe left to delete • Swipe right to load →',
+                style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ReorderableListView.builder(
+            buildDefaultDragHandles: false,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            itemCount: _templates.length,
+            onReorderItem: (int oldIndex, int newIndex) async {
+              final t = _templates.removeAt(oldIndex);
+              _templates.insert(newIndex, t);
+              await _storage.saveAllTemplates(_templates);
+              await _loadData();
+            },
+            itemBuilder: (context, index) {
         final t = _templates[index];
 
         return Container(
@@ -624,7 +640,10 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
           ),
         );
     },
-  );
+  ),
+        ),
+      ],
+    );
   }
 
   Widget _buildRecurringList() {
@@ -652,17 +671,32 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
     final now = DateTime.now();
     final endOfToday = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
-    return ReorderableListView.builder(
-      buildDefaultDragHandles: false,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      itemCount: _recurring.length,
-      onReorderItem: (int oldIndex, int newIndex) async {
-        final r = _recurring.removeAt(oldIndex);
-        _recurring.insert(newIndex, r);
-        await _storage.saveAllRecurringTransactions(_recurring);
-        await _loadData();
-      },
-      itemBuilder: (context, index) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                'Swipe left to delete • Swipe right to load →',
+                style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ReorderableListView.builder(
+            buildDefaultDragHandles: false,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            itemCount: _recurring.length,
+            onReorderItem: (int oldIndex, int newIndex) async {
+              final r = _recurring.removeAt(oldIndex);
+              _recurring.insert(newIndex, r);
+              await _storage.saveAllRecurringTransactions(_recurring);
+              await _loadData();
+            },
+            itemBuilder: (context, index) {
         final r = _recurring[index];
         final isDue = !r.isPaused && !r.nextDueDate.isAfter(endOfToday);
 
@@ -824,6 +858,9 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
           ),
         );
       },
+    ),
+        ),
+      ],
     );
   }
 
@@ -909,7 +946,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
 
         return Dismissible(
           key: ValueKey('${category}_$item'),
-          direction: DismissDirection.endToStart, // Swipe right-to-left ONLY
+          direction: _isEditMode ? DismissDirection.endToStart : DismissDirection.none,
           background: Container(
             margin: const EdgeInsets.symmetric(vertical: 4),
             padding: const EdgeInsets.only(right: 20),
@@ -930,6 +967,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
             ),
             child: ListTile(
               dense: true,
+              onTap: _isEditMode ? () => _showEditItemDialog(category, item) : null,
               leading: CircleAvatar(
                 radius: 12,
                 backgroundColor: const Color(0xFF0F766E).withValues(alpha: 0.12),
@@ -943,12 +981,24 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
                 ),
               ),
               title: Text(item, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-              trailing: ReorderableDragStartListener(
-                index: index,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Icon(Icons.drag_handle, color: Color(0xFF94A3B8), size: 20),
-                ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isEditMode) ...[
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF0F766E)),
+                      tooltip: 'Edit $item',
+                      onPressed: () => _showEditItemDialog(category, item),
+                    ),
+                  ],
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(Icons.drag_handle, color: Color(0xFF94A3B8), size: 20),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -957,12 +1007,99 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
     );
   }
 
+  Future<void> _showEditItemDialog(String category, String oldItem) async {
+    final controller = TextEditingController(text: oldItem);
+    final formKey = GlobalKey<FormState>();
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Edit $category Item'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            decoration: InputDecoration(
+              labelText: 'Name',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) return 'Name cannot be empty';
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dlgCtx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0F766E)),
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.of(dlgCtx).pop(controller.text.trim());
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (newName == null || newName == oldItem) return;
+    if (category == 'Purpose') {
+      final list = List<String>.from(_purposes);
+      final idx = list.indexOf(oldItem);
+      if (idx != -1) {
+        list[idx] = newName;
+        await _storage.savePurposes(list);
+      }
+    } else if (category == 'Spent For') {
+      final list = List<String>.from(_spentFors);
+      final idx = list.indexOf(oldItem);
+      if (idx != -1) {
+        list[idx] = newName;
+        await _storage.saveSpentFors(list);
+      }
+    } else {
+      final map = Map<String, List<String>>.from(_categoryAccounts);
+      final list = List<String>.from(map[category] ?? []);
+      final idx = list.indexOf(oldItem);
+      if (idx != -1) {
+        list[idx] = newName;
+        map[category] = list;
+        await _storage.saveCategoryAccounts(map);
+      }
+    }
+    await _loadData();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Manage Masters'),
         actions: [
+          TextButton.icon(
+            onPressed: () => setState(() => _isEditMode = !_isEditMode),
+            icon: Icon(
+              _isEditMode ? Icons.check_circle_rounded : Icons.edit_rounded,
+              size: 18,
+              color: _isEditMode ? const Color(0xFF10B981) : const Color(0xFF0F766E),
+            ),
+            label: Text(
+              _isEditMode ? 'Done' : 'Edit',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: _isEditMode ? const Color(0xFF10B981) : const Color(0xFF0F766E),
+              ),
+            ),
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort_by_alpha, size: 22),
             tooltip: 'Sort items in tab',
@@ -1005,9 +1142,27 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: _categories.map((c) => _buildListForCategory(c)).toList(),
+          : Column(
+              children: [
+                if (_isEditMode)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    color: const Color(0xFF0F766E).withValues(alpha: 0.1),
+                    child: const Text(
+                      'Edit Mode: Tap item to rename • Swipe left to delete',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF0F766E)),
+                    ),
+                  ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: _categories.map((c) => _buildListForCategory(c)).toList(),
+                  ),
+                ),
+              ],
             ),
       floatingActionButton: FloatingActionButton(
         mini: true,

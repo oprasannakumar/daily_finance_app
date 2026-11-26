@@ -29,6 +29,7 @@ class StorageService {
   static const String _keyCachedEmiPlans = 'cached_active_emi_plans_v1';
   static const String _keyMonthlyBudgets = 'monthly_purpose_budgets_v1';
   static const String _keyAppLockPin = 'app_lock_pin_v1';
+  static const String _keyBiometricLock = 'app_biometric_lock_v1';
 
   List<InvoiceItemRecord>? _cachedInvoices;
   List<DealerPriceItem>? _cachedDealerPrices;
@@ -1524,6 +1525,16 @@ class StorageService {
     }
   }
 
+  Future<bool> getBiometricLockEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyBiometricLock) ?? false;
+  }
+
+  Future<void> setBiometricLockEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyBiometricLock, enabled);
+  }
+
   // Pending Sync Queue Details & Manual Trigger
   Future<({List<FinanceTransaction> saves, List<String> deletes})> getPendingSyncDetails() async {
     final prefs = await SharedPreferences.getInstance();
@@ -1537,6 +1548,29 @@ class StorageService {
     await _resumePendingSyncQueue();
     final details = await getPendingSyncDetails();
     return details.saves.isEmpty && details.deletes.isEmpty;
+  }
+
+  Future<void> clearAllLocalData() async {
+    _offlineRetryTimer?.cancel();
+    _syncQueue.clear();
+    _cachedTransactions = [];
+    _cachedLoanEntries = [];
+    _cachedTemplates = null;
+    _cachedRecurring = null;
+    _cachedBalanceConfig = null;
+    _cachedEmiPlans = null;
+    _cachedInvoices = null;
+    _cachedDealerPrices = null;
+    pendingSyncSetNotifier.value = {};
+    pendingSyncNotifier.value = 0;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    transactionsNotifier.value++;
+    loansNotifier.value++;
+    balanceConfigNotifier.value = null;
+    emiPlansNotifier.value++;
+    recurringNotifier.value++;
+    mastersNotifier.value++;
   }
 
   // Templates

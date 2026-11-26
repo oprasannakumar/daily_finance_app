@@ -253,6 +253,11 @@ class GoogleAuthService {
     }
   }
 
+  Future<void> deleteAccountAndLocalData() async {
+    await disconnect();
+    await StorageService.instance.clearAllLocalData();
+  }
+
   void dispose() {
     _accountSubscription?.cancel();
   }

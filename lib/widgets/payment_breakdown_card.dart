@@ -173,6 +173,17 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
           ),
           onDismissed: (_) => widget.onDelete(),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!widget.isOnlyMode)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6, bottom: 2),
+                  child: Text(
+                    '← Swipe to delete',
+                    style: TextStyle(fontSize: 9.5, color: Colors.grey.shade500),
+                  ),
+                ),
+              Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Exact matching 46px height row for Type, Account, and Amount
@@ -502,6 +513,8 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
             ],
           ],
         ),
+            ],
+          ),
       ),
     ),
   );

@@ -2688,6 +2688,80 @@ class GoogleSheetsService {
     return sheetId;
   }
 
+  static const String backupFolderName = 'App Backups';
+
+  /// Finds or creates the shared "App Backups" folder in Google Drive.
+  Future<String?> _findOrCreateBackupFolder(String token) async {
+    try {
+      final query = Uri.encodeComponent(
+        "name = '$backupFolderName' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+      );
+      final searchUrl = Uri.parse(
+        'https://www.googleapis.com/drive/v3/files?q=$query&spaces=drive&fields=files(id,name)&pageSize=5',
+      );
+      final searchRes = await http.get(
+        searchUrl,
+        headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
+      );
+      if (searchRes.statusCode == 200) {
+        final data = jsonDecode(searchRes.body);
+        final files = data['files'] as List<dynamic>?;
+        if (files != null && files.isNotEmpty) {
+          final id = files.first['id']?.toString();
+          if (id != null && id.isNotEmpty) return id;
+        }
+      }
+
+      final createUrl = Uri.parse('https://www.googleapis.com/drive/v3/files');
+      final createRes = await http.post(
+        createUrl,
+        headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': backupFolderName,
+          'mimeType': 'application/vnd.google-apps.folder',
+        }),
+      );
+      if (createRes.statusCode == 200) {
+        final created = jsonDecode(createRes.body);
+        return created['id']?.toString();
+      }
+    } catch (e) {
+      debugPrint('Error finding/creating App Backups folder: $e');
+    }
+    return null;
+  }
+
+  /// Moves a newly created or existing spreadsheet into the "App Backups" Drive folder.
+  Future<void> _moveFileToBackupFolder(String token, String fileId) async {
+    try {
+      final folderId = await _findOrCreateBackupFolder(token);
+      if (folderId == null || folderId.isEmpty) return;
+
+      final metaUrl = Uri.parse('https://www.googleapis.com/drive/v3/files/$fileId?fields=parents');
+      final metaRes = await http.get(
+        metaUrl,
+        headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
+      );
+      String removeParents = '';
+      if (metaRes.statusCode == 200) {
+        final meta = jsonDecode(metaRes.body);
+        final parents = (meta['parents'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+        if (parents.contains(folderId)) return;
+        removeParents = parents.join(',');
+      }
+
+      final patchUri = Uri.parse(
+        'https://www.googleapis.com/drive/v3/files/$fileId?addParents=${Uri.encodeQueryComponent(folderId)}${removeParents.isNotEmpty ? '&removeParents=${Uri.encodeQueryComponent(removeParents)}' : ''}',
+      );
+      await http.patch(
+        patchUri,
+        headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      debugPrint('Error moving file to App Backups folder: $e');
+    }
+  }
+
   /// Creates a new "account ledger" Google Sheet with all 7 sheets pre-configured.
   Future<String?> _createSpreadsheet(String token) async {
     try {
@@ -2719,6 +2793,7 @@ class GoogleSheetsService {
         final id = data['spreadsheetId']?.toString();
         final url = data['spreadsheetUrl']?.toString();
         if (id != null) {
+          await _moveFileToBackupFolder(token, id);
           await setSpreadsheetId(id);
           if (url != null) await setSpreadsheetUrl(url);
           await setSheetGid(0);
@@ -3440,6 +3515,7 @@ class GoogleSheetsService {
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         final id = data['spreadsheetId'] as String;
+        await _moveFileToBackupFolder(token, id);
         await StorageService.instance.saveGroceryDbId(id);
 
         // Write headers

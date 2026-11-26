@@ -1207,17 +1207,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
 
   void _syncFromAmountToToAmountIfClearedCardBill({bool force = false}) {
     if (!_isSelfTransferMode) return;
-    final narrLower = _narrationController.text.toLowerCase().trim();
-    final isClearedCardBill = narrLower.contains('cleared card bill') ||
-        narrLower.contains('clared card bill') ||
-        narrLower.contains('clear card bill') ||
-        narrLower.contains('cleared card') ||
-        narrLower.contains('card bill');
-    if (isClearedCardBill && _toBreakdowns.isNotEmpty && _breakdowns.isNotEmpty) {
-      if (_toBreakdowns.length == 1) {
-        if (force || !_userEditedToAmount || _toBreakdowns.first.amount == 0) {
-          _toBreakdowns.first.amount = _totalFromAmount;
-        }
+    if (_toBreakdowns.length == 1 && _breakdowns.isNotEmpty) {
+      if (force || !_userEditedToAmount || _toBreakdowns.first.amount == 0) {
+        _toBreakdowns.first.amount = _totalFromAmount;
       }
     }
   }
@@ -4008,6 +4000,64 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                               label: const Text('Disconnect Google Account', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 44,
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFFDC2626),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              ),
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: sheetCtx,
+                                  builder: (dlgCtx) => AlertDialog(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                    title: const Row(
+                                      children: [
+                                        Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626)),
+                                        SizedBox(width: 8),
+                                        Text('Delete Account?'),
+                                      ],
+                                    ),
+                                    content: const Text(
+                                      'WARNING: This will permanently disconnect your Google account from this app and erase ALL locally stored data on this device (transactions, balances, EMIs, masters, budgets, and PIN lock).\n\nYour Google Drive backup files will remain in Drive unless you delete them manually.',
+                                      style: TextStyle(fontSize: 13, height: 1.4),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(dlgCtx).pop(false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      FilledButton(
+                                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                                        onPressed: () => Navigator.of(dlgCtx).pop(true),
+                                        child: const Text('Delete Account'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true) return;
+                                await GoogleAuthService.instance.deleteAccountAndLocalData();
+                                await _loadMasters();
+                                await _loadRecurringTransactions();
+                                await _loadBalancesSummary();
+                                if (mounted) _refreshFloatingStats();
+                                if (sheetCtx.mounted) {
+                                  Navigator.of(sheetCtx).pop();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Account disconnected and local data cleared.'),
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.delete_forever_rounded, size: 18),
+                              label: const Text('Delete Account & Local Data', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
                         ] else ...[
                           Container(
                             padding: const EdgeInsets.all(16),
@@ -5715,7 +5765,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                   availableAccounts: accountsForThisType,
                                   isOnlyMode: _toBreakdowns.length <= 1,
                                   onChanged: () {
-                                    _userEditedToAmount = true;
+                                    if (breakdown.amount > 0 && (breakdown.amount - _totalFromAmount).abs() > 0.01) {
+                                      _userEditedToAmount = true;
+                                    }
                                     setState(() {});
                                   },
                                   onDelete: () => _removeToPaymentMode(index),
@@ -6776,56 +6828,85 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
 
   Future<void> _openAppLockSetupDialog(BuildContext sheetCtx) async {
     final existing = await _storage.getAppLockPin();
+    final existingBio = await _storage.getBiometricLockEnabled();
     if (!sheetCtx.mounted) return;
-    final ctrl = TextEditingController();
+    final ctrl = TextEditingController(text: existing ?? '');
+    bool showPin = false;
+    bool bioEnabled = existingBio;
 
     await showDialog<void>(
       context: sheetCtx,
       builder: (dlgCtx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: Text(existing != null ? 'Update / Disable PIN Lock' : 'Set 4-Digit App PIN'),
-          content: TextField(
-            controller: ctrl,
-            maxLength: 4,
-            keyboardType: TextInputType.number,
-            obscureText: true,
-            decoration: const InputDecoration(
-              hintText: 'Enter 4-digit PIN',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            if (existing != null)
-              TextButton(
-                onPressed: () async {
-                  await _storage.setAppLockPin(null);
-                  if (!dlgCtx.mounted) return;
-                  Navigator.of(dlgCtx).pop();
-                  ScaffoldMessenger.of(sheetCtx).showSnackBar(
-                    const SnackBar(content: Text('App PIN Lock disabled.')),
-                  );
-                },
-                child: const Text('Disable PIN', style: TextStyle(color: Color(0xFFEF4444))),
+        return StatefulBuilder(
+          builder: (ctx, setDlgState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Text(existing != null ? 'App Lock Settings' : 'Set 4-Digit App PIN'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: ctrl,
+                    maxLength: 4,
+                    keyboardType: TextInputType.number,
+                    obscureText: !showPin,
+                    decoration: InputDecoration(
+                      hintText: 'Enter 4-digit PIN',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          showPin ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          size: 20,
+                        ),
+                        onPressed: () => setDlgState(() => showPin = !showPin),
+                      ),
+                    ),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Biometric Unlock', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Fingerprint / Face only (no password fallback)', style: TextStyle(fontSize: 11)),
+                    value: bioEnabled,
+                    onChanged: (v) => setDlgState(() => bioEnabled = v),
+                  ),
+                ],
               ),
-            TextButton(
-              onPressed: () => Navigator.of(dlgCtx).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final pin = ctrl.text.trim();
-                if (pin.length != 4 || int.tryParse(pin) == null) return;
-                await _storage.setAppLockPin(pin);
-                if (!dlgCtx.mounted) return;
-                Navigator.of(dlgCtx).pop();
-                ScaffoldMessenger.of(sheetCtx).showSnackBar(
-                  const SnackBar(content: Text('App PIN Lock enabled!')),
-                );
-              },
-              child: const Text('Save PIN'),
-            ),
-          ],
+              actions: [
+                if (existing != null || existingBio)
+                  TextButton(
+                    onPressed: () async {
+                      await _storage.setAppLockPin(null);
+                      await _storage.setBiometricLockEnabled(false);
+                      if (!dlgCtx.mounted) return;
+                      Navigator.of(dlgCtx).pop();
+                      ScaffoldMessenger.of(sheetCtx).showSnackBar(
+                        const SnackBar(content: Text('App Lock disabled.')),
+                      );
+                    },
+                    child: const Text('Disable Lock', style: TextStyle(color: Color(0xFFEF4444))),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.of(dlgCtx).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    final pin = ctrl.text.trim();
+                    if (pin.isNotEmpty && (pin.length != 4 || int.tryParse(pin) == null)) return;
+                    if (pin.isEmpty && !bioEnabled) return;
+                    await _storage.setAppLockPin(pin.isEmpty ? null : pin);
+                    await _storage.setBiometricLockEnabled(bioEnabled);
+                    if (!dlgCtx.mounted) return;
+                    Navigator.of(dlgCtx).pop();
+                    ScaffoldMessenger.of(sheetCtx).showSnackBar(
+                      const SnackBar(content: Text('App Lock updated!')),
+                    );
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

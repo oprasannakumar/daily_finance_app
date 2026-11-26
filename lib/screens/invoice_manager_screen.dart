@@ -1125,6 +1125,14 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                     ),
                   ),
                 ),
+                if (!isSelf)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      '← Swipe to delete',
+                      style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                    ),
+                  ),
               ],
             ),
           ),
