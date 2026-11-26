@@ -756,6 +756,7 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
+                    settings: const RouteSettings(name: 'BorrowerDetail'),
                     builder: (_) => BorrowerDetailScreen(
                       borrowerName: p.name,
                       initialEntries: _entries,

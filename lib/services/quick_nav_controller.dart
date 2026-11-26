@@ -130,14 +130,16 @@ class QuickNavController extends ChangeNotifier {
       return;
     }
 
-    if (label == _currentScreen) return;
-
-    nav.popUntil((route) => route.isFirst);
     if (label == 'Entry') {
+      nav.popUntil((route) => route.isFirst);
       _currentScreen = 'Entry';
       notifyListeners();
       return;
     }
+
+    if (label == _currentScreen) return;
+
+    nav.popUntil((route) => route.isFirst);
 
     _currentScreen = label;
     notifyListeners();

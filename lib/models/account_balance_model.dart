@@ -592,7 +592,7 @@ class LiveAccountBalanceSummary {
             final nextYear = today.month == 12 ? today.year + 1 : today.year;
             activeDueDate = DateTime(nextYear, nextMonth, dDay);
             cycleKey = '${today.year}-${today.month.toString().padLeft(2, '0')}';
-            nextBillDate = DateTime(nextMonth, today.month == 12 ? today.year + 1 : today.year, bDay);
+            nextBillDate = DateTime(nextYear, nextMonth, bDay);
             final afterNextMonth = nextMonth == 12 ? 1 : nextMonth + 1;
             final afterNextYear = nextMonth == 12 ? nextYear + 1 : nextYear;
             nextDueDate = DateTime(afterNextYear, afterNextMonth, dDay);
@@ -609,25 +609,50 @@ class LiveAccountBalanceSummary {
           }
         }
 
-        // Determine Billed Amount
-        final billedAmt = card.statementBilledAmount != null && card.statementBilledAmount! > 0
-            ? card.statementBilledAmount!
-            : cardUsed;
-
-        // Sum payments to this card within this active cycle (since activeBillDate)
+        // Sum payments to this card AND unbilled spends since activeBillDate
         double paidInCycle = 0.0;
+        double unbilledSpendsSinceBillDate = 0.0;
+        final cardNameLower = cardName.trim().toLowerCase();
         for (final tx in transactions) {
-          if ((tx.isSelfTransfer || tx.flow == 'Transfer') && !tx.date.isBefore(activeBillDate)) {
-            final toList = tx.toBreakdowns ?? [];
-            for (final to in toList) {
-              if (to.effectiveAccount.trim().toLowerCase() == cardName.trim().toLowerCase()) {
-                paidInCycle += to.amount;
+          final txDay = DateTime(tx.date.year, tx.date.month, tx.date.day);
+          if (!txDay.isBefore(activeBillDate)) {
+            if (tx.isSelfTransfer || tx.flow == 'Transfer') {
+              for (final to in (tx.toBreakdowns ?? [])) {
+                if (to.effectiveAccount.trim().toLowerCase() == cardNameLower) {
+                  paidInCycle += to.amount;
+                }
+              }
+              for (final from in tx.breakdowns) {
+                if (from.effectiveAccount.trim().toLowerCase() == cardNameLower) {
+                  unbilledSpendsSinceBillDate += from.amount;
+                }
+              }
+            } else if (tx.flow == 'Withdraw') {
+              for (final b in tx.breakdowns) {
+                if (b.effectiveAccount.trim().toLowerCase() == cardNameLower) {
+                  unbilledSpendsSinceBillDate += b.amount;
+                }
+              }
+            } else if (tx.flow == 'Deposit') {
+              for (final b in tx.breakdowns) {
+                if (b.effectiveAccount.trim().toLowerCase() == cardNameLower) {
+                  paidInCycle += b.amount;
+                }
               }
             }
           }
         }
 
-        final remaining = (billedAmt - paidInCycle).clamp(0.0, double.infinity);
+        // Determine Billed Amount & Remaining Due (never count spends on/after activeBillDate as billed due)
+        final bool hasExplicitStatement =
+            card.statementBilledAmount != null && card.statementBilledAmount! > 0;
+        final double billedAmt = hasExplicitStatement
+            ? card.statementBilledAmount!
+            : (cardUsed - unbilledSpendsSinceBillDate + paidInCycle).clamp(0.0, double.infinity);
+
+        final double remaining = hasExplicitStatement
+            ? (billedAmt - paidInCycle).clamp(0.0, double.infinity)
+            : (cardUsed - unbilledSpendsSinceBillDate).clamp(0.0, double.infinity);
         final isManuallyPaid = card.manualPaidCycle == cycleKey;
 
         // If remaining > 0, bill is active and not manually marked paid
