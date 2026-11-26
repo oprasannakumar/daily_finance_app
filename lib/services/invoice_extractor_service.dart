@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'storage_service.dart';
 
 class ExtractedInvoiceItem {
@@ -30,6 +33,7 @@ class ExtractedInvoiceItem {
 class ExtractedInvoiceData {
   final String dealerName;
   final String billNumber;
+  final DateTime? invoiceDate;
   final String currency;
   final List<ExtractedInvoiceItem> items;
   final String usedProvider;
@@ -37,6 +41,7 @@ class ExtractedInvoiceData {
   ExtractedInvoiceData({
     required this.dealerName,
     this.billNumber = '',
+    this.invoiceDate,
     required this.currency,
     required this.items,
     required this.usedProvider,
@@ -53,10 +58,11 @@ class InvoiceExtractorService {
 
   static const String _extractionPrompt = '''
 You are an expert invoice data extraction assistant.
-Analyze the provided invoice page image(s) and extract the following fields strictly as valid JSON:
+Analyze the provided OCR text extracted from an invoice/bill and extract the following fields strictly as valid JSON:
 {
   "dealer_name": "Name of the dealer, vendor, store, or seller issuing the invoice",
   "bill_number": "Invoice number, bill number, or receipt number if visible, otherwise empty string",
+  "invoice_date": "Invoice date in YYYY-MM-DD format if visible, otherwise empty string",
   "currency": "Currency symbol or 3-letter ISO code if visible (e.g., ₹, INR, \$, USD), otherwise empty string",
   "items": [
     {
@@ -75,12 +81,40 @@ Rules:
 - Return ONLY the JSON object, with no extra commentary or markdown.
 ''';
 
-  Future<ExtractedInvoiceData> extractFromImages(
-    List<Uint8List> imageBytesList, {
-    String mimeType = 'image/jpeg',
-  }) async {
-    if (imageBytesList.isEmpty) {
-      throw Exception('No invoice image provided.');
+  /// Runs on-device ML Kit OCR on the given image/PDF page bytes and returns combined text.
+  Future<String> extractOcrText(List<Uint8List> imageBytesList) async {
+    if (imageBytesList.isEmpty) return '';
+    final tempDir = await getTemporaryDirectory();
+    final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    final buffer = StringBuffer();
+
+    try {
+      for (int i = 0; i < imageBytesList.length; i++) {
+        final file = File('${tempDir.path}/ocr_page_${DateTime.now().millisecondsSinceEpoch}_$i.png');
+        await file.writeAsBytes(imageBytesList[i], flush: true);
+        try {
+          final inputImage = InputImage.fromFilePath(file.path);
+          final recognized = await recognizer.processImage(inputImage);
+          final pageText = recognized.text.trim();
+          if (pageText.isNotEmpty) {
+            if (buffer.isNotEmpty) buffer.writeln('\n--- PAGE ${i + 1} ---\n');
+            buffer.writeln(pageText);
+          }
+        } finally {
+          if (await file.exists()) {
+            await file.delete();
+          }
+        }
+      }
+    } finally {
+      await recognizer.close();
+    }
+    return buffer.toString().trim();
+  }
+
+  Future<ExtractedInvoiceData> extractFromOcrText(String ocrText) async {
+    if (ocrText.trim().isEmpty) {
+      throw Exception('No readable text found in the selected document.');
     }
 
     final grokKey = ((await StorageService.instance.getGrokApiKey()) ?? '').trim();
@@ -90,12 +124,11 @@ Rules:
       throw Exception('Please configure at least one API key (Grok or Gemini) in API Keys settings.');
     }
 
-    final base64Pages = imageBytesList.map((b) => base64Encode(b)).toList();
     String? primaryError;
 
     if (grokKey.isNotEmpty) {
       try {
-        return await _extractWithGrok(grokKey, base64Pages, mimeType);
+        return await _extractTextWithGrok(grokKey, ocrText);
       } catch (e) {
         primaryError = e.toString();
       }
@@ -105,7 +138,7 @@ Rules:
 
     if (geminiKey.isNotEmpty) {
       try {
-        return await _extractWithGemini(geminiKey, base64Pages, mimeType);
+        return await _extractTextWithGemini(geminiKey, ocrText);
       } catch (e) {
         throw Exception('Both models failed.\n• Grok: $primaryError\n• Gemini: $e');
       }
@@ -114,16 +147,7 @@ Rules:
     throw Exception('Grok extraction failed: $primaryError');
   }
 
-  Future<ExtractedInvoiceData> _extractWithGrok(String apiKey, List<String> base64Pages, String mimeType) async {
-    final contentParts = <Map<String, dynamic>>[
-      {'type': 'text', 'text': _extractionPrompt.trim()},
-      for (final b64 in base64Pages)
-        {
-          'type': 'image_url',
-          'image_url': {'url': 'data:$mimeType;base64,$b64'},
-        },
-    ];
-
+  Future<ExtractedInvoiceData> _extractTextWithGrok(String apiKey, String ocrText) async {
     final res = await http
         .post(
           Uri.parse(_grokEndpoint),
@@ -136,11 +160,14 @@ Rules:
             'temperature': 0.0,
             'response_format': {'type': 'json_object'},
             'messages': [
-              {'role': 'user', 'content': contentParts},
+              {
+                'role': 'user',
+                'content': '${_extractionPrompt.trim()}\n\nOCR TEXT:\n$ocrText',
+              },
             ],
           }),
         )
-        .timeout(const Duration(seconds: 90));
+        .timeout(const Duration(seconds: 60));
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('HTTP ${res.statusCode}: ${res.body}');
@@ -155,18 +182,7 @@ Rules:
     return _parseInvoiceJson(content, 'Grok ($_grokModel)');
   }
 
-  Future<ExtractedInvoiceData> _extractWithGemini(String apiKey, List<String> base64Pages, String mimeType) async {
-    final parts = <Map<String, dynamic>>[
-      {'text': _extractionPrompt.trim()},
-      for (final b64 in base64Pages)
-        {
-          'inline_data': {
-            'mime_type': mimeType,
-            'data': b64,
-          },
-        },
-    ];
-
+  Future<ExtractedInvoiceData> _extractTextWithGemini(String apiKey, String ocrText) async {
     final url = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/$_geminiModel:generateContent?key=$apiKey',
     );
@@ -176,7 +192,11 @@ Rules:
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'contents': [
-              {'parts': parts},
+              {
+                'parts': [
+                  {'text': '${_extractionPrompt.trim()}\n\nOCR TEXT:\n$ocrText'},
+                ],
+              },
             ],
             'generationConfig': {
               'temperature': 0.0,
@@ -184,19 +204,38 @@ Rules:
             },
           }),
         )
-        .timeout(const Duration(seconds: 90));
+        .timeout(const Duration(seconds: 60));
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('HTTP ${res.statusCode}: ${res.body}');
     }
 
     final root = jsonDecode(res.body) as Map<String, dynamic>;
-    final candidates = root['candidates'] as List<dynamic>?;
+    final candidates = root['candidates']?.jsonArrayOrNull ?? root['candidates'] as List<dynamic>?;
     if (candidates == null || candidates.isEmpty) {
       throw Exception('Gemini response missing candidates.');
     }
     final text = (candidates.first as Map<String, dynamic>)['content']?['parts']?[0]?['text']?.toString() ?? '';
     return _parseInvoiceJson(text, 'Gemini ($_geminiModel)');
+  }
+
+  DateTime? _parseInvoiceDate(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return null;
+    final iso = DateTime.tryParse(s);
+    if (iso != null) return iso;
+    // Try DD/MM/YYYY or DD-MM-YYYY
+    final m = RegExp(r'^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})$').firstMatch(s);
+    if (m != null) {
+      final d = int.parse(m.group(1)!);
+      final mo = int.parse(m.group(2)!);
+      var y = int.parse(m.group(3)!);
+      if (y < 100) y += 2000;
+      if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+        return DateTime(y, mo, d);
+      }
+    }
+    return null;
   }
 
   ExtractedInvoiceData _parseInvoiceJson(String raw, String provider) {
@@ -224,9 +263,14 @@ Rules:
     return ExtractedInvoiceData(
       dealerName: (map['dealer_name'] ?? '').toString().trim(),
       billNumber: (map['bill_number'] ?? '').toString().trim(),
+      invoiceDate: _parseInvoiceDate((map['invoice_date'] ?? '').toString()),
       currency: (map['currency'] ?? '').toString().trim(),
       items: items,
       usedProvider: provider,
     );
   }
+}
+
+extension on Object? {
+  List<dynamic>? get jsonArrayOrNull => this is List<dynamic> ? this as List<dynamic> : null;
 }

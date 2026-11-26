@@ -23,3 +23,7 @@
 
 # Preserve attributes
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+# ML Kit Text Recognition (unused optional script classes)
+-dontwarn com.google.mlkit.vision.text.**
+-keep class com.google.mlkit.vision.text.** { *; }

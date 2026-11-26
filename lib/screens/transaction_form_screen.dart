@@ -6055,9 +6055,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                   final recipient = entry.value;
                                   final isPersonal = recipient.isPersonal;
 
-                                  final rowWidget = Container(
-                                    margin: const EdgeInsets.symmetric(vertical: 3),
-                                    height: 44,
+                                  final rowWidget = SizedBox(
+                                    height: 46,
                                     child: Row(
                                       children: [
                                         Expanded(

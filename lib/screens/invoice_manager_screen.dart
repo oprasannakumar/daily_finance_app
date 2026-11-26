@@ -9,6 +9,7 @@ import '../models/invoice_model.dart';
 import '../services/google_sheets_service.dart';
 import '../services/invoice_extractor_service.dart';
 import '../services/storage_service.dart';
+import '../widgets/popup_select_field.dart';
 import '../widgets/swipe_to_delete_wrapper.dart';
 
 class InvoiceManagerScreen extends StatefulWidget {
@@ -483,11 +484,16 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
     setState(() {
       _extractedPreviewPages = pages;
-      _extractionStatus = 'Extracting bill no, dealer & items with AI...';
+      _extractionStatus = 'Running on-device OCR...';
     });
 
     try {
-      final extracted = await InvoiceExtractorService.instance.extractFromImages(pages, mimeType: mimeType);
+      final ocrText = await InvoiceExtractorService.instance.extractOcrText(pages);
+      if (!mounted) return;
+      setState(() {
+        _extractionStatus = 'Extracting bill no, date, dealer & items...';
+      });
+      final extracted = await InvoiceExtractorService.instance.extractFromOcrText(ocrText);
       if (!mounted) return;
       setState(() {
         _isExtracting = false;
@@ -518,7 +524,11 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       final billNoCtrl = TextEditingController(
         text: extracted.billNumber.isNotEmpty ? extracted.billNumber : _billNoController.text.trim(),
       );
-      final recipientOptions = <String>{'Self', ..._knownRecipients}.toList();
+      DateTime mappedDate = extracted.invoiceDate ?? _selectedDate;
+      final recipientOptions = <String>{
+        'Self',
+        ..._knownRecipients.where((r) => r.trim().isNotEmpty && r != 'Split'),
+      }.toList();
       final assignments = List<String>.filled(extracted.items.length, 'Self');
 
       final apply = await showDialog<bool>(
@@ -550,13 +560,49 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
-                    controller: billNoCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Invoice / Bill No',
-                      isDense: true,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: TextField(
+                          controller: billNoCtrl,
+                          decoration: InputDecoration(
+                            labelText: 'Invoice / Bill No',
+                            isDense: true,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: ctx,
+                              initialDate: mappedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2035),
+                            );
+                            if (picked != null) {
+                              setDlgState(() => mappedDate = picked);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Date',
+                              isDense: true,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: Text(
+                              DateFormat('dd-MMM-yy').format(mappedDate),
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -635,23 +681,13 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                               const SizedBox(width: 8),
                               SizedBox(
                                 width: 112,
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: assignments[idx],
-                                  isExpanded: true,
-                                  decoration: InputDecoration(
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                  items: recipientOptions
-                                      .map((r) => DropdownMenuItem(
-                                            value: r,
-                                            child: Text(r, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
-                                          ))
-                                      .toList(),
-                                  onChanged: (val) {
-                                    if (val != null) setDlgState(() => assignments[idx] = val);
-                                  },
+                                child: PopupSelectField(
+                                  key: ValueKey('map_item_${idx}_${assignments[idx]}'),
+                                  label: 'Assign To',
+                                  placeholder: 'Self',
+                                  items: recipientOptions,
+                                  selectedValue: assignments[idx],
+                                  onSelected: (val) => setDlgState(() => assignments[idx] = val),
                                 ),
                               ),
                             ],
@@ -689,6 +725,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
         }
 
         setState(() {
+          _selectedDate = mappedDate;
           if (billNoCtrl.text.trim().isNotEmpty) {
             _billNoController.text = billNoCtrl.text.trim();
           }
