@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/transaction_model.dart';
 import 'calculator_keyboard_sheet.dart';
 import 'popup_select_field.dart';
+import 'swipe_to_delete_wrapper.dart';
 
 class PaymentBreakdownCard extends StatefulWidget {
   final int index;
@@ -153,42 +154,18 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
         ? (isCash ? const Color(0xFF00E5BE) : const Color(0xFFF1F5F9))
         : (isCash ? const Color(0xFF0F766E) : const Color(0xFF1E293B));
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Dismissible(
-          key: ValueKey(widget.breakdown.id),
-          direction: widget.isOnlyMode
-              ? DismissDirection.none // Always keep at least 1 payment mode!
-              : DismissDirection.endToStart, // Swipe right-to-left ONLY
-          background: Container(
-            padding: const EdgeInsets.only(right: 18),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEF4444),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            alignment: Alignment.centerRight,
-            child: const Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 22),
-          ),
-          onDismissed: (_) => widget.onDelete(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (!widget.isOnlyMode)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6, bottom: 2),
-                  child: Text(
-                    '← Swipe to delete',
-                    style: TextStyle(fontSize: 9.5, color: Colors.grey.shade500),
-                  ),
-                ),
-              Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Exact matching 46px height row for Type, Account, and Amount
+    return SwipeToDeleteWrapper(
+      key: ValueKey(widget.breakdown.id),
+      enabled: !widget.isOnlyMode,
+      borderRadius: BorderRadius.circular(10),
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      onDelete: widget.onDelete,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+              // Exact matching 44px height row for Type, Account, and Amount
               SizedBox(
-                height: 46,
+                height: 44,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -246,10 +223,10 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                     const SizedBox(width: 6),
                   ],
 
-                  // Amount block (Matching exact 46px height, identical to Type and Account)
+                  // Amount block (Matching exact 44px height, identical to Type and Account)
                   SizedBox(
                     width: isCash ? 100 : 92,
-                    height: 46,
+                    height: 44,
                     child: InkWell(
                       onTap: isCash ? null : _openCalculator,
                       borderRadius: BorderRadius.circular(12),
@@ -258,8 +235,8 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                           isDense: true,
                           filled: true,
                           fillColor: amtFillColor,
-                          constraints: const BoxConstraints(minHeight: 46, maxHeight: 46),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                          constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(color: amtBorderColor, width: 1.2),
@@ -513,10 +490,6 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
             ],
           ],
         ),
-            ],
-          ),
-      ),
-    ),
-  );
-}
+    );
+  }
 }

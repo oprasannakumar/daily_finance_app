@@ -21,6 +21,7 @@ import '../widgets/calculator_keyboard_sheet.dart';
 import '../widgets/batch_review_sheet.dart';
 import '../widgets/theme_action_emojis.dart';
 import '../widgets/theme_toggle_button.dart';
+import '../widgets/swipe_to_delete_wrapper.dart';
 import '../theme/app_theme_colors.dart';
 import 'transaction_history_screen.dart';
 import 'manage_details_screen.dart';
@@ -2640,17 +2641,36 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
       }
 
       if ((_totalFromAmount - _totalToAmount).abs() > 0.05) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Transfer mismatch! "From" total (₹${IndianCurrency.format(_totalFromAmount)}) must equal "To" total (₹${IndianCurrency.format(_totalToAmount)})',
-              textAlign: TextAlign.center,
+        final diff = (_totalFromAmount - _totalToAmount).abs();
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (dlgCtx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 24),
+                SizedBox(width: 8),
+                Text('Amount Mismatch', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              ],
             ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
+            content: Text(
+              'From total (₹${IndianCurrency.format(_totalFromAmount)}) and To total (₹${IndianCurrency.format(_totalToAmount)}) differ by ₹${IndianCurrency.format(diff)}.\n\nDo you want to proceed and save anyway?',
+              style: const TextStyle(fontSize: 13.5, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dlgCtx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFF59E0B)),
+                onPressed: () => Navigator.of(dlgCtx).pop(true),
+                child: const Text('Proceed'),
+              ),
+            ],
           ),
         );
-        return;
+        if (proceed != true || !mounted) return;
       }
 
       final isUpdate = _editingTransactionId != null;
@@ -3461,35 +3481,35 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                           final r = currentDue[idx];
                           final isDue = !r.nextDueDate.isAfter(endOfToday);
 
-                          return Dismissible(
-                            key: ValueKey('recurring_${r.id}'),
-                            direction: DismissDirection.horizontal,
-                            background: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 4),
-                              padding: const EdgeInsets.only(left: 16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0F766E),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              alignment: Alignment.centerLeft,
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.edit_note_rounded, color: Colors.white, size: 22),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'Edit Recurrence',
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Dismissible(
+                                key: ValueKey('recurring_${r.id}'),
+                                direction: DismissDirection.horizontal,
+                                background: Container(
+                                  padding: const EdgeInsets.only(left: 16),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF0F766E),
                                   ),
-                                ],
-                              ),
-                            ),
-                            secondaryBackground: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 4),
-                              padding: const EdgeInsets.only(right: 16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEF4444),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                                  alignment: Alignment.centerLeft,
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.edit_note_rounded, color: Colors.white, size: 22),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Edit Recurrence',
+                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                secondaryBackground: Container(
+                                  padding: const EdgeInsets.only(right: 16),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFEF4444),
+                                  ),
                               alignment: Alignment.centerRight,
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
@@ -3622,6 +3642,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                     ),
                                   ],
                                 ),
+                              ),
+                            ),
                               ),
                             ),
                           );
@@ -5701,6 +5723,17 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                   ),
                                 ],
                               ),
+                              if (_breakdowns.length > 1)
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 2, right: 4),
+                                    child: Text(
+                                      '← Swipe to delete',
+                                      style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                                    ),
+                                  ),
+                                ),
                               const SizedBox(height: 6),
                               ..._breakdowns.asMap().entries.map((entry) {
                                 final index = entry.key;
@@ -5748,6 +5781,17 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                   ),
                                 ],
                               ),
+                              if (_toBreakdowns.length > 1)
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 2, right: 4),
+                                    child: Text(
+                                      '← Swipe to delete',
+                                      style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                                    ),
+                                  ),
+                                ),
                               const SizedBox(height: 6),
                               ..._toBreakdowns.asMap().entries.map((entry) {
                                 final index = entry.key;
@@ -5940,16 +5984,18 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                             height: 44,
                                             child: TextFormField(
                                               controller: _customPurposeController,
+                                              textAlignVertical: TextAlignVertical.center,
                                               style: TextStyle(fontSize: 13, color: textPrimary),
                                               decoration: InputDecoration(
                                                 hintText: 'Enter Purpose',
                                                 isDense: true,
-                                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                                constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                                 filled: true,
                                                 fillColor: inputBg,
-                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                                 enabledBorder: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(10),
+                                                  borderRadius: BorderRadius.circular(12),
                                                   borderSide: BorderSide(color: inputBorder, width: 1.2),
                                                 ),
                                               ),
@@ -5994,23 +6040,25 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                             height: 44,
                                             child: TextFormField(
                                               controller: _customSpentForController,
+                                              textAlignVertical: TextAlignVertical.center,
                                               style: TextStyle(fontSize: 13, color: textPrimary),
                                               decoration: InputDecoration(
                                                 hintText: 'Name / Contact',
                                                 isDense: true,
-                                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                                constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                                 filled: true,
                                                 fillColor: inputBg,
-                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                                 enabledBorder: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(10),
+                                                  borderRadius: BorderRadius.circular(12),
                                                   borderSide: BorderSide(color: inputBorder, width: 1.2),
                                                 ),
-                                                suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                                suffixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 44),
                                                 suffixIcon: IconButton(
                                                   icon: const Icon(Icons.contacts_rounded, size: 18, color: cyanAccent),
                                                   padding: EdgeInsets.zero,
-                                                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                                  constraints: const BoxConstraints(minWidth: 38, minHeight: 44),
                                                   tooltip: 'Pick Contact',
                                                   onPressed: _pickContactForSpentFor,
                                                 ),
@@ -6051,6 +6099,17 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                   ),
                                 ],
                               ),
+                              if (_breakdowns.length > 1)
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 2, right: 4),
+                                    child: Text(
+                                      '← Swipe to delete',
+                                      style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                                    ),
+                                  ),
+                                ),
                               const SizedBox(height: 6),
                               ..._breakdowns.asMap().entries.map((entry) {
                                 final index = entry.key;
@@ -6277,26 +6336,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                     ),
                                   );
 
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 3),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: Dismissible(
-                                        key: ValueKey('split_dismiss_${recipient.id}'),
-                                        direction: DismissDirection.endToStart,
-                                        background: Container(
-                                          padding: const EdgeInsets.only(right: 16),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFEF4444),
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          alignment: Alignment.centerRight,
-                                          child: const Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 22),
-                                        ),
-                                        onDismissed: (_) => _removeSplitRecipient(idx),
-                                        child: rowWidget,
-                                      ),
-                                    ),
+                                  return SwipeToDeleteWrapper(
+                                    key: ValueKey('split_dismiss_${recipient.id}'),
+                                    borderRadius: BorderRadius.circular(10),
+                                    margin: const EdgeInsets.symmetric(vertical: 3),
+                                    onDelete: () => _removeSplitRecipient(idx),
+                                    child: rowWidget,
                                   );
                                 }),
                               ],
@@ -6850,10 +6895,15 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                     maxLength: 4,
                     keyboardType: TextInputType.number,
                     obscureText: !showPin,
+                    textAlignVertical: TextAlignVertical.center,
                     decoration: InputDecoration(
                       hintText: 'Enter 4-digit PIN',
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       border: const OutlineInputBorder(),
+                      suffixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                       suffixIcon: IconButton(
+                        padding: EdgeInsets.zero,
                         icon: Icon(
                           showPin ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                           size: 20,

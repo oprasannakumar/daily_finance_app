@@ -24,6 +24,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   static const String _prefKeyIsRight = 'quick_switch_edge_pill_right';
   static const String _prefKeyTransparency = 'quick_switch_edge_pill_transparency';
   static const String _prefKeyAutoHide = 'quick_switch_trackball_autohide';
+  static const String _prefKeyOrder = 'quick_switch_dock_order';
 
   static const double _pillWidth = 22.0;
   static const double _pillHeight = 76.0;
@@ -45,6 +46,26 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
   bool _isRightEdge = true;
   bool _isDragging = false;
   bool _isDockOpen = false;
+  bool _isHoldSelecting = false;
+  int? _hoveredDockIndex;
+
+  List<String> _orderedLabels = _dockItems.map((e) => e['label'] as String).toList();
+  final Map<int, GlobalKey> _dockItemKeys = {};
+
+  List<Map<String, dynamic>> get _orderedDockItems {
+    final byLabel = {for (final item in _dockItems) item['label'] as String: item};
+    final result = <Map<String, dynamic>>[];
+    for (final label in _orderedLabels) {
+      final item = byLabel[label];
+      if (item != null) result.add(item);
+    }
+    for (final item in _dockItems) {
+      if (!result.any((r) => r['label'] == item['label'])) {
+        result.add(item);
+      }
+    }
+    return result;
+  }
 
   // Customization state: higher transparency => lower opacity
   double _transparency = 0.55;
@@ -80,6 +101,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
       final isRight = prefs.getBool(_prefKeyIsRight);
       final trans = prefs.getDouble(_prefKeyTransparency);
       final autoHide = prefs.getBool(_prefKeyAutoHide);
+      final order = prefs.getStringList(_prefKeyOrder);
 
       if (!mounted) return;
       setState(() {
@@ -87,6 +109,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
         if (isRight != null) _isRightEdge = isRight;
         if (trans != null) _transparency = trans.clamp(0.10, 0.90);
         if (autoHide != null) _autoHide = autoHide;
+        if (order != null && order.isNotEmpty) _orderedLabels = order;
       });
       _resetIdleTimer();
     } catch (_) {}
@@ -106,7 +129,32 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
       await prefs.setDouble(_prefKeyTransparency, _transparency);
       await prefs.setBool(_prefKeyAutoHide, _autoHide);
       await prefs.setBool(_prefKeyIsRight, _isRightEdge);
+      await prefs.setStringList(_prefKeyOrder, _orderedLabels);
     } catch (_) {}
+  }
+
+  void _updateHoveredDockIndex(Offset globalPos) {
+    final items = _orderedDockItems;
+    int? hit;
+    for (int i = 0; i < items.length; i++) {
+      final key = _dockItemKeys[i];
+      final ctx = key?.currentContext;
+      if (ctx == null) continue;
+      final ro = ctx.findRenderObject();
+      if (ro is RenderBox && ro.hasSize) {
+        final topLeft = ro.localToGlobal(Offset.zero);
+        if (globalPos.dy >= topLeft.dy && globalPos.dy <= topLeft.dy + ro.size.height) {
+          hit = i;
+          break;
+        }
+      }
+    }
+    if (hit != _hoveredDockIndex) {
+      if (hit != null) {
+        HapticFeedback.selectionClick();
+      }
+      setState(() => _hoveredDockIndex = hit);
+    }
   }
 
   void _resetIdleTimer() {
@@ -360,8 +408,80 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                     ),
                   ),
                   const SizedBox(height: 10),
+                  // Reorder Menu Items
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                    decoration: BoxDecoration(
+                      color: tileBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: tileBorder),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Reorder Side Pill Menu',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textPrimary),
+                        ),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          height: 180,
+                          child: ReorderableListView.builder(
+                            buildDefaultDragHandles: false,
+                            proxyDecorator: (child, index, animation) => Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                              elevation: 4,
+                              child: child,
+                            ),
+                            itemCount: _orderedDockItems.length,
+                            onReorderItem: (oldIndex, newIndex) {
+                              final items = _orderedDockItems.map((e) => e['label'] as String).toList();
+                              final moved = items.removeAt(oldIndex);
+                              items.insert(newIndex, moved);
+                              setSheetState(() => _orderedLabels = items);
+                              setState(() => _orderedLabels = items);
+                              unawaited(_saveCustomization());
+                            },
+                            itemBuilder: (ctx, i) {
+                              final item = _orderedDockItems[i];
+                              final lbl = item['label'] as String;
+                              final emj = item['emoji'] as String;
+                              return Container(
+                                key: ValueKey('dock_order_$lbl'),
+                                margin: const EdgeInsets.symmetric(vertical: 2),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF151932) : Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: tileBorder),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(emj, style: const TextStyle(fontSize: 15)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        lbl,
+                                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: textPrimary),
+                                      ),
+                                    ),
+                                    ReorderableDragStartListener(
+                                      index: i,
+                                      child: Icon(Icons.drag_handle_rounded, size: 18, color: textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   Text(
-                    'Tip: Tap or swipe inward on the side pill to open the sidebar • Hold & drag up/down to move',
+                    'Tip: Tap or swipe inward to open • Hold & slide on the pill to quick-pick a screen',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 11, color: textSecondary),
                   ),
@@ -437,53 +557,62 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                     child: SingleChildScrollView(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        children: _dockItems.map((item) {
+                        children: _orderedDockItems.asMap().entries.map((entry) {
+                          final idx = entry.key;
+                          final item = entry.value;
                           final label = item['label'] as String;
                           final emoji = item['emoji'] as String;
                           final color = item['color'] as Color;
                           final isActive = controller.currentScreen == label;
+                          final isHovered = _isHoldSelecting && _hoveredDockIndex == idx;
+                          final itemKey = _dockItemKeys.putIfAbsent(idx, () => GlobalKey());
                           return Padding(
+                            key: itemKey,
                             padding: const EdgeInsets.only(bottom: 10),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(14),
                               onTap: () => _navigateTo(label),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 46,
-                                    height: 46,
-                                    decoration: BoxDecoration(
-                                      color: isActive ? accent : tileBg,
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
-                                        color: isActive ? Colors.white : color.withValues(alpha: 0.35),
-                                        width: isActive ? 1.6 : 1.0,
+                              child: AnimatedScale(
+                                scale: isHovered ? 1.12 : 1.0,
+                                duration: const Duration(milliseconds: 90),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 46,
+                                      height: 46,
+                                      decoration: BoxDecoration(
+                                        color: (isActive || isHovered) ? accent : tileBg,
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: (isActive || isHovered) ? Colors.white : color.withValues(alpha: 0.35),
+                                          width: (isActive || isHovered) ? 1.8 : 1.0,
+                                        ),
                                       ),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        emoji,
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          decoration: TextDecoration.none,
+                                      child: Center(
+                                        child: Text(
+                                          emoji,
+                                          style: const TextStyle(
+                                            fontSize: 20,
+                                            decoration: TextDecoration.none,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    label,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
-                                      color: isActive ? accent : textPrimary,
-                                      decoration: TextDecoration.none,
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: (isActive || isHovered) ? FontWeight.bold : FontWeight.w600,
+                                        color: (isActive || isHovered) ? accent : textPrimary,
+                                        decoration: TextDecoration.none,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           );
@@ -576,16 +705,17 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                   ),
                   _buildSideDock(context, controller, screenSize, padding, isDark, accent),
                 ],
-                if (!_isDockOpen)
-                  Positioned(
-                    right: _isRightEdge ? 0 : null,
-                    left: _isRightEdge ? null : 0,
-                    top: effectiveTop,
+                Positioned(
+                  right: _isRightEdge ? 0 : null,
+                  left: _isRightEdge ? null : 0,
+                  top: effectiveTop,
+                  child: IgnorePointer(
+                    ignoring: _isDockOpen && !_isHoldSelecting,
                     child: Material(
                       color: Colors.transparent,
                       child: AnimatedOpacity(
-                        opacity: displayOpacity,
-                        duration: const Duration(milliseconds: 220),
+                        opacity: _isDockOpen ? 0.0 : displayOpacity,
+                        duration: const Duration(milliseconds: 180),
                         child: GestureDetector(
                           key: const Key('quick_switch_trackball'),
                           onTap: () {
@@ -593,9 +723,43 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                             HapticFeedback.selectionClick();
                             setState(() => _isDockOpen = true);
                           },
-                          onLongPress: () {
+                          onLongPressStart: (details) {
+                            _resetIdleTimer();
                             HapticFeedback.mediumImpact();
-                            _openCustomizeSheet();
+                            setState(() {
+                              _isDockOpen = true;
+                              _isHoldSelecting = true;
+                            });
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted && _isHoldSelecting) {
+                                _updateHoveredDockIndex(details.globalPosition);
+                              }
+                            });
+                          },
+                          onLongPressMoveUpdate: (details) {
+                            if (_isHoldSelecting) {
+                              _updateHoveredDockIndex(details.globalPosition);
+                            }
+                          },
+                          onLongPressEnd: (_) {
+                            final chosen = _hoveredDockIndex;
+                            final items = _orderedDockItems;
+                            setState(() {
+                              _isHoldSelecting = false;
+                              _hoveredDockIndex = null;
+                            });
+                            if (chosen != null && chosen >= 0 && chosen < items.length) {
+                              _navigateTo(items[chosen]['label'] as String);
+                            } else {
+                              setState(() => _isDockOpen = false);
+                            }
+                            _resetIdleTimer();
+                          },
+                          onLongPressCancel: () {
+                            setState(() {
+                              _isHoldSelecting = false;
+                              _hoveredDockIndex = null;
+                            });
                           },
                           onPanStart: (details) {
                             _dragStartPos = details.globalPosition;
@@ -683,6 +847,7 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                       ),
                     ),
                   ),
+                ),
               ],
             );
           },

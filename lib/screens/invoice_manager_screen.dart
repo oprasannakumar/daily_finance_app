@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/invoice_model.dart';
 import '../services/google_sheets_service.dart';
 import '../services/storage_service.dart';
+import '../widgets/swipe_to_delete_wrapper.dart';
 
 class InvoiceManagerScreen extends StatefulWidget {
   final DateTime? initialDate;
@@ -1061,7 +1062,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
     final card = Card(
       elevation: 2,
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: isSelf ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: purple.withValues(alpha: 0.3)),
@@ -1125,14 +1126,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                     ),
                   ),
                 ),
-                if (!isSelf)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      '← Swipe to delete',
-                      style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-                    ),
-                  ),
               ],
             ),
           ),
@@ -1142,31 +1135,12 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
     if (isSelf) return card;
 
-    return Dismissible(
+    return SwipeToDeleteWrapper(
       key: ValueKey('recipient_${group.recipient}_${group.hashCode}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        decoration: BoxDecoration(
-          color: Colors.red.shade400,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Icon(Icons.delete_outline, color: Colors.white, size: 24),
-            SizedBox(width: 8),
-            Text(
-              'Delete Borrower',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-          ],
-        ),
-      ),
-      confirmDismiss: (dir) async {
-        return await showDialog<bool>(
+      borderRadius: BorderRadius.circular(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      confirmDelete: () async {
+        final res = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Delete Borrower Group'),
@@ -1181,8 +1155,9 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
             ],
           ),
         );
+        return res ?? false;
       },
-      onDismissed: (_) => _removeRecipientGroup(group),
+      onDelete: () => _removeRecipientGroup(group),
       child: card,
     );
   }
@@ -1193,7 +1168,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     final primaryColor = isDark ? const Color(0xFFA78BFA) : const Color(0xFFFF7A5C);
 
     final itemWidget = Container(
-      margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: bgInput,
@@ -1295,29 +1269,11 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       ),
     );
 
-    return Dismissible(
+    return SwipeToDeleteWrapper(
       key: ValueKey('item_${group.recipient}_${item.hashCode}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        decoration: BoxDecoration(
-          color: Colors.red.shade400,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Icon(Icons.delete_outline, color: Colors.white, size: 20),
-            SizedBox(width: 6),
-            Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-          ],
-        ),
-      ),
-      onDismissed: (_) {
-        _removeItemFromRecipient(group, index);
-      },
+      borderRadius: BorderRadius.circular(12),
+      margin: const EdgeInsets.only(bottom: 10),
+      onDelete: () => _removeItemFromRecipient(group, index),
       child: itemWidget,
     );
   }

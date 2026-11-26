@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/storage_service.dart';
 import '../models/transaction_model.dart';
 import '../utils/currency_formatter.dart';
+import '../widgets/swipe_to_delete_wrapper.dart';
 
 class ManageDetailsScreen extends StatefulWidget {
   final String? initialCategory;
@@ -493,6 +494,16 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
     }
   }
 
+  Widget _roundedProxyDecorator(Widget child, int index, Animation<double> animation) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 6,
+      shadowColor: Colors.black26,
+      child: child,
+    );
+  }
+
   Widget _buildTemplatesList() {
     if (_templates.isEmpty) {
       return Center(
@@ -527,6 +538,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
         Expanded(
           child: ReorderableListView.builder(
             buildDefaultDragHandles: false,
+            proxyDecorator: _roundedProxyDecorator,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             itemCount: _templates.length,
             onReorderItem: (int oldIndex, int newIndex) async {
@@ -538,10 +550,12 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
             itemBuilder: (context, index) {
         final t = _templates[index];
 
-        return Container(
+        return Padding(
           key: ValueKey('template_box_${t.id}'),
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          child: Dismissible(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Dismissible(
             key: ValueKey('template_dismiss_${t.id}'),
             direction: DismissDirection.horizontal,
             background: Container(
@@ -638,6 +652,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
               ),
             ),
           ),
+          ),
         );
     },
   ),
@@ -688,6 +703,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
         Expanded(
           child: ReorderableListView.builder(
             buildDefaultDragHandles: false,
+            proxyDecorator: _roundedProxyDecorator,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             itemCount: _recurring.length,
             onReorderItem: (int oldIndex, int newIndex) async {
@@ -700,10 +716,12 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
         final r = _recurring[index];
         final isDue = !r.isPaused && !r.nextDueDate.isAfter(endOfToday);
 
-        return Container(
+        return Padding(
           key: ValueKey('recurring_box_${r.id}'),
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          child: Dismissible(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Dismissible(
             key: ValueKey('recurring_dismiss_${r.id}'),
             direction: DismissDirection.horizontal,
             background: Container(
@@ -856,6 +874,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
               ),
             ),
           ),
+          ),
         );
       },
     ),
@@ -899,6 +918,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
 
     return ReorderableListView.builder(
       buildDefaultDragHandles: false,
+      proxyDecorator: _roundedProxyDecorator,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       itemCount: items.length,
       onReorderItem: (int oldIndex, int newIndex) async {
@@ -944,22 +964,13 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
           );
         }
 
-        return Dismissible(
+        return SwipeToDeleteWrapper(
           key: ValueKey('${category}_$item'),
-          direction: _isEditMode ? DismissDirection.endToStart : DismissDirection.none,
-          background: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            padding: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEF4444),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.centerRight,
-            child: const Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 24),
-          ),
-          onDismissed: (_) => _onSwipeDelete(category, item),
+          enabled: _isEditMode,
+          borderRadius: BorderRadius.circular(12),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          onDelete: () => _onSwipeDelete(category, item),
           child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
@@ -1158,7 +1169,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
-                    physics: const NeverScrollableScrollPhysics(),
+                    physics: _isEditMode ? const NeverScrollableScrollPhysics() : null,
                     children: _categories.map((c) => _buildListForCategory(c)).toList(),
                   ),
                 ),

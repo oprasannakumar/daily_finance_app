@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:daily_finance_app/screens/transaction_form_screen.dart';
 import 'package:daily_finance_app/services/storage_service.dart';
 import 'package:daily_finance_app/widgets/popup_select_field.dart';
+import 'package:daily_finance_app/widgets/swipe_to_delete_wrapper.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +46,7 @@ void main() {
     // Verify My Share CAN be dismissed by swiping
     final myShareDismissible = find.ancestor(
       of: find.text('My Share (You)'),
-      matching: find.byType(Dismissible),
+      matching: find.byType(SwipeToDeleteWrapper),
     );
     expect(myShareDismissible, findsOneWidget);
     await tester.drag(myShareDismissible, const Offset(-500.0, 0.0));
@@ -109,7 +110,7 @@ void main() {
 
     // Dismiss the other recipient so split sum becomes 500 while total is 1000
     final dismissibleFinder = find.byWidgetPredicate(
-      (w) => w is Dismissible && w.key.toString().contains('split_dismiss'),
+      (w) => w is SwipeToDeleteWrapper && w.key.toString().contains('split_dismiss'),
     );
     expect(dismissibleFinder, findsNWidgets(2));
     await tester.drag(dismissibleFinder.last, const Offset(-500.0, 0.0));

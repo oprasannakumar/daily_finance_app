@@ -178,34 +178,45 @@ class DailyFinanceApp extends StatelessWidget {
             final mq = MediaQuery.of(context);
             final visibleHeight = (mq.size.height - mq.viewInsets.bottom).clamp(240.0, 2000.0);
             final centerBottomInset = (visibleHeight * 0.42).clamp(110.0, 460.0);
+            final isDarkTheme = Theme.of(context).brightness == Brightness.dark;
 
             return Theme(
               data: Theme.of(context).copyWith(
                 snackBarTheme: Theme.of(context).snackBarTheme.copyWith(
                   behavior: SnackBarBehavior.floating,
-                  insetPadding: EdgeInsets.fromLTRB(24, 16, 24, centerBottomInset),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  backgroundColor: isDarkTheme ? const Color(0xFF1E2547) : const Color(0xFF1E293B),
+                  contentTextStyle: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  insetPadding: EdgeInsets.fromLTRB(20, 16, 20, centerBottomInset),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
                 ),
               ),
-              child: Listener(
-                behavior: HitTestBehavior.translucent,
-                onPointerDown: (PointerDownEvent event) {
-                  final currentFocus = FocusManager.instance.primaryFocus;
-                  if (currentFocus != null && currentFocus.hasFocus) {
-                    final renderObject = currentFocus.context?.findRenderObject();
-                    if (renderObject is RenderBox && renderObject.hasSize) {
-                      final pos = renderObject.localToGlobal(Offset.zero);
-                      final bounds = pos & renderObject.size;
-                      if (!bounds.contains(event.position)) {
+              child: _DynamicSnackBarMessenger(
+                centerBottomInset: centerBottomInset,
+                isDark: isDarkTheme,
+                child: Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: (PointerDownEvent event) {
+                    final currentFocus = FocusManager.instance.primaryFocus;
+                    if (currentFocus != null && currentFocus.hasFocus) {
+                      final renderObject = currentFocus.context?.findRenderObject();
+                      if (renderObject is RenderBox && renderObject.hasSize) {
+                        final pos = renderObject.localToGlobal(Offset.zero);
+                        final bounds = pos & renderObject.size;
+                        if (!bounds.contains(event.position)) {
+                          currentFocus.unfocus();
+                        }
+                      } else {
                         currentFocus.unfocus();
                       }
-                    } else {
-                      currentFocus.unfocus();
                     }
-                  }
-                },
-                child: AppLockGate(
-                  child: QuickSwitchOverlay(child: child ?? const SizedBox.shrink()),
+                  },
+                  child: AppLockGate(
+                    child: QuickSwitchOverlay(child: child ?? const SizedBox.shrink()),
+                  ),
                 ),
               ),
             );
@@ -213,6 +224,93 @@ class DailyFinanceApp extends StatelessWidget {
           home: const TransactionFormScreen(),
         );
       },
+    );
+  }
+}
+
+class _DynamicSnackBarMessenger extends ScaffoldMessenger {
+  final double centerBottomInset;
+  final bool isDark;
+
+  const _DynamicSnackBarMessenger({
+    required this.centerBottomInset,
+    required this.isDark,
+    required super.child,
+  });
+
+  @override
+  ScaffoldMessengerState createState() => _DynamicSnackBarMessengerState();
+}
+
+class _DynamicSnackBarMessengerState extends ScaffoldMessengerState {
+  @override
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason> showSnackBar(
+    SnackBar snackBar, {
+    AnimationStyle? snackBarAnimationStyle,
+  }) {
+    final parent = widget as _DynamicSnackBarMessenger;
+    final bgColor = snackBar.backgroundColor ??
+        (parent.isDark ? const Color(0xFF1E2547) : const Color(0xFF1E293B));
+
+    final wrappedSnackBar = SnackBar(
+      key: snackBar.key,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      padding: EdgeInsets.zero,
+      margin: EdgeInsets.only(bottom: parent.centerBottomInset, left: 20, right: 20),
+      duration: snackBar.duration,
+      dismissDirection: snackBar.dismissDirection,
+      onVisible: snackBar.onVisible,
+      clipBehavior: Clip.none,
+      content: Center(
+        child: IntrinsicWidth(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.16),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: DefaultTextStyle(
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                    textAlign: TextAlign.center,
+                    child: snackBar.content,
+                  ),
+                ),
+                if (snackBar.action != null) ...[
+                  const SizedBox(width: 10),
+                  snackBar.action!,
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return super.showSnackBar(
+      wrappedSnackBar,
+      snackBarAnimationStyle: snackBarAnimationStyle,
     );
   }
 }
