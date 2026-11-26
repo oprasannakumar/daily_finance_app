@@ -1689,7 +1689,9 @@ class GoogleSheetsService {
 
     // Update in-memory session state immediately
     cachedTransactions ??= [];
-    cachedTransactions!.removeWhere((t) => t.id == tx.id || t.referenceId == tx.referenceId);
+    cachedTransactions!.removeWhere((t) =>
+        (tx.id.isNotEmpty && t.id == tx.id) ||
+        (tx.referenceId.isNotEmpty && t.referenceId == tx.referenceId));
     cachedTransactions!.insert(0, tx);
 
     try {

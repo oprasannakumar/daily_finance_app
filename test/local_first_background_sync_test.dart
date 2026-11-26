@@ -113,5 +113,46 @@ void main() {
       list = await storage.getTransactions();
       expect(list.any((t) => t.referenceId == 'REF-19112026-DEL1'), isFalse);
     });
+
+    test('saving new entry with empty id preserves all existing local transactions', () async {
+      final storage = StorageService.instance;
+      await storage.clearCachedTransactions();
+
+      final tx1 = FinanceTransaction(
+        id: '',
+        date: DateTime(2026, 11, 25),
+        referenceId: 'REF-25112026-OLD1',
+        narration: 'Existing Offline Tx',
+        flow: 'Withdraw',
+        invoice: '',
+        purpose: 'Food & Groceries',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(paymentType: 'UPI', account: 'SBI', amount: 250.0),
+        ],
+        totalAmount: 250.0,
+      );
+      await storage.saveTransaction(tx1);
+
+      final tx2 = FinanceTransaction(
+        id: '',
+        date: DateTime(2026, 11, 26),
+        referenceId: 'REF-26112026-NEW2',
+        narration: 'New Offline Tx',
+        flow: 'Withdraw',
+        invoice: '',
+        purpose: 'Shopping',
+        spentFor: 'Self',
+        breakdowns: [
+          PaymentBreakdown(paymentType: 'Cash', account: 'Cash', amount: 400.0),
+        ],
+        totalAmount: 400.0,
+      );
+      await storage.saveTransaction(tx2);
+
+      final list = await storage.getTransactions();
+      expect(list.any((t) => t.referenceId == 'REF-25112026-OLD1'), isTrue);
+      expect(list.any((t) => t.referenceId == 'REF-26112026-NEW2'), isTrue);
+    });
   });
 }

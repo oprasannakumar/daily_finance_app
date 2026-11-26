@@ -693,7 +693,9 @@ class StorageService {
     final merged = List<FinanceTransaction>.from(remoteList);
     final pendingSaves = await _getPendingSaves(prefs);
     for (final p in pendingSaves) {
-      merged.removeWhere((t) => t.id == p.id || t.referenceId == p.referenceId);
+      merged.removeWhere((t) =>
+          (p.id.isNotEmpty && t.id == p.id) ||
+          (p.referenceId.isNotEmpty && t.referenceId == p.referenceId));
       merged.insert(0, p);
     }
     final pendingDeletes = await _getPendingDeletes(prefs);
@@ -1127,7 +1129,9 @@ class StorageService {
 
     // Hydrate from SharedPreferences first if memory cache is cold so existing offline history is never wiped
     _cachedTransactions ??= _loadTransactionsFromPrefs(prefs) ?? [];
-    _cachedTransactions!.removeWhere((t) => t.id == transaction.id || t.referenceId == transaction.referenceId);
+    _cachedTransactions!.removeWhere((t) =>
+        (transaction.id.isNotEmpty && t.id == transaction.id) ||
+        (transaction.referenceId.isNotEmpty && t.referenceId == transaction.referenceId));
     _cachedTransactions!.insert(0, transaction);
     _cachedTransactions!.sort((a, b) => b.date.compareTo(a.date));
     GoogleSheetsService.instance.cachedTransactions =
@@ -1182,10 +1186,10 @@ class StorageService {
     // 1. Instant in-memory removal (< 1ms)
     _cachedTransactions ??= [];
     _cachedTransactions!.removeWhere((t) =>
-      t.id == tid ||
-      t.id == idOrReference ||
+      (tid.isNotEmpty && t.id == tid) ||
+      (idOrReference.isNotEmpty && t.id == idOrReference) ||
       (ref.isNotEmpty && t.referenceId == ref) ||
-      t.referenceId == idOrReference
+      (idOrReference.isNotEmpty && t.referenceId == idOrReference)
     );
     GoogleSheetsService.instance.cachedTransactions =
         List<FinanceTransaction>.from(_cachedTransactions!);
@@ -1239,7 +1243,9 @@ class StorageService {
 
   Future<void> _addPendingSave(SharedPreferences prefs, FinanceTransaction tx) async {
     final list = await _getPendingSaves(prefs);
-    list.removeWhere((t) => t.id == tx.id || t.referenceId == tx.referenceId);
+    list.removeWhere((t) =>
+        (tx.id.isNotEmpty && t.id == tx.id) ||
+        (tx.referenceId.isNotEmpty && t.referenceId == tx.referenceId));
     list.add(tx);
     final encoded = list.map((t) => jsonEncode(t.toJson())).toList();
     await prefs.setStringList(_keyPendingSaves, encoded);
@@ -1247,6 +1253,7 @@ class StorageService {
   }
 
   Future<void> _removePendingSave(String idOrRef) async {
+    if (idOrRef.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     final list = await _getPendingSaves(prefs);
     list.removeWhere((t) => t.id == idOrRef || t.referenceId == idOrRef);
