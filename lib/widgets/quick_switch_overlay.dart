@@ -312,52 +312,191 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
       builder: (sheetCtx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
+            String emojiForAction(String action) {
+              switch (action) {
+                case 'Quick Menu':
+                  return '⚡';
+                case 'Trackball Settings':
+                  return '🎛️';
+                case 'Entry ↔ History':
+                  return '🔄';
+                case 'Entry':
+                  return '✍️';
+                case 'History':
+                  return '📜';
+                case 'Balances':
+                  return '💰';
+                case 'EMIs':
+                  return '💳';
+                case 'Dashboard':
+                  return '📊';
+                case 'Borrowers':
+                  return '🤝';
+                case 'Invoices':
+                  return '🧾';
+                case 'Masters':
+                  return '⚙️';
+                case 'API Keys':
+                  return '🔑';
+                default:
+                  return '🚫';
+              }
+            }
+
+            Future<void> openActionPicker(
+              String title,
+              String currentValue,
+              ValueChanged<String> onChanged,
+            ) async {
+              final picked = await showDialog<String>(
+                context: sheetCtx,
+                builder: (dlgCtx) {
+                  return Dialog(
+                    backgroundColor: sheetBg,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(color: tileBorder, width: 1.2),
+                    ),
+                    insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.touch_app_rounded, size: 17, color: accent),
+                              const SizedBox(width: 8),
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: textPrimary,
+                                ),
+                              ),
+                              const Spacer(),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () => Navigator.of(dlgCtx).pop(),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: Icon(Icons.close_rounded, size: 18, color: textSecondary),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _actionOptions.map((opt) {
+                              final selected = opt == currentValue;
+                              return InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () => Navigator.of(dlgCtx).pop(opt),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: selected ? accent.withValues(alpha: 0.14) : tileBg,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: selected ? accent : tileBorder,
+                                      width: selected ? 1.4 : 1.0,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(emojiForAction(opt), style: const TextStyle(fontSize: 13)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        opt,
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: selected ? FontWeight.bold : FontWeight.w600,
+                                          color: selected ? accent : textPrimary,
+                                        ),
+                                      ),
+                                      if (selected) ...[
+                                        const SizedBox(width: 5),
+                                        Icon(Icons.check_circle_rounded, size: 14, color: accent),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+
+              if (picked != null && picked != currentValue) {
+                onChanged(picked);
+                setSheetState(() {});
+                setState(() {});
+                unawaited(_saveCustomization());
+              }
+            }
+
             Widget buildDropdownRow(
               String label,
               String value,
               ValueChanged<String> onChanged,
             ) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: tileBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: tileBorder),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: textPrimary,
-                      ),
-                    ),
-                    const Spacer(),
-                    DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: value,
-                        isDense: true,
-                        dropdownColor: sheetBg,
+              return InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => openActionPicker(label, value, onChanged),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: tileBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: tileBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        label,
                         style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.bold,
-                          color: accent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
                         ),
-                        items: _actionOptions
-                            .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
-                            .toList(),
-                        onChanged: (v) {
-                          if (v == null) return;
-                          onChanged(v);
-                          setSheetState(() {});
-                          setState(() {});
-                          unawaited(_saveCustomization());
-                        },
                       ),
-                    ),
-                  ],
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: accent.withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(emojiForAction(value), style: const TextStyle(fontSize: 12)),
+                            const SizedBox(width: 5),
+                            Text(
+                              value,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: accent,
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: accent),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }
