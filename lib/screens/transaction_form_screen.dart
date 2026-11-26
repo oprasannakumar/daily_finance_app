@@ -6177,6 +6177,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                     key: ValueKey('split_dismiss_${recipient.id}'),
                                     borderRadius: BorderRadius.circular(12),
                                     margin: const EdgeInsets.symmetric(vertical: 3),
+                                    backgroundBorder: Border.all(color: inputBorder, width: 1.2),
                                     onDelete: () => _removeSplitRecipient(idx),
                                     child: Container(
                                       decoration: BoxDecoration(

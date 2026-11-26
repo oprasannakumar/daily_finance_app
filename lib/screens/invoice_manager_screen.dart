@@ -349,6 +349,8 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
   bool _isLoading = false;
   bool _isSaving = false;
   bool _isExtracting = false;
+  String? _extractionStatus;
+  List<Uint8List> _extractedPreviewPages = [];
 
   final _currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
@@ -408,92 +410,89 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     return matching.isNotEmpty ? matching : _dealerPrices;
   }
 
-  Future<void> _extractFromInvoicePhoto() async {
-    final mode = await showModalBottomSheet<String>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            const Text('Extract Invoice Using AI', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            ListTile(
-              leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFFFF7A5C)),
-              title: const Text('Take Photo (Camera)'),
-              onTap: () => Navigator.pop(ctx, 'camera'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF4ECDC4)),
-              title: const Text('Choose Image from Gallery'),
-              onTap: () => Navigator.pop(ctx, 'gallery'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF8B5CF6)),
-              title: const Text('Choose PDF Document'),
-              onTap: () => Navigator.pop(ctx, 'pdf'),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-    if (mode == null) return;
-
+  Future<void> _extractFromSource(String mode) async {
     final pages = <Uint8List>[];
     String mimeType = 'image/jpeg';
 
-    if (mode == 'pdf') {
+    if (mode == 'doc') {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf'],
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
       );
       if (result.isEmpty || !mounted) return;
       final file = result.first;
-      final pdfBytes = file.path != null ? await File(file.path!).readAsBytes() : null;
-      if (pdfBytes == null || pdfBytes.isEmpty) return;
+      final fileBytes = file.path != null ? await File(file.path!).readAsBytes() : null;
+      if (fileBytes == null || fileBytes.isEmpty) return;
 
-      setState(() => _isExtracting = true);
-      try {
-        int count = 0;
-        await for (final raster in Printing.raster(pdfBytes, dpi: 150)) {
-          pages.add(await raster.toPng());
-          count++;
-          if (count >= 4) break;
+      final isPdf = (file.extension ?? '').toLowerCase() == 'pdf' ||
+          file.name.toLowerCase().endsWith('.pdf');
+
+      if (isPdf) {
+        setState(() {
+          _isExtracting = true;
+          _extractionStatus = 'Rendering PDF pages...';
+        });
+        try {
+          int count = 0;
+          await for (final raster in Printing.raster(fileBytes, dpi: 150)) {
+            pages.add(await raster.toPng());
+            count++;
+            if (count >= 5) break;
+          }
+          mimeType = 'image/png';
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _isExtracting = false;
+              _extractionStatus = null;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to read PDF: $e', textAlign: TextAlign.center)),
+            );
+          }
+          return;
         }
-        mimeType = 'image/png';
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isExtracting = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to read PDF: $e', textAlign: TextAlign.center)),
-          );
-        }
-        return;
+      } else {
+        setState(() {
+          _isExtracting = true;
+          _extractionStatus = 'Preparing image...';
+        });
+        pages.add(fileBytes);
       }
     } else {
       final picked = await ImagePicker().pickImage(
-        source: mode == 'camera' ? ImageSource.camera : ImageSource.gallery,
+        source: ImageSource.camera,
         imageQuality: 85,
-        maxWidth: 1800,
+        maxWidth: 1600,
       );
       if (picked == null || !mounted) return;
-      setState(() => _isExtracting = true);
+      setState(() {
+        _isExtracting = true;
+        _extractionStatus = 'Preparing camera photo...';
+      });
       pages.add(await picked.readAsBytes());
     }
 
     if (pages.isEmpty || !mounted) {
-      setState(() => _isExtracting = false);
+      setState(() {
+        _isExtracting = false;
+        _extractionStatus = null;
+      });
       return;
     }
+
+    setState(() {
+      _extractedPreviewPages = pages;
+      _extractionStatus = 'Extracting bill no, dealer & items with AI...';
+    });
 
     try {
       final extracted = await InvoiceExtractorService.instance.extractFromImages(pages, mimeType: mimeType);
       if (!mounted) return;
-      setState(() => _isExtracting = false);
+      setState(() {
+        _isExtracting = false;
+        _extractionStatus = null;
+      });
 
       if (extracted.items.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -721,7 +720,10 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       billNoCtrl.dispose();
     } catch (e) {
       if (mounted) {
-        setState(() => _isExtracting = false);
+        setState(() {
+          _isExtracting = false;
+          _extractionStatus = null;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Extraction failed: $e', textAlign: TextAlign.center),
@@ -1242,23 +1244,92 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // AI Invoice Extractor Button
-          OutlinedButton.icon(
-            onPressed: _isExtracting ? null : _extractFromInvoicePhoto,
-            icon: _isExtracting
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.document_scanner_rounded, size: 20),
-            label: Text(
-              _isExtracting ? 'Extracting Invoice...' : '📷 Extract from Bill Photo / PDF',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: primary,
-              side: BorderSide(color: primary.withValues(alpha: 0.6), width: 1.2),
-              padding: const EdgeInsets.symmetric(vertical: 11),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
+          // AI Invoice Extractor Bar (matching invoice-extractor-android: PDF / Image + Camera)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isExtracting ? null : () => _extractFromSource('doc'),
+                  icon: const Icon(Icons.upload_file_rounded, size: 18),
+                  label: const Text('PDF / Image', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: primary,
+                    side: BorderSide(color: primary.withValues(alpha: 0.6), width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isExtracting ? null : () => _extractFromSource('camera'),
+                  icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                  label: const Text('Camera', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: secondary,
+                    side: BorderSide(color: secondary.withValues(alpha: 0.7), width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
           ),
+          if (_isExtracting && _extractionStatus != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: primary.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: primary)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _extractionStatus!,
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (_extractedPreviewPages.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 68,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _extractedPreviewPages.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, idx) => Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(_extractedPreviewPages[idx], width: 54, height: 68, fit: BoxFit.cover),
+                    ),
+                    Positioned(
+                      bottom: 2,
+                      right: 2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text('P${idx + 1}', style: const TextStyle(color: Colors.white, fontSize: 9)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
 
           // Row 1: Date & Invoice No
