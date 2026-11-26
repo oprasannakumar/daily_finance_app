@@ -12,6 +12,7 @@ class SwipeToDeleteWrapper extends StatefulWidget {
   final BorderRadius borderRadius;
   final EdgeInsetsGeometry margin;
   final bool enabled;
+  final bool allowPartialReveal;
   final BoxBorder? border;
   final BoxBorder? backgroundBorder;
 
@@ -26,6 +27,7 @@ class SwipeToDeleteWrapper extends StatefulWidget {
     this.borderRadius = const BorderRadius.all(Radius.circular(14)),
     this.margin = EdgeInsets.zero,
     this.enabled = true,
+    this.allowPartialReveal = true,
     this.border,
     this.backgroundBorder,
   });
@@ -197,10 +199,12 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
                   },
                   onHorizontalDragEnd: (details) {
                     final vx = details.primaryVelocity ?? 0.0;
-                    if (_dragOffset <= -maxWidth * 0.35 || vx < -550) {
+                    if (_dragOffset <= -maxWidth * (widget.allowPartialReveal ? 0.35 : 0.25) ||
+                        vx < (widget.allowPartialReveal ? -550 : -350)) {
                       _animateTo(-maxWidth);
                       _triggerDelete();
-                    } else if (_dragOffset <= -36 || (vx < -200 && _dragOffset < 0)) {
+                    } else if (widget.allowPartialReveal &&
+                        (_dragOffset <= -36 || (vx < -200 && _dragOffset < 0))) {
                       _animateTo(-_revealWidth);
                     } else if (widget.onSwipeRight != null &&
                         (_dragOffset >= maxWidth * 0.35 || vx > 550)) {
@@ -213,6 +217,7 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
                       _animateTo(0.0);
                     }
                   },
+                  onHorizontalDragCancel: () => _animateTo(0.0),
                   child: Transform.translate(
                     offset: Offset(_dragOffset, 0),
                     child: widget.child,

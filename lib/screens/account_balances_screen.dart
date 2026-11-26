@@ -119,12 +119,20 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     }
   }
 
+  void _pruneControllers(Map<String, TextEditingController> map, List<String> activeKeys) {
+    final stale = map.keys.where((k) => !activeKeys.contains(k)).toList();
+    for (final k in stale) {
+      map.remove(k)?.dispose();
+    }
+  }
+
   void _populateControllers() {
-    // Clear old controllers or update them
+    // Clear stale controllers for deleted accounts
     final bankList = List<String>.from(_categories['Bank Accounts'] ?? []);
     for (final k in _config.bankOpeningBalances.keys) {
       if (!bankList.contains(k)) bankList.add(k);
     }
+    _pruneControllers(_bankControllers, bankList);
     for (final acc in bankList) {
       final val = _config.bankOpeningBalances[acc];
       final text = val != null && val > 0 ? val.toStringAsFixed(2) : '';
@@ -140,6 +148,13 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     for (final k in _config.creditCardLimits.keys) {
       if (!ccList.contains(k)) ccList.add(k);
     }
+    _pruneControllers(_ccTotalControllers, ccList);
+    _pruneControllers(_ccUsedControllers, ccList);
+    _pruneControllers(_ccGroupControllers, ccList);
+    _pruneControllers(_ccBillDayControllers, ccList);
+    _pruneControllers(_ccDueDayControllers, ccList);
+    _pruneControllers(_ccBilledAmountControllers, ccList);
+    _ccIsShared.removeWhere((k, _) => !ccList.contains(k));
     for (final card in ccList) {
       final ccLimit = _config.creditCardLimits[card];
       final totalText = ccLimit != null && ccLimit.totalLimit > 0 ? ccLimit.totalLimit.toStringAsFixed(2) : '';
@@ -206,6 +221,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     for (final k in _config.walletOpeningBalances.keys) {
       if (!walletList.contains(k)) walletList.add(k);
     }
+    _pruneControllers(_walletControllers, walletList);
     for (final w in walletList) {
       final val = _config.walletOpeningBalances[w];
       final text = val != null && val > 0 ? val.toStringAsFixed(2) : '';
@@ -221,6 +237,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     for (final k in _config.rewardOpeningBalances.keys) {
       if (!rewardList.contains(k)) rewardList.add(k);
     }
+    _pruneControllers(_rewardControllers, rewardList);
     for (final r in rewardList) {
       final val = _config.rewardOpeningBalances[r];
       final text = val != null && val > 0 ? val.toStringAsFixed(2) : '';
