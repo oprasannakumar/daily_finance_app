@@ -668,6 +668,7 @@ class _EmiConversionSheetState extends State<EmiConversionSheet> {
       );
 
       await GoogleSheetsService.instance.saveEmiPlan(plan);
+      await StorageService.instance.processDueEmiInstallments();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

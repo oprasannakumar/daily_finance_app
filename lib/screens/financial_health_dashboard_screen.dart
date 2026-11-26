@@ -766,7 +766,9 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Available: ₹${IndianCurrency.format(c.availableLimit)} of ₹${IndianCurrency.format(c.totalLimit)}',
+                          c.isShared
+                              ? 'Available: ₹${IndianCurrency.format(c.availableLimit)} of ₹${IndianCurrency.format(c.totalLimit)} • Card Used: ₹${IndianCurrency.format(c.usedLimit)}'
+                              : 'Available: ₹${IndianCurrency.format(c.availableLimit)} of ₹${IndianCurrency.format(c.totalLimit)}',
                           style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
                         ),
                       ],

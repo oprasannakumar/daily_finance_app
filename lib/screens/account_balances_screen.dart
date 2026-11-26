@@ -1235,6 +1235,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
               final usedLimit = isShared
                   ? (liveSummary?.groupTotalUsed ?? configLimit?.initialUsedAmount ?? 0.0)
                   : (liveSummary?.usedLimit ?? configLimit?.initialUsedAmount ?? 0.0);
+              final individualUsedLimit = liveSummary?.usedLimit ?? configLimit?.initialUsedAmount ?? 0.0;
 
               final available = liveSummary?.availableLimit ?? (totalLimit - usedLimit).clamp(0.0, double.infinity);
               final utilization = totalLimit > 0 ? (usedLimit / totalLimit).clamp(0.0, 1.0) : 0.0;
@@ -1370,7 +1371,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                           style: TextStyle(fontSize: 12, color: textSecondary, fontWeight: FontWeight.w600),
                         ),
                         Text(
-                          'Used: ₹${IndianCurrency.format(usedLimit)} (${(utilization * 100).toStringAsFixed(1)}%)',
+                          '${isShared ? "Group Used: " : "Used: "}₹${IndianCurrency.format(usedLimit)} (${(utilization * 100).toStringAsFixed(1)}%)',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -1381,6 +1382,30 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                         ),
                       ],
                     ),
+                    if (isShared) ...[
+                      const SizedBox(height: 5),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'This Card Used',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            '₹${IndianCurrency.format(individualUsedLimit)}${totalLimit > 0 ? ' (${((individualUsedLimit / totalLimit) * 100).clamp(0.0, 100.0).toStringAsFixed(1)}%)' : ''}',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF6366F1),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
 
                     // Billing & Due Cycle Info
                     if (billDay != null || dueDay != null || nextDue != null) ...[

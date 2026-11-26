@@ -63,7 +63,11 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
     });
 
     try {
-      final fetched = await _sheets.fetchEmiPlans(forceRefresh: forceRefresh);
+      var fetched = await _sheets.fetchEmiPlans(forceRefresh: forceRefresh);
+      final posted = await _storage.processDueEmiInstallments();
+      if (posted.isNotEmpty) {
+        fetched = await _storage.getCachedEmiPlans();
+      }
       if (mounted) {
         setState(() {
           _plans = fetched;

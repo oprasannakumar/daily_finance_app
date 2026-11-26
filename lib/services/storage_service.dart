@@ -900,6 +900,8 @@ class StorageService {
   Future<List<AutoPostedEmiInstallment>> processDueEmiInstallments({DateTime? referenceDate}) async {
     final now = referenceDate ?? DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    // Ensure transaction cache is hydrated before any saveTransaction call
+    await getTransactions();
     final plans = await getCachedEmiPlans();
     final postedList = <AutoPostedEmiInstallment>[];
 

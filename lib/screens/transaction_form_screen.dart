@@ -49,7 +49,8 @@ class TransactionFormScreen extends StatefulWidget {
   State<TransactionFormScreen> createState() => _TransactionFormScreenState();
 }
 
-class _TransactionFormScreenState extends State<TransactionFormScreen> {
+class _TransactionFormScreenState extends State<TransactionFormScreen>
+    with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   final StorageService _storage = StorageService.instance;
 
@@ -112,6 +113,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     QuickNavController.instance.registerRootHandler(_handleMenuItemClick);
     _speech = stt.SpeechToText();
     _initSpeech();
@@ -529,7 +531,15 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkDueEmiInstallmentsOnStartup();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     QuickNavController.instance.unregisterRootHandler(_handleMenuItemClick);
     try {
       _speech.stop();
