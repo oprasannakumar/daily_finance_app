@@ -7,6 +7,7 @@ import '../models/transaction_model.dart';
 import '../services/quick_nav_controller.dart';
 import '../services/storage_service.dart';
 import '../utils/currency_formatter.dart';
+import '../widgets/glass_surface.dart';
 import '../widgets/statement_export_dialog.dart';
 import 'transaction_history_screen.dart';
 
@@ -159,22 +160,26 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF13141F) : const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Financial Health & Liquidity',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              'Net worth, credit utilization & cash flow',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-          ],
-        ),
+    return GlassBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: buildGlassAppBarFlexibleSpace(context),
+          title: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Financial Health & Liquidity',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                'Net worth, credit utilization & cash flow',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
+          ),
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_outlined),
@@ -250,6 +255,7 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
                 ),
               ),
             ),
+      ),
     );
   }
 

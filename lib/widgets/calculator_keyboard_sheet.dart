@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../theme/app_theme_colors.dart';
 
 /// Interactive calculator bottom sheet keyboard designed specifically for the Amount field.
 /// Supports numbers, parentheses, operators (+, -, *, /, %), backspace, clear,
@@ -260,28 +262,61 @@ class _CalculatorKeyboardSheetState extends State<CalculatorKeyboardSheet> {
     return values.isNotEmpty ? values.last : 0.0;
   }
 
-  Widget _buildKey(String label, {Color? bg, Color? fg, int flex = 1, VoidCallback? onTap}) {
+  Widget _buildKey(
+    String label, {
+    Color? bg,
+    Color? fg,
+    List<Color>? gradientColors,
+    int flex = 1,
+    VoidCallback? onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = AppThemeColors.of(context);
+    final defaultBg = isDark ? const Color(0xCC1E264F) : Colors.white.withValues(alpha: 0.88);
+    final borderCol = gradientColors != null
+        ? Colors.white.withValues(alpha: 0.25)
+        : (isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0));
+
     return Expanded(
       flex: flex,
       child: Padding(
-        padding: const EdgeInsets.all(3.0),
-        child: Material(
-          color: bg ?? Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          elevation: 1,
-          shadowColor: Colors.black12,
-          child: InkWell(
-            onTap: onTap ?? () => _onKeyPress(label),
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              height: 44,
-              alignment: Alignment.center,
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: label.length > 2 ? 14 : 18,
-                  fontWeight: FontWeight.bold,
-                  color: fg ?? const Color(0xFF1E293B),
+        padding: const EdgeInsets.all(3.5),
+        child: Container(
+          height: 46,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: gradientColors == null ? (bg ?? defaultBg) : null,
+            gradient: gradientColors != null
+                ? LinearGradient(
+                    colors: gradientColors,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            border: Border.all(color: borderCol, width: 1.0),
+            boxShadow: [
+              BoxShadow(
+                color: gradientColors != null
+                    ? gradientColors.first.withValues(alpha: 0.32)
+                    : Colors.black.withValues(alpha: isDark ? 0.24 : 0.05),
+                blurRadius: gradientColors != null ? 10 : 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap ?? () => _onKeyPress(label),
+              borderRadius: BorderRadius.circular(12),
+              child: Center(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: label.length > 2 ? 14 : 18,
+                    fontWeight: FontWeight.bold,
+                    color: fg ?? colors.textPrimary,
+                  ),
                 ),
               ),
             ),
@@ -293,153 +328,169 @@ class _CalculatorKeyboardSheetState extends State<CalculatorKeyboardSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, -2)),
-        ],
-      ),
-      padding: const EdgeInsets.only(left: 12, right: 12, top: 10, bottom: 16),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = AppThemeColors.of(context);
+    final opBg = isDark ? const Color(0xCC263163) : const Color(0xFFF1F5F9);
+    final opFg = isDark ? const Color(0xFF38BDF8) : const Color(0xFF0F766E);
+    final dangerBg = isDark ? const Color(0x55F43F5E) : const Color(0xFFFEE2E2);
+    final dangerFg = isDark ? const Color(0xFFFDA4AF) : const Color(0xFFDC2626);
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? [const Color(0xEB182046), const Color(0xE60D122C)]
+                  : [const Color(0xF5FFFFFF), const Color(0xEBEEF9FF)],
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+            border: Border(
+              top: BorderSide(
+                color: isDark ? Colors.white.withValues(alpha: 0.16) : Colors.white,
+                width: 1.3,
               ),
             ),
-
-            // Calculator Display Box
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Expression row
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    reverse: true,
-                    child: Text(
-                      _expression.isEmpty ? '0' : _expression,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: _expression.isEmpty ? Colors.grey : const Color(0xFF334155),
-                        fontFamily: 'monospace',
-                        letterSpacing: 0.5,
-                      ),
+          ),
+          padding: const EdgeInsets.only(left: 12, right: 12, top: 10, bottom: 16),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: colors.textSecondary.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  // Real-time evaluated result
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                ),
+
+                // Frosted Glass Calculator Display Box
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? [const Color(0xCC111735), const Color(0xCC1B2452)]
+                          : [Colors.white.withValues(alpha: 0.92), const Color(0xFFF0FDFA).withValues(alpha: 0.90)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark ? colors.purpleAccent.withValues(alpha: 0.4) : colors.inputBorder,
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const Text(
-                        'CALCULATED AMOUNT',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F766E),
-                          letterSpacing: 0.8,
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        reverse: true,
+                        child: Text(
+                          _expression.isEmpty ? '0' : _expression,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: _expression.isEmpty ? colors.textSecondary : colors.textPrimary,
+                            fontFamily: 'monospace',
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
-                      Text(
-                        '= ₹ $_previewResult',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: _hasError ? Colors.red : const Color(0xFF0F766E),
-                        ),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'CALCULATED AMOUNT',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFF00E5BE) : const Color(0xFF0F766E),
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          Text(
+                            '= ₹ $_previewResult',
+                            style: TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w800,
+                              color: _hasError
+                                  ? const Color(0xFFEF4444)
+                                  : (isDark ? const Color(0xFF00E5BE) : const Color(0xFF0F766E)),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
+                ),
+                const SizedBox(height: 8),
 
-            // Keypad Rows
-            // Row 1: ( , ) , % , ⌫
-            Row(
-              children: [
-                _buildKey('(', bg: const Color(0xFFF1F5F9)),
-                _buildKey(')', bg: const Color(0xFFF1F5F9)),
-                _buildKey('%', bg: const Color(0xFFF1F5F9), fg: const Color(0xFF0F766E)),
-                _buildKey('⌫', bg: const Color(0xFFFEE2E2), fg: const Color(0xFFDC2626)),
-              ],
-            ),
-
-            // Row 2: C , / , * , -
-            Row(
-              children: [
-                _buildKey('C', bg: const Color(0xFFFEE2E2), fg: const Color(0xFFDC2626)),
-                _buildKey('/', bg: const Color(0xFFF1F5F9), fg: const Color(0xFF0F766E)),
-                _buildKey('*', bg: const Color(0xFFF1F5F9), fg: const Color(0xFF0F766E)),
-                _buildKey('-', bg: const Color(0xFFF1F5F9), fg: const Color(0xFF0F766E)),
-              ],
-            ),
-
-            // Row 3: 7 , 8 , 9 , +
-            Row(
-              children: [
-                _buildKey('7'),
-                _buildKey('8'),
-                _buildKey('9'),
-                _buildKey('+', bg: const Color(0xFFF1F5F9), fg: const Color(0xFF0F766E)),
-              ],
-            ),
-
-            // Row 4: 4 , 5 , 6 , =
-            Row(
-              children: [
-                _buildKey('4'),
-                _buildKey('5'),
-                _buildKey('6'),
-                _buildKey('=', bg: const Color(0xFFCCFBF1), fg: const Color(0xFF0F766E)),
-              ],
-            ),
-
-            // Row 5: 1 , 2 , 3 , .
-            Row(
-              children: [
-                _buildKey('1'),
-                _buildKey('2'),
-                _buildKey('3'),
-                _buildKey('.'),
-              ],
-            ),
-
-            // Row 6: 0 , 00 , Apply Button
-            Row(
-              children: [
-                _buildKey('0', flex: 1),
-                _buildKey('00', flex: 1),
-                _buildKey(
-                  'Apply Amount (✓)',
-                  flex: 2,
-                  bg: const Color(0xFF0F766E),
-                  fg: Colors.white,
-                  onTap: _confirmAndApply,
+                Row(
+                  children: [
+                    _buildKey('(', bg: opBg),
+                    _buildKey(')', bg: opBg),
+                    _buildKey('%', bg: opBg, fg: opFg),
+                    _buildKey('⌫', bg: dangerBg, fg: dangerFg),
+                  ],
+                ),
+                Row(
+                  children: [
+                    _buildKey('C', bg: dangerBg, fg: dangerFg),
+                    _buildKey('/', bg: opBg, fg: opFg),
+                    _buildKey('*', bg: opBg, fg: opFg),
+                    _buildKey('-', bg: opBg, fg: opFg),
+                  ],
+                ),
+                Row(
+                  children: [
+                    _buildKey('7'),
+                    _buildKey('8'),
+                    _buildKey('9'),
+                    _buildKey('+', bg: opBg, fg: opFg),
+                  ],
+                ),
+                Row(
+                  children: [
+                    _buildKey('4'),
+                    _buildKey('5'),
+                    _buildKey('6'),
+                    _buildKey('=', bg: opFg.withValues(alpha: 0.16), fg: opFg),
+                  ],
+                ),
+                Row(
+                  children: [
+                    _buildKey('1'),
+                    _buildKey('2'),
+                    _buildKey('3'),
+                    _buildKey('.'),
+                  ],
+                ),
+                Row(
+                  children: [
+                    _buildKey('0', flex: 1),
+                    _buildKey('00', flex: 1),
+                    _buildKey(
+                      'Apply Amount (✓)',
+                      flex: 2,
+                      gradientColors: [colors.secondaryGradStart, colors.secondaryGradEnd],
+                      fg: Colors.white,
+                      onTap: _confirmAndApply,
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

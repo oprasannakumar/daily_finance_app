@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import '../services/storage_service.dart';
+import '../theme/app_theme_colors.dart';
+import 'glass_surface.dart';
 
 class AppLockGate extends StatefulWidget {
   final Widget child;
@@ -171,25 +173,34 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0B0E1E) : const Color(0xFFF8FAFC);
-    final keyBg = isDark ? const Color(0xFF151932) : Colors.white;
+    final colors = AppThemeColors.of(context);
     final accent = isDark ? const Color(0xFFA78BFA) : const Color(0xFF4F46E5);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final textPrimary = colors.textPrimary;
     final hasPin = _configuredPin != null && _configuredPin!.length == 4;
 
-    return Scaffold(
-      backgroundColor: bg,
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.lock_rounded, size: 42, color: accent),
-              const SizedBox(height: 14),
-              Text(
-                'Daily Finance Locked',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textPrimary),
-              ),
+    return GlassBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GlassContainer(
+                  blurSigma: 18,
+                  borderRadius: BorderRadius.circular(24),
+                  padding: const EdgeInsets.all(18),
+                  gradientColors: [
+                    accent.withValues(alpha: 0.22),
+                    colors.secondaryGradStart.withValues(alpha: 0.14),
+                  ],
+                  child: Icon(Icons.lock_rounded, size: 38, color: accent),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Daily Finance Locked',
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: textPrimary),
+                ),
               const SizedBox(height: 6),
               Text(
                 _hasError
@@ -287,18 +298,18 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
                           child: InkWell(
                             borderRadius: BorderRadius.circular(32),
                             onTap: () => _onDigit(key),
-                            child: Container(
-                              width: 64,
-                              height: 64,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: keyBg,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
-                              ),
-                              child: Text(
-                                key,
-                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textPrimary),
+                            child: GlassContainer(
+                              blurSigma: 12,
+                              borderRadius: BorderRadius.circular(32),
+                              child: SizedBox(
+                                width: 64,
+                                height: 64,
+                                child: Center(
+                                  child: Text(
+                                    key,
+                                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textPrimary),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -317,6 +328,7 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
             ],
           ),
         ),
+      ),
       ),
     );
   }

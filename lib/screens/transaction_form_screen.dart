@@ -23,6 +23,7 @@ import '../widgets/theme_action_emojis.dart';
 import '../widgets/theme_toggle_button.dart';
 import '../widgets/swipe_to_delete_wrapper.dart';
 import '../widgets/ai_settings_dialog.dart';
+import '../widgets/glass_surface.dart';
 import '../theme/app_theme_colors.dart';
 import 'transaction_history_screen.dart';
 import 'manage_details_screen.dart';
@@ -4680,36 +4681,57 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
     Color? activeBg,
     required VoidCallback onTap,
   }) {
+    final themeColors = AppThemeColors.of(context);
+    final accent = activeColor ?? const Color(0xFFF43F5E);
     final borderColor = isSelected
-        ? (activeColor ?? const Color(0xFFF43F5E))
-        : (isDark ? const Color(0xFF262C54) : const Color(0xFFF1E5DC));
-    final bgColor = isSelected
-        ? (activeBg ?? (isDark ? const Color(0xFF381A2D) : const Color(0xFFFFF1F2)))
-        : (isDark ? const Color(0xFF1B2042) : Colors.white);
+        ? accent.withValues(alpha: 0.90)
+        : themeColors.inputBorder.withValues(alpha: isDark ? 0.65 : 0.85);
+    final gradColors = isSelected
+        ? [
+            accent.withValues(alpha: isDark ? 0.42 : 0.22),
+            (activeBg ?? accent).withValues(alpha: isDark ? 0.26 : 0.14),
+          ]
+        : [
+            themeColors.inputBg,
+            themeColors.cardBg.withValues(alpha: isDark ? 0.72 : 0.84),
+          ];
 
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
           height: 44,
           decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradColors,
+            ),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: borderColor,
-              width: isSelected ? 1.6 : 1.2,
+              width: isSelected ? 1.6 : 1.15,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: (activeColor ?? const Color(0xFFF43F5E)).withValues(alpha: 0.18),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+                      color: accent.withValues(alpha: isDark ? 0.34 : 0.22),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
                     )
                   ]
-                : null,
+                : [
+                    BoxShadow(
+                      color: isDark
+                          ? Colors.black.withValues(alpha: 0.16)
+                          : const Color(0xFF6366F1).withValues(alpha: 0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: Center(
             child: Text(
@@ -4740,16 +4762,18 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const GlassBackdrop(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      );
     }
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final colors = theme.extension<AppThemeColors>() ?? (isDark ? AppThemeColors.dark : AppThemeColors.light);
 
-    final pageBg = colors.pageBg;
-    final cardBg = colors.cardBg;
-    final cardBorder = colors.cardBorder;
     final inputBg = colors.inputBg;
     final inputBorder = colors.inputBorder;
     final textPrimary = colors.textPrimary;
@@ -4768,9 +4792,10 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
     final double splitDiff = (_totalAmount - splitSum).abs();
     final double transferDiff = (_totalFromAmount - _totalToAmount).abs();
 
-    return Scaffold(
-      backgroundColor: pageBg,
-      body: SafeArea(
+    return GlassBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
         child: GestureDetector(
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
           behavior: HitTestBehavior.translucent,
@@ -4810,23 +4835,11 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                     padding: const EdgeInsets.fromLTRB(10, 8, 10, 20),
                     children: [
                     // Main Container Card matching reference image
-                    Container(
-                      clipBehavior: Clip.antiAlias,
+                    GlassContainer(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: cardBg,
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: cardBorder, width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: isDark
-                                ? Colors.black.withValues(alpha: 0.4)
-                                : const Color(0xFFE2D6CE).withValues(alpha: 0.35),
-                            blurRadius: 18,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
+                      borderRadius: BorderRadius.circular(28),
+                      blurSigma: 20,
+                      borderWidth: 1.4,
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -4895,13 +4908,20 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                             color: isDark ? const Color(0xFFC084FC) : const Color(0xFFA855F7),
                                           ),
                                         ),
-                                        Text(
+                                        GradientText(
                                           'Smart Entry',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: isDark ? const Color(0xFFC084FC) : const Color(0xFFA855F7),
+                                          gradient: LinearGradient(
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                            colors: isDark
+                                                ? [colors.purpleAccent, colors.secondaryGradStart]
+                                                : [colors.purpleAccent, colors.primaryGradEnd],
+                                          ),
+                                          style: const TextStyle(
+                                            fontSize: 18.5,
+                                            fontWeight: FontWeight.w800,
                                             letterSpacing: 0.2,
+                                            color: Colors.white,
                                           ),
                                         ),
                                       ],
@@ -5940,15 +5960,22 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                               // TOTAL AMOUNT & DIFFERENCE Box
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF1B2042) : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: (_selectedSpentFor == 'Split' && splitDiff > 0.01)
-                                        ? const Color(0xFFEF4444)
-                                        : (isDark ? const Color(0xFF262C54) : const Color(0xFFF1E5DC)),
-                                    width: (_selectedSpentFor == 'Split' && splitDiff > 0.01) ? 1.5 : 1.2,
-                                  ),
+                                decoration: glassTileDecoration(
+                                  context,
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderColor: (_selectedSpentFor == 'Split' && splitDiff > 0.01)
+                                      ? const Color(0xFFEF4444)
+                                      : colors.purpleAccent.withValues(alpha: isDark ? 0.35 : 0.28),
+                                  borderWidth: (_selectedSpentFor == 'Split' && splitDiff > 0.01) ? 1.5 : 1.2,
+                                  gradientColors: isDark
+                                      ? [
+                                          colors.glassSurfaceTop,
+                                          colors.heroGradStart.withValues(alpha: 0.16),
+                                        ]
+                                      : [
+                                          Colors.white.withValues(alpha: 0.90),
+                                          const Color(0xFFF3E8FF).withValues(alpha: 0.65),
+                                        ],
                                 ),
                                 child: Column(
                                   children: [
@@ -6192,66 +6219,70 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                               children: [
                                 Expanded(
                                   flex: 5,
-                                  child: SizedBox(
+                                  child: GlassGradientButton(
                                     height: 46,
-                                    child: FilledButton(
-                                      style: FilledButton.styleFrom(
-                                        backgroundColor: isDark ? const Color(0xFFA78BFA) : coralAccent,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                        padding: EdgeInsets.zero,
-                                      ),
-                                      onPressed: _saveTransaction,
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const SaveThemeEmoji(size: 20),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Save',
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.bold,
-                                              color: isDark ? const Color(0xFF151932) : Colors.white,
-                                            ),
+                                    borderRadius: BorderRadius.circular(14),
+                                    colors: [colors.primaryGradStart, colors.primaryGradEnd],
+                                    onPressed: _saveTransaction,
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        SaveThemeEmoji(size: 20),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Save',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   flex: 5,
-                                  child: SizedBox(
+                                  child: Container(
                                     height: 46,
-                                    child: OutlinedButton(
-                                      style: OutlinedButton.styleFrom(
-                                        backgroundColor: isDark ? const Color(0xFF1B2042) : Colors.white,
-                                        side: BorderSide(
-                                          color: isDark ? const Color(0xFF2C3360) : const Color(0xFFE2E8F0),
-                                          width: 1.2,
-                                        ),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                        padding: EdgeInsets.zero,
-                                      ),
-                                      onPressed: _repeatLastTransaction,
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          RepeatThemeEmoji(
-                                            size: 18,
-                                            color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0F766E),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Repeat',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              color: textPrimary,
+                                    decoration: glassTileDecoration(
+                                      context,
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderColor: colors.secondaryGradStart.withValues(alpha: 0.45),
+                                      gradientColors: isDark
+                                          ? [
+                                              colors.secondaryGradStart.withValues(alpha: 0.20),
+                                              colors.secondaryGradEnd.withValues(alpha: 0.12),
+                                            ]
+                                          : [
+                                              const Color(0xFFECFEFF).withValues(alpha: 0.90),
+                                              const Color(0xFFF0FDF4).withValues(alpha: 0.85),
+                                            ],
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(14),
+                                        onTap: _repeatLastTransaction,
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            RepeatThemeEmoji(
+                                              size: 18,
+                                              color: colors.secondaryGradStart,
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Repeat',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: textPrimary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -6261,35 +6292,45 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                             const SizedBox(height: 8),
 
                             // 8. Save as Template Button
-                            SizedBox(
-                              height: 42,
+                            Container(
+                              height: 44,
                               width: double.infinity,
-                              child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  backgroundColor: isDark ? const Color(0xFF1E1A3C) : const Color(0xFFF5F3FF),
-                                  side: BorderSide(
-                                    color: isDark ? const Color(0xFF6D28D9) : const Color(0xFFDDD6FE),
-                                    width: 1.2,
-                                  ),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                ),
-                                onPressed: _showSaveAsTemplateDialog,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(_editingTemplateId != null ? '💾' : '⭐', style: const TextStyle(fontSize: 14)),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      _editingTemplateId != null
-                                          ? 'Update Template'
-                                          : 'Save as Template',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark ? const Color(0xFFC084FC) : const Color(0xFF7C3AED),
+                              decoration: glassTileDecoration(
+                                context,
+                                borderRadius: BorderRadius.circular(14),
+                                borderColor: colors.purpleAccent.withValues(alpha: 0.45),
+                                gradientColors: isDark
+                                    ? [
+                                        colors.purpleAccent.withValues(alpha: 0.22),
+                                        colors.primaryGradEnd.withValues(alpha: 0.14),
+                                      ]
+                                    : [
+                                        const Color(0xFFF5F3FF).withValues(alpha: 0.92),
+                                        const Color(0xFFFCE7F3).withValues(alpha: 0.80),
+                                      ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: _showSaveAsTemplateDialog,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(_editingTemplateId != null ? '💾' : '⭐', style: const TextStyle(fontSize: 14)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _editingTemplateId != null
+                                            ? 'Update Template'
+                                            : 'Save as Template',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: colors.purpleAccent,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -6327,13 +6368,17 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF3B2E6A) : const Color(0xFFDDD6FE),
+                            gradient: colors.heroGradient,
                             shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.35),
+                              width: 1.2,
+                            ),
                             boxShadow: [
                               BoxShadow(
-                                color: (isDark ? const Color(0xFF7C3AED) : const Color(0xFF8B5CF6)).withValues(alpha: 0.35),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
+                                color: colors.heroGradStart.withValues(alpha: 0.42),
+                                blurRadius: 14,
+                                offset: const Offset(0, 5),
                               ),
                             ],
                           ),
@@ -6366,6 +6411,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
           ],
         ),
       ),
+    ),
     ),
   );
 }

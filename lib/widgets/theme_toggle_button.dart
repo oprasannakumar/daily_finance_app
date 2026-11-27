@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme_colors.dart';
 
-/// 360-degree rotating theme toggle button with smooth icon morph and color transition
+/// 360-degree rotating theme toggle button with smooth icon morph and gradient glass transition
 class ThemeToggleRotatingButton extends StatefulWidget {
   final bool isDark;
   final VoidCallback onToggle;
@@ -54,6 +55,7 @@ class _ThemeToggleRotatingButtonState extends State<ThemeToggleRotatingButton>
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
+    final colors = AppThemeColors.of(context);
 
     return InkWell(
       onTap: _handleTap,
@@ -64,17 +66,31 @@ class _ThemeToggleRotatingButtonState extends State<ThemeToggleRotatingButton>
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1F1B3C) : const Color(0xFFFFFBEB),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [
+                    colors.primaryGradStart.withValues(alpha: 0.34),
+                    colors.primaryGradEnd.withValues(alpha: 0.24),
+                  ]
+                : [
+                    const Color(0xFFFFFBEB).withValues(alpha: 0.92),
+                    const Color(0xFFFFEDD5).withValues(alpha: 0.85),
+                  ],
+          ),
           shape: BoxShape.circle,
           border: Border.all(
-            color: isDark ? const Color(0xFF7C3AED) : const Color(0xFFFDE68A),
+            color: isDark
+                ? colors.primaryGradStart.withValues(alpha: 0.65)
+                : const Color(0xFFF59E0B).withValues(alpha: 0.45),
             width: 1.3,
           ),
           boxShadow: [
             BoxShadow(
-              color: (isDark ? const Color(0xFF7C3AED) : const Color(0xFFF59E0B))
-                  .withValues(alpha: 0.25),
-              blurRadius: 8,
+              color: (isDark ? colors.primaryGradStart : const Color(0xFFF59E0B))
+                  .withValues(alpha: 0.28),
+              blurRadius: 10,
               offset: const Offset(0, 2),
             ),
           ],

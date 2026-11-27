@@ -9,7 +9,9 @@ import '../models/invoice_model.dart';
 import '../services/google_sheets_service.dart';
 import '../services/invoice_extractor_service.dart';
 import '../services/storage_service.dart';
+import '../theme/app_theme_colors.dart';
 import '../widgets/ai_settings_dialog.dart';
+import '../widgets/glass_surface.dart';
 import '../widgets/popup_select_field.dart';
 import '../widgets/swipe_to_delete_wrapper.dart';
 
@@ -1160,57 +1162,64 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = const Color(0xFFFF7A5C);
-    final secondaryColor = const Color(0xFF4ECDC4);
-    final purpleColor = const Color(0xFFA78BFA);
+    final colors = AppThemeColors.of(context);
+    final primaryColor = colors.primaryGradStart;
+    final secondaryColor = colors.secondaryGradStart;
+    final purpleColor = colors.purpleAccent;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          '🧾 Invoice Manager',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Refresh from Google Sheets',
-            onPressed: _isLoading ? null : () => _loadData(forceRefresh: true),
+    return GlassBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: buildGlassAppBarFlexibleSpace(context),
+          title: const Text(
+            '🧾 Invoice Manager',
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: primaryColor,
-          labelColor: primaryColor,
-          unselectedLabelColor: Colors.grey,
-          tabs: const [
-            Tab(icon: Icon(Icons.note_add_outlined), text: 'Create Invoice'),
-            Tab(icon: Icon(Icons.receipt_long_outlined), text: 'View Invoices'),
-          ],
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
-              children: [
-                TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildCreateMode(primaryColor, secondaryColor, purpleColor, isDark),
-                    _buildViewMode(primaryColor, secondaryColor, purpleColor, isDark),
-                  ],
-                ),
-                if (_isScanFabExpanded && _tabController.index == 0)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isScanFabExpanded = false),
-                      child: Container(color: Colors.black.withValues(alpha: 0.2)),
-                    ),
-                  ),
-              ],
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'Refresh from Google Sheets',
+              onPressed: _isLoading ? null : () => _loadData(forceRefresh: true),
             ),
-      floatingActionButton: _tabController.index == 0
-          ? _buildScanFabMenu(primaryColor, secondaryColor, isDark)
-          : null,
+          ],
+          bottom: TabBar(
+            controller: _tabController,
+            indicatorColor: primaryColor,
+            labelColor: isDark ? Colors.white : primaryColor,
+            unselectedLabelColor: colors.textSecondary,
+            tabs: const [
+              Tab(icon: Icon(Icons.note_add_outlined), text: 'Create Invoice'),
+              Tab(icon: Icon(Icons.receipt_long_outlined), text: 'View Invoices'),
+            ],
+          ),
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Stack(
+                children: [
+                  TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildCreateMode(primaryColor, secondaryColor, purpleColor, isDark),
+                      _buildViewMode(primaryColor, secondaryColor, purpleColor, isDark),
+                    ],
+                  ),
+                  if (_isScanFabExpanded && _tabController.index == 0)
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _isScanFabExpanded = false),
+                        child: Container(color: Colors.black.withValues(alpha: 0.28)),
+                      ),
+                    ),
+                ],
+              ),
+        floatingActionButton: _tabController.index == 0
+            ? _buildScanFabMenu(primaryColor, secondaryColor, isDark)
+            : null,
+      ),
     );
   }
 

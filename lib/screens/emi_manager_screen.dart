@@ -4,8 +4,10 @@ import '../models/emi_plan_model.dart';
 import '../models/transaction_model.dart';
 import '../services/google_sheets_service.dart';
 import '../services/storage_service.dart';
+import '../theme/app_theme_colors.dart';
 import '../utils/currency_formatter.dart';
 import '../widgets/emi_conversion_sheet.dart';
+import '../widgets/glass_surface.dart';
 import 'transaction_history_screen.dart';
 
 class EmiManagerScreen extends StatefulWidget {
@@ -467,134 +469,147 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF111429) : const Color(0xFFF8F9FA);
-    final cardBg = isDark ? const Color(0xFF1A1F3D) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF2C3258) : const Color(0xFFE2E8F0);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF1E293B);
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    const coral = Color(0xFFFF5C38);
-    const teal = Color(0xFF00B074);
+    final colors = AppThemeColors.of(context);
+    final cardBg = colors.cardBg;
+    final borderColor = colors.inputBorder;
+    final textPrimary = colors.textPrimary;
+    final textSecondary = colors.textSecondary;
+    final coral = colors.primaryGradStart;
+    final teal = colors.secondaryGradStart;
 
     final activeCount = _plans.where((p) => p.status.toUpperCase() == 'ACTIVE').length;
 
-    return Scaffold(
-      backgroundColor: bg,
-      appBar: AppBar(
-        title: const Text('Credit Card EMIs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: _isRefreshing
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: coral))
-                : const Icon(Icons.sync),
-            tooltip: 'Sync with Google Sheets',
-            onPressed: () => _loadPlans(forceRefresh: true),
-          ),
-          IconButton(
-            icon: const Icon(Icons.add_circle, color: coral, size: 28),
-            tooltip: 'New EMI Plan',
-            onPressed: () => _openConversionSheet(),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: coral))
-          : RefreshIndicator(
-              color: coral,
-              onRefresh: () => _loadPlans(forceRefresh: true),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                children: [
-                  // KPI Banner
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: isDark
-                            ? [const Color(0xFF2E1A47), const Color(0xFF162547)]
-                            : [const Color(0xFFFFF0EB), const Color(0xFFE8F5E9)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Monthly Commitment', style: TextStyle(fontSize: 12, color: textSecondary)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '₹${IndianCurrency.formatSmart(_totalMonthlyCommitment)}',
-                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: coral),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: coral.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
+    return GlassBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: buildGlassAppBarFlexibleSpace(context),
+          title: const Text('Credit Card EMIs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          centerTitle: false,
+          actions: [
+            IconButton(
+              icon: _isRefreshing
+                  ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: coral))
+                  : const Icon(Icons.sync),
+              tooltip: 'Sync with Google Sheets',
+              onPressed: () => _loadPlans(forceRefresh: true),
+            ),
+            IconButton(
+              icon: Icon(Icons.add_circle, color: coral, size: 28),
+              tooltip: 'New EMI Plan',
+              onPressed: () => _openConversionSheet(),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: _isLoading
+            ? Center(child: CircularProgressIndicator(color: coral))
+            : RefreshIndicator(
+                color: coral,
+                onRefresh: () => _loadPlans(forceRefresh: true),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  children: [
+                    // KPI Banner
+                    GlassContainer(
+                      padding: const EdgeInsets.all(16),
+                      borderRadius: BorderRadius.circular(20),
+                      blurSigma: 18,
+                      borderColor: colors.primaryGradStart.withValues(alpha: 0.25),
+                      gradientColors: isDark
+                          ? [
+                              colors.heroGradStart.withValues(alpha: 0.45),
+                              colors.glassSurfaceBottom,
+                            ]
+                          : [
+                              const Color(0xEBFFF0EB),
+                              const Color(0xE0E6FCF8),
+                            ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.credit_card, size: 14, color: coral),
-                                  const SizedBox(width: 4),
+                                  Text('Monthly Commitment', style: TextStyle(fontSize: 12, color: textSecondary)),
+                                  const SizedBox(height: 2),
                                   Text(
-                                    '$activeCount Active',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: coral),
+                                    '₹${IndianCurrency.formatSmart(_totalMonthlyCommitment)}',
+                                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: coral),
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Outstanding Principal: ₹${IndianCurrency.formatSmart(_totalOutstandingPrincipal)}',
-                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: textPrimary),
-                            ),
-                            Text(
-                              '${_plans.length} Total Plans',
-                              style: TextStyle(fontSize: 12, color: textSecondary),
-                            ),
-                          ],
-                        ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  gradient: colors.primaryGradient,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: coral.withValues(alpha: 0.28),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.credit_card, size: 14, color: Colors.white),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '$activeCount Active',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Outstanding Principal: ₹${IndianCurrency.formatSmart(_totalOutstandingPrincipal)}',
+                                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: textPrimary),
+                              ),
+                              Text(
+                                '${_plans.length} Total Plans',
+                                style: TextStyle(fontSize: 12, color: textSecondary),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Filter Chips Row
+                    Row(
+                      children: [
+                        _buildFilterChip('Active ($activeCount)', 'ACTIVE', isDark),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('Completed', 'COMPLETED', isDark),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('All (${_plans.length})', 'ALL', isDark),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 14),
 
-                  // Filter Chips Row
-                  Row(
-                    children: [
-                      _buildFilterChip('Active ($activeCount)', 'ACTIVE', isDark),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Completed', 'COMPLETED', isDark),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('All (${_plans.length})', 'ALL', isDark),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // List of Plans
-                  if (_filteredPlans.isEmpty)
-                    _buildEmptyState(isDark, textPrimary, textSecondary, coral)
-                  else
-                    ..._filteredPlans.map((plan) => _buildPlanCard(plan, isDark, cardBg, borderColor, textPrimary, textSecondary, coral, teal)),
-                ],
+                    // List of Plans
+                    if (_filteredPlans.isEmpty)
+                      _buildEmptyState(isDark, textPrimary, textSecondary, coral)
+                    else
+                      ..._filteredPlans.map((plan) => _buildPlanCard(plan, isDark, cardBg, borderColor, textPrimary, textSecondary, coral, teal)),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
@@ -670,17 +685,10 @@ class _EmiManagerScreenState extends State<EmiManagerScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: cardBg,
-        border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
+      decoration: glassTileDecoration(
+        context,
+        borderRadius: BorderRadius.circular(18),
+        borderColor: borderColor,
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),

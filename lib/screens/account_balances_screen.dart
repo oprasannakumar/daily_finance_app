@@ -5,7 +5,9 @@ import '../models/account_balance_model.dart';
 import '../models/transaction_model.dart';
 import '../services/quick_nav_controller.dart';
 import '../services/storage_service.dart';
+import '../theme/app_theme_colors.dart';
 import '../utils/currency_formatter.dart';
+import '../widgets/glass_surface.dart';
 import 'emi_manager_screen.dart';
 import 'financial_health_dashboard_screen.dart';
 import 'transaction_history_screen.dart';
@@ -481,17 +483,21 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5);
-    final bg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
-    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final colors = AppThemeColors.of(context);
+    final primaryColor = isDark ? colors.purpleAccent : colors.heroGradStart;
+    final cardBg = colors.cardBg;
+    final textPrimary = colors.textPrimary;
+    final textSecondary = colors.textSecondary;
+    final borderColor = colors.inputBorder;
 
-    return Scaffold(
-      backgroundColor: bg,
-      appBar: AppBar(
-        title: Column(
+    return GlassBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: buildGlassAppBarFlexibleSpace(context),
+          title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -614,6 +620,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                 _buildBottomBar(primaryColor, isDark),
               ],
             ),
+      ),
     );
   }
 
@@ -651,20 +658,21 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
           // Total Bank Available Header Card
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFECFDF5),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isDark ? const Color(0xFF059669).withValues(alpha: 0.4) : const Color(0xFFA7F3D0),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+            decoration: glassTileDecoration(
+              context,
+              borderRadius: BorderRadius.circular(18),
+              borderColor: isDark
+                  ? const Color(0xFF059669).withValues(alpha: 0.45)
+                  : const Color(0xFF10B981).withValues(alpha: 0.35),
+              gradientColors: isDark
+                  ? [
+                      const Color(0xCC064E3B),
+                      const Color(0xBF0F172A),
+                    ]
+                  : [
+                      const Color(0xEAECFDF5),
+                      const Color(0xE0E0F2FE),
+                    ],
             ),
             child: Row(
               children: [

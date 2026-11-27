@@ -4,8 +4,10 @@ import 'package:intl/intl.dart';
 import '../models/transaction_model.dart';
 import '../services/quick_nav_controller.dart';
 import '../services/storage_service.dart';
+import '../theme/app_theme_colors.dart';
 import '../utils/currency_formatter.dart';
 import '../widgets/borrower_export_dialog.dart';
+import '../widgets/glass_surface.dart';
 import '../widgets/transaction_details_dialog.dart';
 
 class BorrowerDetailScreen extends StatefulWidget {
@@ -113,11 +115,10 @@ class _BorrowerDetailScreenState extends State<BorrowerDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
-    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final colors = AppThemeColors.of(context);
+    final borderColor = colors.inputBorder;
+    final textPrimary = colors.textPrimary;
+    final textSecondary = colors.textSecondary;
     const accent = Color(0xFF6366F1);
 
     double totalGiven = 0.0;
@@ -161,12 +162,14 @@ class _BorrowerDetailScreenState extends State<BorrowerDetailScreen> {
         ? 'You will get'
         : (net < -0.01 ? 'You owe' : 'Settled');
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: cardColor,
-        elevation: 0,
-        title: Column(
+    return GlassBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: buildGlassAppBarFlexibleSpace(context),
+          title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -365,10 +368,10 @@ class _BorrowerDetailScreenState extends State<BorrowerDetailScreen> {
           if (monthlyList.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor),
+              decoration: glassTileDecoration(
+                context,
+                borderRadius: BorderRadius.circular(18),
+                borderColor: borderColor,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,10 +422,10 @@ class _BorrowerDetailScreenState extends State<BorrowerDetailScreen> {
           if (typeList.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor),
+              decoration: glassTileDecoration(
+                context,
+                borderRadius: BorderRadius.circular(18),
+                borderColor: borderColor,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -470,10 +473,10 @@ class _BorrowerDetailScreenState extends State<BorrowerDetailScreen> {
               child: Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: borderColor),
+                decoration: glassTileDecoration(
+                  context,
+                  borderRadius: BorderRadius.circular(14),
+                  borderColor: borderColor,
                 ),
                 child: Row(
                   children: [
@@ -534,6 +537,7 @@ class _BorrowerDetailScreenState extends State<BorrowerDetailScreen> {
             );
           }),
         ],
+      ),
       ),
     );
   }

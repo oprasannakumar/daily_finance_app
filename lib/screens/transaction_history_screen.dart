@@ -5,8 +5,10 @@ import '../models/account_balance_model.dart';
 import '../models/emi_plan_model.dart';
 import '../models/transaction_model.dart';
 import '../services/storage_service.dart';
+import '../theme/app_theme_colors.dart';
 import '../utils/currency_formatter.dart';
 import '../widgets/faceted_filter_sheet.dart';
+import '../widgets/glass_surface.dart';
 import '../widgets/statement_export_dialog.dart';
 import '../widgets/emi_conversion_sheet.dart';
 import 'borrowers_ledger_screen.dart';
@@ -932,30 +934,41 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       }
     }
     final summaryCount = itemsToSum.length;
+    final colors = AppThemeColors.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: _isSelectionActive
-            ? Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${_selectedIds.length} Selected',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2563EB),
+    return GlassBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: buildGlassAppBarFlexibleSpace(context),
+          title: _isSelectionActive
+              ? Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            colors.heroGradStart.withValues(alpha: 0.22),
+                            colors.heroGradEnd.withValues(alpha: 0.16),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${_selectedIds.length} Selected',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: colors.purpleAccent,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              )
-            : const Text('History'),
+                  ],
+                )
+              : const Text('History'),
         actions: [
           if (_isSelectionActive) ...[
             IconButton(
@@ -1718,6 +1731,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 }

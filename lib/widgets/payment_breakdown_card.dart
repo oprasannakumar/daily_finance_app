@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/transaction_model.dart';
+import '../theme/app_theme_colors.dart';
 import 'calculator_keyboard_sheet.dart';
+import 'glass_surface.dart';
 import 'popup_select_field.dart';
 import 'swipe_to_delete_wrapper.dart';
 
@@ -146,10 +148,11 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
     final showAccount = hasType && !isCash;
     final isOtherAccount = widget.breakdown.account == 'Other';
 
+    final themeColors = AppThemeColors.of(context);
     final Color amtFillColor = isDark
-        ? (isCash ? const Color(0xFF112E2D) : const Color(0xFF1B2042))
-        : (isCash ? const Color(0xFFF0FDF4) : Colors.white);
-    final Color amtBorderColor = isDark ? const Color(0xFF2C3360) : const Color(0xFFCBD5E1);
+        ? (isCash ? const Color(0xCC112E2D) : themeColors.inputBg)
+        : (isCash ? const Color(0xDCF0FDF4) : themeColors.inputBg);
+    final Color amtBorderColor = themeColors.inputBorder;
     final Color amtTextColor = isDark
         ? (isCash ? const Color(0xFF00E5BE) : const Color(0xFFF1F5F9))
         : (isCash ? const Color(0xFF0F766E) : const Color(0xFF1E293B));
@@ -163,7 +166,7 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
       onDelete: widget.onDelete,
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -279,7 +282,7 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                     labelStyle: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                     isDense: true,
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF1B2042) : Colors.white,
+                    fillColor: themeColors.inputBg,
                     constraints: const BoxConstraints(minHeight: 46, maxHeight: 46),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                     border: OutlineInputBorder(
@@ -306,13 +309,15 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                   return Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF151932) : const Color(0xFFFAF7F2),
+                    decoration: glassTileDecoration(
+                      context,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF2C3360) : const Color(0xFFEBE3D5),
-                        width: 1.2,
-                      ),
+                      borderColor: isDark
+                          ? const Color(0xFF00D2B4).withValues(alpha: 0.28)
+                          : const Color(0xFFE2D9C8).withValues(alpha: 0.9),
+                      gradientColors: isDark
+                          ? [const Color(0xCC11203B), const Color(0xA60E1832)]
+                          : [const Color(0xDEFFFDF9), const Color(0xCCF0FDF9)],
                     ),
                     child: Column(
                       children: [
@@ -387,9 +392,17 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                             return Container(
                               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
                               decoration: BoxDecoration(
-                                color: isDark
-                                    ? (hasValue ? const Color(0xFF1E284A) : const Color(0xFF1B2042))
-                                    : (hasValue ? const Color(0xFFF0FDF4) : Colors.white),
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: isDark
+                                      ? (hasValue
+                                          ? [const Color(0xDE163547), const Color(0xBF182746)]
+                                          : [const Color(0xB81B2042), const Color(0x99141836)])
+                                      : (hasValue
+                                          ? [const Color(0xEDF0FDF4), const Color(0xDCE0F2FE)]
+                                          : [const Color(0xDCFFFFFF), const Color(0xC2F8FAFC)]),
+                                ),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: hasValue

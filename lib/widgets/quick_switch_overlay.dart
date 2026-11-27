@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../theme/app_theme_colors.dart';
+import 'glass_surface.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/quick_actions_service.dart';
@@ -197,10 +200,11 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
     controller.setQuickSheetOpen(true);
 
     final isDark = Theme.of(navContext).brightness == Brightness.dark;
-    final sheetBg = isDark ? const Color(0xFF151932) : Colors.white;
-    final tileBg = isDark ? const Color(0xFF1E2448) : const Color(0xFFF8FAFC);
-    final tileBorder = isDark ? const Color(0xFF2E376E) : const Color(0xFFE2E8F0);
-    final accent = isDark ? const Color(0xFFA78BFA) : const Color(0xFFFF5C38);
+    final colors = AppThemeColors.of(navContext);
+    final sheetBg = colors.glassSurfaceTop;
+    final tileBg = colors.inputBg;
+    final tileBorder = colors.inputBorder;
+    final accent = isDark ? colors.purpleAccent : colors.primaryGradStart;
     final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
     final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
@@ -211,12 +215,14 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
       builder: (sheetCtx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
-            return Container(
-              decoration: BoxDecoration(
-                color: sheetBg,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-                border: Border(top: BorderSide(color: tileBorder, width: 1.2)),
-              ),
+            return GlassContainer(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+              borderColor: tileBorder,
+              blurSigma: 20,
+              gradientColors: [
+                sheetBg,
+                colors.glassSurfaceBottom.withValues(alpha: isDark ? 0.88 : 0.92),
+              ],
               padding: EdgeInsets.fromLTRB(
                 16,
                 10,
@@ -493,10 +499,10 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
     bool isDark,
     Color accent,
   ) {
-    final dockBg = isDark ? const Color(0xFF151932) : Colors.white;
-    final tileBg = isDark ? const Color(0xFF1E2448) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? const Color(0xFF2E376E) : const Color(0xFFE2E8F0);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final colors = AppThemeColors.of(context);
+    final dockBg = colors.glassSurfaceTop;
+    final tileBg = colors.inputBg;
+    final borderColor = colors.inputBorder;
     final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
     final maxDockHeight = (screenSize.height - padding.top - padding.bottom - 36).clamp(240.0, 620.0);
 
@@ -522,22 +528,17 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
           child: Material(
             key: const Key('quick_switch_side_dock'),
             type: MaterialType.transparency,
-            child: Container(
+            child: GlassContainer(
               width: _dockWidth,
               constraints: BoxConstraints(maxHeight: maxDockHeight),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-              decoration: BoxDecoration(
-                color: dockBg.withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: borderColor, width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.18),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
+              borderRadius: BorderRadius.circular(26),
+              blurSigma: 22,
+              borderColor: borderColor,
+              gradientColors: [
+                dockBg.withValues(alpha: 0.92),
+                colors.glassSurfaceBottom.withValues(alpha: 0.84),
+              ],
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -757,33 +758,57 @@ class _QuickSwitchOverlayState extends State<QuickSwitchOverlay> {
                               _hoveredDockIndex = null;
                             });
                           },
-                          child: Container(
-                            width: _pillWidth,
-                            height: _pillHeight,
-                            decoration: BoxDecoration(
-                              color: pillBg,
-                              borderRadius: _isRightEdge
-                                  ? const BorderRadius.horizontal(left: Radius.circular(14))
-                                  : const BorderRadius.horizontal(right: Radius.circular(14)),
-                              border: Border.all(
-                                color: borderColor,
-                                width: _isDragging ? 1.8 : 1.1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.14),
-                                  blurRadius: 8,
-                                  offset: Offset(_isRightEdge ? -2 : 2, 2),
-                                ),
-                              ],
-                            ),
-                            child: Center(
+                          child: ClipRRect(
+                            borderRadius: _isRightEdge
+                                ? const BorderRadius.horizontal(left: Radius.circular(14))
+                                : const BorderRadius.horizontal(right: Radius.circular(14)),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                               child: Container(
-                                width: 4,
-                                height: 30,
+                                width: _pillWidth,
+                                height: _pillHeight,
                                 decoration: BoxDecoration(
-                                  color: accent,
-                                  borderRadius: BorderRadius.circular(4),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      pillBg.withValues(alpha: isDark ? 0.84 : 0.90),
+                                      (isDark ? const Color(0xFF0E1330) : const Color(0xFFFFF1EC))
+                                          .withValues(alpha: 0.80),
+                                    ],
+                                  ),
+                                  borderRadius: _isRightEdge
+                                      ? const BorderRadius.horizontal(left: Radius.circular(14))
+                                      : const BorderRadius.horizontal(right: Radius.circular(14)),
+                                  border: Border.all(
+                                    color: _isDragging ? accent : borderColor,
+                                    width: _isDragging ? 1.8 : 1.1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (isDark ? accent : Colors.black)
+                                          .withValues(alpha: isDark ? 0.30 : 0.14),
+                                      blurRadius: 10,
+                                      offset: Offset(_isRightEdge ? -2 : 2, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    width: 4,
+                                    height: 30,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          accent,
+                                          AppThemeColors.of(context).primaryGradEnd,
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),

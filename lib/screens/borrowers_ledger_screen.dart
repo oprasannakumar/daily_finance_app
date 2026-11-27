@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/transaction_model.dart';
 import '../services/storage_service.dart';
+import '../theme/app_theme_colors.dart';
 import '../utils/currency_formatter.dart';
 import '../widgets/borrower_faceted_filter_sheet.dart';
+import '../widgets/glass_surface.dart';
 import '../widgets/transaction_details_dialog.dart';
 import '../widgets/borrower_export_dialog.dart';
 import 'borrower_detail_screen.dart';
@@ -155,11 +157,12 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = const Color(0xFF0F766E);
-    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final textPrimary = isDark ? Colors.white : const Color(0xFF1E293B);
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final colors = AppThemeColors.of(context);
+    final primaryColor = isDark ? colors.secondaryGradStart : const Color(0xFF0F766E);
+    final cardBg = colors.cardBg;
+    final textPrimary = colors.textPrimary;
+    final textSecondary = colors.textSecondary;
+    final borderColor = colors.inputBorder;
 
     // Filter entries using faceted filter criteria + quick filters
     final filtered = _entries.where((e) {
@@ -201,10 +204,14 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
 
     final activeFilterCount = _filterCriteria.activeFilterCount;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: Column(
+    return GlassBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: buildGlassAppBarFlexibleSpace(context),
+          title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
@@ -245,7 +252,6 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
               onPressed: _resetAllFilters,
             ),
         ],
-        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -558,6 +564,7 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
               ),
             ),
           ),
+      ),
     );
   }
 

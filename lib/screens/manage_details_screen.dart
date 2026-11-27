@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/storage_service.dart';
 import '../models/transaction_model.dart';
+import '../theme/app_theme_colors.dart';
 import '../utils/currency_formatter.dart';
+import '../widgets/glass_surface.dart';
 import '../widgets/swipe_to_delete_wrapper.dart';
 
 class ManageDetailsScreen extends StatefulWidget {
@@ -1000,98 +1002,135 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Masters'),
-        actions: [
-          TextButton.icon(
-            onPressed: () => setState(() => _isEditMode = !_isEditMode),
-            icon: Icon(
-              _isEditMode ? Icons.check_circle_rounded : Icons.edit_rounded,
-              size: 18,
-              color: _isEditMode ? const Color(0xFF10B981) : const Color(0xFF0F766E),
-            ),
-            label: Text(
-              _isEditMode ? 'Done' : 'Edit',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: _isEditMode ? const Color(0xFF10B981) : const Color(0xFF0F766E),
+    final colors = AppThemeColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GlassBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: buildGlassAppBarFlexibleSpace(context),
+          title: const Text('Manage Masters'),
+          actions: [
+            TextButton.icon(
+              onPressed: () => setState(() => _isEditMode = !_isEditMode),
+              icon: Icon(
+                _isEditMode ? Icons.check_circle_rounded : Icons.edit_rounded,
+                size: 18,
+                color: _isEditMode ? colors.secondaryGradStart : colors.primaryGradStart,
               ),
-            ),
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.sort_by_alpha, size: 22),
-            tooltip: 'Sort items in tab',
-            onSelected: (val) => _sortCurrentCategory(val),
-            itemBuilder: (ctx) => [
-              const PopupMenuItem(
-                value: 'asc',
-                child: Row(
-                  children: [
-                    Icon(Icons.arrow_upward, size: 18, color: Color(0xFF0F766E)),
-                    SizedBox(width: 8),
-                    Text('Sort A to Z'),
-                  ],
+              label: Text(
+                _isEditMode ? 'Done' : 'Edit',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: _isEditMode ? colors.secondaryGradStart : colors.primaryGradStart,
                 ),
               ),
-              const PopupMenuItem(
-                value: 'desc',
-                child: Row(
-                  children: [
-                    Icon(Icons.arrow_downward, size: 18, color: Color(0xFF0F766E)),
-                    SizedBox(width: 8),
-                    Text('Sort Z to A'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh, size: 22),
-            tooltip: 'Refresh Masters',
-            onPressed: _loadData,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          tabs: _categories.map((c) => Tab(text: c)).toList(),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                if (_isEditMode)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    color: const Color(0xFF0F766E).withValues(alpha: 0.1),
-                    child: const Text(
-                      'Edit Mode: Tap item to rename • Swipe left to delete',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF0F766E)),
-                    ),
+            ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.sort_by_alpha, size: 22),
+              tooltip: 'Sort items in tab',
+              onSelected: (val) => _sortCurrentCategory(val),
+              itemBuilder: (ctx) => [
+                PopupMenuItem(
+                  value: 'asc',
+                  child: Row(
+                    children: [
+                      Icon(Icons.arrow_upward, size: 18, color: colors.secondaryGradStart),
+                      const SizedBox(width: 8),
+                      const Text('Sort A to Z'),
+                    ],
                   ),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    physics: _isEditMode ? const NeverScrollableScrollPhysics() : null,
-                    children: _categories.map((c) => _buildListForCategory(c)).toList(),
+                ),
+                PopupMenuItem(
+                  value: 'desc',
+                  child: Row(
+                    children: [
+                      Icon(Icons.arrow_downward, size: 18, color: colors.primaryGradStart),
+                      const SizedBox(width: 8),
+                      const Text('Sort Z to A'),
+                    ],
                   ),
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        mini: true,
-        backgroundColor: const Color(0xFF0F766E),
-        foregroundColor: Colors.white,
-        onPressed: () {
-          final currentCategory = _categories[_tabController.index];
-          _showAddItemDialog(currentCategory);
-        },
-        child: const Icon(Icons.add),
+            IconButton(
+              icon: const Icon(Icons.refresh, size: 22),
+              tooltip: 'Refresh Masters',
+              onPressed: _loadData,
+            ),
+          ],
+          bottom: TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            indicatorColor: colors.primaryGradStart,
+            labelColor: isDark ? Colors.white : colors.primaryGradStart,
+            unselectedLabelColor: colors.textSecondary,
+            tabs: _categories.map((c) => Tab(text: c)).toList(),
+          ),
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  if (_isEditMode)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            colors.secondaryGradStart.withValues(alpha: 0.16),
+                            colors.secondaryGradEnd.withValues(alpha: 0.12),
+                          ],
+                        ),
+                      ),
+                      child: Text(
+                        'Edit Mode: Tap item to rename • Swipe left to delete',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? colors.secondaryGradStart : const Color(0xFF0F766E),
+                        ),
+                      ),
+                    ),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      physics: _isEditMode ? const NeverScrollableScrollPhysics() : null,
+                      children: _categories.map((c) => _buildListForCategory(c)).toList(),
+                    ),
+                  ),
+                ],
+              ),
+        floatingActionButton: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: colors.primaryGradient,
+            boxShadow: [
+              BoxShadow(
+                color: colors.primaryGradStart.withValues(alpha: 0.35),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: FloatingActionButton(
+            mini: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            foregroundColor: Colors.white,
+            onPressed: () {
+              final currentCategory = _categories[_tabController.index];
+              _showAddItemDialog(currentCategory);
+            },
+            child: const Icon(Icons.add),
+          ),
+        ),
       ),
     );
   }
