@@ -171,19 +171,20 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
 {
   "action": "reset_form" | "load_template" | "set_mode" | "self_transfer" | "log_transaction",
     * "reset_form": ONLY to clear the whole form.
-    * "self_transfer": Moving money between own accounts, cash deposited/withdrawn, OR clearing a credit card bill.
-    * "log_transaction": Standard expenses, incomes, or split bills.
+    * "self_transfer": Moving money between own accounts, cash deposited/withdrawn, OR paying/clearing a credit card bill.
+    * "log_transaction": Standard expenses, incomes, split bills, and ALL bank/card/UPI purchase or credit SMS alerts (e.g. "Spent Rs.324 On HDFC Bank Card 4179 At AVENUE SUPERMARTS..."). IMPORTANT: A card purchase SMS is ALWAYS "log_transaction" (flow "withdraw"), NEVER "self_transfer"! Ignore SMS fraud/block disclaimers like "Not You? To Block+Reissue Call .../SMS BLOCK CC 4179 to ...".
   "template_name": "name of template if loading, else empty",
   "mode_target": "biketaxi|batch|recurring|split|selfTransfer if setting mode, else empty",
-  "source_account": "Account money is leaving from. (If paying a credit card bill, extract the bank account used here)",
-  "destination_account": "Account receiving money. (If paying a credit card bill, extract the credit card name here)",
-  "narration": "Short clean description of the transaction. If paying a credit card bill, strictly use 'Cleared card bill'.",
+  "source_account": "ONLY if action is 'self_transfer': account money is leaving from. Otherwise leave EMPTY ''.",
+  "destination_account": "ONLY if action is 'self_transfer': account receiving money. Otherwise leave EMPTY ''.",
+  "narration": "Short clean description of the transaction (e.g. 'Spent at AVENUE SUPERMARTS LIMI'). Never include card block instructions or phone numbers. If paying a credit card bill, strictly use 'Cleared card bill'.",
+  "date": "YYYY-MM-DD if an explicit date is in the text/SMS, else empty ''",
   "flow": "withdraw" or "deposit",
-  "account": "Best match from lists: [${allKnownAccounts.join(', ')}] or 'Cash'",
-  "payment_type": "STRICT RULE: If the account is a digital wallet (like Paytm, PhonePe Wallet, Amazon Pay, Mobikwik, Freecharge) OR if the word 'wallet' is used, payment_type MUST BE 'WALLET'. Otherwise use 'CREDIT', 'DEBIT', 'UPI', 'CASH', or 'NET'.",
+  "account": "Best match from lists: [${allKnownAccounts.join(', ')}] or 'Cash' (match bank/card name or last-4 digits like 4179 if present)",
+  "payment_type": "STRICT RULE: If the account is a digital wallet (like Paytm, PhonePe Wallet, Amazon Pay, Mobikwik, Freecharge) OR if the word 'wallet' is used, payment_type MUST BE 'WALLET'. If 'Card', 'Credit Card', or 'CC' is used (without 'Debit'), payment_type MUST BE 'CREDIT'. Otherwise use 'DEBIT', 'UPI', 'CASH', or 'NET'.",
   "denominations": {"500": 2, "100": 1} (Extract count of notes if mentioned, e.g., '2 notes of 500', '500x2', '500*2'. Keys MUST be valid INR note values: 500, 200, 100, 50, 20, 10. Omit if no notes mentioned.),
-  "amount": 0.00, (Must be a number. If denominations are provided but no total is mentioned, mathematically calculate it: 500*2 + 100*1 = 1100),
-  "purpose": "Best match from: [${purposes.join(', ')}]",
+  "amount": 0.00, (Must be a number, NOT card digits or helpline numbers. If denominations are provided but no total is mentioned, mathematically calculate it: 500*2 + 100*1 = 1100),
+  "purpose": "Best match from: [${purposes.join(', ')}] (e.g. 'AVENUE SUPERMARTS' / 'DMART' -> Groceries)",
   "spent_for": "If multiple people are involved or it's a split equally, output 'Split'. If just one specific person for a loan/split, output their name. Otherwise best match from [${spentFors.join(', ')}].",
   "split_recipient_names": ["Name 1", "Name 2"] (Array of strings. Extract ALL other people involved. Do NOT include the user ('Self'). If none, empty array []),
   "is_split_equally": boolean (true if text contains 'split equally', 'divided equally', or implies dividing the total evenly),
@@ -461,6 +462,13 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
       final templateName = json['template_name']?.toString().trim();
       final modeTarget = json['mode_target']?.toString().trim();
 
+      final hasNonEmptyTransferAccounts =
+          (json['source_account']?.toString().trim().isNotEmpty ?? false) &&
+          (json['destination_account']?.toString().trim().isNotEmpty ?? false);
+      final hasNonEmptyTransferTypes =
+          (json['fromPaymentType']?.toString().trim().isNotEmpty ?? false) &&
+          (json['toPaymentType']?.toString().trim().isNotEmpty ?? false);
+
       bool isSelfTransfer = action == 'self_transfer' ||
           json['isSelfTransfer'] == true ||
           json['isSelfTransfer']?.toString().toLowerCase() == 'true' ||
@@ -468,12 +476,12 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
           json['is_self_transfer']?.toString().toLowerCase() == 'true' ||
           json['selfTransfer'] == true ||
           json['self_transfer'] == true ||
-          (json['source_account'] != null && json['destination_account'] != null) ||
-          (json['fromPaymentType'] != null && json['toPaymentType'] != null) ||
+          (action != 'log_transaction' &&
+              (hasNonEmptyTransferAccounts || hasNonEmptyTransferTypes)) ||
           (json['flow']?.toString().toLowerCase() == 'transfer');
 
       final lowerRaw = '$rawText ${json['narration']?.toString() ?? ''}'.toLowerCase();
-      if (!isSelfTransfer) {
+      if (!isSelfTransfer && action != 'log_transaction') {
         if (lowerRaw.contains('credit card bill') ||
             lowerRaw.contains('card bill') ||
             lowerRaw.contains('cash withdrawn') ||
@@ -570,6 +578,12 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
       final isLoanOrSplit = json['is_loan_or_split'] == true ||
           json['is_loan_or_split']?.toString().toLowerCase() == 'true';
 
+      DateTime? parsedDate;
+      final dateRaw = json['date']?.toString().trim();
+      if (dateRaw != null && dateRaw.isNotEmpty) {
+        parsedDate = DateTime.tryParse(dateRaw);
+      }
+
       return AiParsedTransaction(
         action: action,
         templateName: templateName,
@@ -582,6 +596,7 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
         spentFor: spentFor,
         account: account,
         paymentType: paymentType,
+        date: parsedDate,
         fromPaymentType: fromPaymentType,
         fromAccount: fromAccount,
         fromAmount: fromAmount,
@@ -837,9 +852,32 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
       flow = 'Withdraw';
     }
 
+    final coreText = userInput
+        .replaceAll(
+          RegExp(
+            r'(?:\.\s*)?(?:not\s+you\??|if\s+not\s+done\s+by\s+you|to\s+block\b|sms\s+block\b|call\s+1800\d+).*$',
+            caseSensitive: false,
+            dotAll: true,
+          ),
+          '',
+        )
+        .trim();
+    final coreLower = coreText.toLowerCase();
+
+    DateTime? smsDate;
+    final isoDateMatch = RegExp(r'\b(20\d{2})-(\d{2})-(\d{2})\b').firstMatch(coreText);
+    if (isoDateMatch != null) {
+      final y = int.tryParse(isoDateMatch.group(1)!);
+      final m = int.tryParse(isoDateMatch.group(2)!);
+      final d = int.tryParse(isoDateMatch.group(3)!);
+      if (y != null && m != null && d != null) {
+        smsDate = DateTime(y, m, d);
+      }
+    }
+
     // Spent For detection (Blank if not specified)
     String? spentFor;
-    final forMatch = RegExp(r'\bfor\s+([a-zA-Z]+)\b', caseSensitive: false).firstMatch(userInput);
+    final forMatch = RegExp(r'\bfor\s+([a-zA-Z]+)\b', caseSensitive: false).firstMatch(coreText);
     if (forMatch != null) {
       final rawSf = forMatch.group(1)?.trim();
       if (rawSf != null && rawSf.isNotEmpty && !['a', 'an', 'the', 'my'].contains(rawSf.toLowerCase())) {
@@ -849,31 +887,71 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
 
     // Payment Mode & Account detection
     String paymentType = 'UPI';
-    if (lower.contains('credit card') || lower.contains('credit')) {
+    if (!coreLower.contains('debit') &&
+        (coreLower.contains('credit card') ||
+            coreLower.contains('credit') ||
+            RegExp(r'\b(?:bank\s+card|cc|card)\b').hasMatch(coreLower))) {
       paymentType = 'Credit';
-    } else if (lower.contains('wallet') || lower.contains('paytm')) {
+    } else if (coreLower.contains('wallet') || coreLower.contains('paytm')) {
       paymentType = 'Wallets';
-    } else if (lower.contains('cash')) {
+    } else if (coreLower.contains('cash')) {
       paymentType = 'Cash';
-    } else if (lower.contains('netbanking') || lower.contains('net banking')) {
+    } else if (coreLower.contains('netbanking') || coreLower.contains('net banking')) {
       paymentType = 'Net';
-    } else if (lower.contains('debit')) {
+    } else if (coreLower.contains('debit')) {
       paymentType = 'Debit';
     }
 
     String? account;
+    final cardDigitsMatch = RegExp(
+      r'\bcard\s+(?:xx+|ending\s+in\s+|no\.?\s*)?(\d{4})\b',
+      caseSensitive: false,
+    ).firstMatch(coreText);
     final accRegex = RegExp(
       r'(?:using|via|through|from|by|with)\s+([a-zA-Z0-9\s]+?)(?:\s+(?:for|on|dated|at|rs|rupees)|(?:\s*[.,])|$)',
       caseSensitive: false,
     );
-    final accMatch = accRegex.firstMatch(userInput);
-    if (accMatch != null) {
+    final onCardRegex = RegExp(
+      r'\bon\s+([a-zA-Z0-9\s]+?)\s+(?:bank\s+)?(?:credit\s+|debit\s+)?card\b',
+      caseSensitive: false,
+    );
+    final accMatch = accRegex.firstMatch(coreText);
+    final onCardMatch = onCardRegex.firstMatch(coreText);
+
+    if (cardDigitsMatch != null) {
+      final digits = cardDigitsMatch.group(1)!;
+      for (final list in categoryAccounts.values) {
+        for (final knownAcc in list) {
+          if (knownAcc.contains(digits)) {
+            account = knownAcc;
+            break;
+          }
+        }
+        if (account != null) break;
+      }
+    }
+
+    if (account == null && onCardMatch != null) {
+      final bankHint = _cleanAccountName(onCardMatch.group(1) ?? '').toLowerCase();
+      final cardList = categoryAccounts['Credit Cards'] ?? const <String>[];
+      for (final knownCard in cardList) {
+        if (bankHint.isNotEmpty && knownCard.toLowerCase().contains(bankHint)) {
+          account = knownCard;
+          break;
+        }
+      }
+      account ??= cardList.isNotEmpty ? cardList.first : _cleanAccountName(onCardMatch.group(1) ?? '');
+    }
+
+    if (account == null && accMatch != null) {
       account = _cleanAccountName(accMatch.group(1) ?? '');
-    } else {
+    }
+
+    if (account == null) {
       // Check known accounts
       for (final list in categoryAccounts.values) {
         for (final knownAcc in list) {
-          if (lower.contains(knownAcc.toLowerCase())) {
+          if (coreLower.contains(knownAcc.toLowerCase())) {
             account = knownAcc;
             break;
           }
@@ -884,44 +962,57 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
 
     // Purpose detection
     String purpose = 'Others';
-    if (lower.contains('dmart') ||
-        lower.contains('grocery') ||
-        lower.contains('groceries') ||
-        lower.contains('food') ||
-        lower.contains('supermarket') ||
-        lower.contains('restaurant') ||
-        lower.contains('swiggy') ||
-        lower.contains('zomato')) {
-      purpose = _findMatchingPurpose('Food & Groceries', purposes) ?? 'Food & Groceries';
-    } else if (lower.contains('electricity') ||
-        lower.contains('current bill') ||
-        lower.contains('power bill') ||
-        lower.contains('water bill') ||
-        lower.contains('wifi') ||
-        lower.contains('rent') ||
-        lower.contains('utility') ||
-        lower.contains('bill')) {
+    if (coreLower.contains('dmart') ||
+        coreLower.contains('avenue supermart') ||
+        coreLower.contains('supermart') ||
+        coreLower.contains('grocery') ||
+        coreLower.contains('groceries') ||
+        coreLower.contains('food') ||
+        coreLower.contains('supermarket') ||
+        coreLower.contains('restaurant') ||
+        coreLower.contains('swiggy') ||
+        coreLower.contains('zomato')) {
+      purpose = _findMatchingPurpose('Groceries', purposes) ??
+          _findMatchingPurpose('Food & Groceries', purposes) ??
+          'Food & Groceries';
+    } else if (coreLower.contains('electricity') ||
+        coreLower.contains('current bill') ||
+        coreLower.contains('power bill') ||
+        coreLower.contains('water bill') ||
+        coreLower.contains('wifi') ||
+        coreLower.contains('rent') ||
+        coreLower.contains('utility') ||
+        coreLower.contains('bill')) {
       purpose = _findMatchingPurpose('Rent & Utilities', purposes) ?? 'Rent & Utilities';
-    } else if (lower.contains('medicine') ||
-        lower.contains('medical') ||
-        lower.contains('doctor') ||
-        lower.contains('hospital')) {
+    } else if (coreLower.contains('medicine') ||
+        coreLower.contains('medical') ||
+        coreLower.contains('doctor') ||
+        coreLower.contains('hospital')) {
       purpose = _findMatchingPurpose('Medical & Health', purposes) ?? 'Medical & Health';
-    } else if (lower.contains('petrol') ||
-        lower.contains('fuel') ||
-        lower.contains('diesel') ||
-        lower.contains('uber') ||
-        lower.contains('ola')) {
+    } else if (coreLower.contains('petrol') ||
+        coreLower.contains('fuel') ||
+        coreLower.contains('diesel') ||
+        coreLower.contains('uber') ||
+        coreLower.contains('ola')) {
       purpose = _findMatchingPurpose('Fuel & Transport', purposes) ?? 'Fuel & Transport';
-    } else if (lower.contains('salary') || lower.contains('income')) {
+    } else if (coreLower.contains('salary') || coreLower.contains('income')) {
       purpose = _findMatchingPurpose('Salary & Income', purposes) ?? 'Salary & Income';
     } else if (purposes.isNotEmpty) {
       purpose = purposes.first;
     }
 
     // Narration construction
-    // e.g. "paid 658 at dmart using HDFC PhonePe credit card for mother" -> "Paid at dmart"
-    var cleanNarration = userInput;
+    var cleanNarration = coreText;
+    // Remove timestamp / date clauses like "On 2026-11-27:14:54:01"
+    cleanNarration = cleanNarration.replaceAll(
+      RegExp(r'\bon\s+20\d{2}-\d{2}-\d{2}(?:[:T\s]\d{2}:\d{2}(?::\d{2})?)?', caseSensitive: false),
+      ' ',
+    );
+    // Remove "On <Bank> Card <digits>"
+    cleanNarration = cleanNarration.replaceAll(
+      RegExp(r'\bon\s+[a-zA-Z0-9\s]+?\s+(?:bank\s+)?(?:credit\s+|debit\s+)?card(?:\s+\d{4})?', caseSensitive: false),
+      ' ',
+    );
     // Remove amount (with a space to avoid joining words)
     cleanNarration = cleanNarration.replaceAll(
       RegExp(r'(?:rs\.?|inr|rupees|₹)?\s*[0-9]+(?:\.[0-9]{1,2})?\s*(?:rs\.?|inr|rupees|₹|bucks)?', caseSensitive: false),
@@ -954,6 +1045,7 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
       spentFor: spentFor,
       account: account,
       paymentType: paymentType,
+      date: smsDate,
       source: 'local_rules',
     );
   }

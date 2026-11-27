@@ -374,15 +374,18 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                         ),
                         const SizedBox(height: 6),
 
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            mainAxisSpacing: 4,
-                            crossAxisSpacing: 4,
-                            childAspectRatio: 2.35,
-                          ),
+                        Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 270),
+                            child: GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                mainAxisSpacing: 4,
+                                crossAxisSpacing: 4,
+                                childAspectRatio: 2.05,
+                              ),
                           itemCount: PaymentBreakdown.supportedDenominations.length,
                           itemBuilder: (context, idx) {
                             final denom = PaymentBreakdown.supportedDenominations[idx];
@@ -497,6 +500,8 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                               ),
                             );
                           },
+                            ),
+                          ),
                         ),
                       ],
                     ),

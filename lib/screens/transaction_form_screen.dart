@@ -4492,6 +4492,11 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
       }
 
       setState(() {
+        if (parsed.date != null) {
+          _selectedDate = parsed.date!;
+          _referenceId = FinanceTransaction.generateReferenceId(_selectedDate);
+          _referenceIdController.text = _referenceId;
+        }
         if (parsed.isSelfTransfer) {
           _isSelfTransferMode = true;
           _isSplitModeEnabled = false;

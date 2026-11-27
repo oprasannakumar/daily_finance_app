@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:daily_finance_app/main.dart';
 import 'package:daily_finance_app/models/transaction_model.dart';
+import 'package:daily_finance_app/services/ai_transaction_service.dart';
 import 'package:daily_finance_app/services/google_sheets_service.dart';
 import 'package:daily_finance_app/services/quick_nav_controller.dart';
 import 'package:daily_finance_app/services/storage_service.dart';
@@ -198,5 +199,30 @@ void main() {
     await tester.tap(find.text('LOAD'));
     await tester.pumpAndSettle();
     expect(loaded, isTrue);
+  });
+
+  test('AiTransactionService parses HDFC card SMS as Credit Withdraw (not Self Transfer)', () {
+    const sms =
+        'Spent Rs.324 On HDFC Bank Card 4179 At AVENUE SUPERMARTS LIMI On 2026-11-27:14:54:01.Not You? To Block+Reissue Call 18002586161/SMS BLOCK CC 4179 to 7308080808';
+
+    final parsed = AiTransactionService.instance.parseLocalRulesOnly(
+      userInput: sms,
+      purposes: const ['Groceries', 'Food & Dining', 'Others'],
+      spentFors: const ['Self', 'Home'],
+      categoryAccounts: const {
+        'Credit Cards': ['HDFC Millennia 4179', 'Axis MyZone'],
+        'Bank Accounts': ['HDFC Bank', 'SBI Bank'],
+      },
+    );
+
+    expect(parsed.isSelfTransfer, isFalse);
+    expect(parsed.flow, 'Withdraw');
+    expect(parsed.amount, 324.0);
+    expect(parsed.paymentType, 'Credit');
+    expect(parsed.account, 'HDFC Millennia 4179');
+    expect(parsed.purpose, 'Groceries');
+    expect(parsed.date, DateTime(2026, 11, 27));
+    expect(parsed.narration.contains('7308080808'), isFalse);
+    expect(parsed.narration.toLowerCase().contains('avenue supermarts'), isTrue);
   });
 }

@@ -2260,98 +2260,122 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
           ),
           const SizedBox(height: 8),
 
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 6,
-              crossAxisSpacing: 6,
-              childAspectRatio: 1.75,
-            ),
-            itemCount: PaymentBreakdown.supportedDenominations.length,
-            itemBuilder: (context, idx) {
-              final denom = PaymentBreakdown.supportedDenominations[idx];
-              final count = _liveSummary?.cashDenominations[denom] ?? (_config.cashOpeningDenominations[denom] ?? 0);
-              final subtotal = denom * count;
-              final hasValue = count > 0;
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 6,
+                  crossAxisSpacing: 6,
+                  childAspectRatio: 1.95,
+                ),
+                itemCount: PaymentBreakdown.supportedDenominations.length,
+                itemBuilder: (context, idx) {
+                  final denom = PaymentBreakdown.supportedDenominations[idx];
+                  final count = _liveSummary?.cashDenominations[denom] ?? (_config.cashOpeningDenominations[denom] ?? 0);
+                  final subtotal = denom * count;
+                  final hasValue = count > 0;
 
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? (hasValue ? const Color(0xFF1E284A) : const Color(0xFF1B2042))
-                      : (hasValue ? const Color(0xFFF0FDF4) : Colors.white),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: hasValue
-                        ? (isDark ? const Color(0xFF00D2B4) : const Color(0xFF10B981))
-                        : (isDark ? const Color(0xFF282F5A) : const Color(0xFFE2E8F0)),
-                    width: hasValue ? 1.4 : 0.9,
-                  ),
-                  boxShadow: hasValue
-                      ? [
-                          BoxShadow(
-                            color: (isDark ? const Color(0xFF00D2B4) : const Color(0xFF10B981))
-                                .withValues(alpha: isDark ? 0.20 : 0.10),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? (hasValue ? const Color(0xFF1E284A) : const Color(0xFF1B2042))
+                          : (hasValue ? const Color(0xFFF0FDF4) : Colors.white),
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(
                         color: hasValue
-                            ? (isDark
-                                ? const Color(0xFF00D2B4).withValues(alpha: 0.2)
-                                : const Color(0xFF10B981).withValues(alpha: 0.12))
-                            : (isDark
-                                ? Colors.white.withValues(alpha: 0.06)
-                                : const Color(0xFFF1F5F9)),
-                        borderRadius: BorderRadius.circular(6),
+                            ? (isDark ? const Color(0xFF00D2B4) : const Color(0xFF10B981))
+                            : (isDark ? const Color(0xFF282F5A) : const Color(0xFFE2E8F0)),
+                        width: hasValue ? 1.4 : 0.9,
                       ),
-                      child: Text(
-                        '₹$denom',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: hasValue
-                              ? (isDark ? const Color(0xFF00D2B4) : const Color(0xFF059669))
-                              : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                      boxShadow: hasValue
+                          ? [
+                              BoxShadow(
+                                color: (isDark ? const Color(0xFF00D2B4) : const Color(0xFF10B981))
+                                    .withValues(alpha: isDark ? 0.20 : 0.10),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: hasValue
+                                    ? (isDark
+                                        ? const Color(0xFF00D2B4).withValues(alpha: 0.2)
+                                        : const Color(0xFF10B981).withValues(alpha: 0.12))
+                                    : (isDark
+                                        ? Colors.white.withValues(alpha: 0.06)
+                                        : const Color(0xFFF1F5F9)),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Text(
+                                '₹$denom',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: hasValue
+                                      ? (isDark ? const Color(0xFF00D2B4) : const Color(0xFF059669))
+                                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    '× $count',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: hasValue
+                                          ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                                          : textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '₹${IndianCurrency.format(subtotal)}',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: hasValue
+                                    ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                                    : textSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '× $count',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: hasValue
-                            ? (isDark ? Colors.white : const Color(0xFF0F172A))
-                            : textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '₹${IndianCurrency.format(subtotal)}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: hasValue
-                            ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
-                            : textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+                  );
+                },
+              ),
+            ),
           ),
         ],
       ),
@@ -2424,7 +2448,10 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textSecondary),
         ),
         const SizedBox(height: 8),
-        GridView.builder(
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 285),
+            child: GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -2524,6 +2551,8 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
               ),
             );
           },
+        ),
+          ),
         ),
       ],
     );
