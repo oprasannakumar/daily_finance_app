@@ -2351,6 +2351,7 @@ class _RemapItemSplitDialogState extends State<RemapItemSplitDialog> {
                             Container(
                               key: ValueKey('split_alloc_qty_$idx'),
                               height: 46,
+                              alignment: Alignment.center,
                               padding: const EdgeInsets.symmetric(horizontal: 10),
                               decoration: BoxDecoration(
                                 color: colors.inputBg,
@@ -2361,23 +2362,27 @@ class _RemapItemSplitDialogState extends State<RemapItemSplitDialog> {
                                 ),
                               ),
                               child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   Text(
                                     'Qty',
                                     style: TextStyle(
-                                      fontSize: 11.5,
+                                      fontSize: 12,
+                                      height: 1.2,
                                       fontWeight: FontWeight.w600,
                                       color: colors.textSecondary,
                                     ),
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 6),
                                   Expanded(
                                     child: TextField(
                                       controller: _qtyCtrls[idx],
                                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                       textAlign: TextAlign.right,
+                                      textAlignVertical: TextAlignVertical.center,
                                       style: TextStyle(
                                         fontSize: 13.5,
+                                        height: 1.2,
                                         fontWeight: FontWeight.bold,
                                         color: colors.textPrimary,
                                       ),
@@ -2385,9 +2390,11 @@ class _RemapItemSplitDialogState extends State<RemapItemSplitDialog> {
                                         hintText: '0',
                                         hintStyle: TextStyle(
                                           fontSize: 13,
+                                          height: 1.2,
                                           color: colors.textSecondary.withValues(alpha: 0.6),
                                         ),
-                                        isDense: true,
+                                        isCollapsed: true,
+                                        constraints: const BoxConstraints(minHeight: 0),
                                         filled: false,
                                         border: InputBorder.none,
                                         enabledBorder: InputBorder.none,

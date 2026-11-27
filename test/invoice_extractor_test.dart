@@ -156,6 +156,15 @@ void main() {
       MappedInvoiceResult? mappedResult;
       await tester.pumpWidget(
         MaterialApp(
+          theme: ThemeData(
+            useMaterial3: true,
+            inputDecorationTheme: const InputDecorationTheme(
+              filled: true,
+              isDense: true,
+              constraints: BoxConstraints(minHeight: 46),
+              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            ),
+          ),
           home: Builder(
             builder: (ctx) => Scaffold(
               body: ElevatedButton(
@@ -206,6 +215,15 @@ void main() {
       List<ItemAllocationSplit>? splitResult;
       await tester.pumpWidget(
         MaterialApp(
+          theme: ThemeData(
+            useMaterial3: true,
+            inputDecorationTheme: const InputDecorationTheme(
+              filled: true,
+              isDense: true,
+              constraints: BoxConstraints(minHeight: 46),
+              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            ),
+          ),
           home: Builder(
             builder: (ctx) => Scaffold(
               body: ElevatedButton(
@@ -236,9 +254,13 @@ void main() {
       // Verify dropdown and Qty input align horizontally at identical 46px height
       final recipRect = tester.getRect(find.byKey(const ValueKey('split_alloc_recip_0_Self')));
       final qtyRect = tester.getRect(find.byKey(const ValueKey('split_alloc_qty_0')));
+      final qtyLabelRect = tester.getRect(find.text('Qty').first);
+      final qtyInputRect = tester.getRect(find.byType(EditableText).first);
       expect(recipRect.top, closeTo(qtyRect.top, 0.1));
       expect(recipRect.bottom, closeTo(qtyRect.bottom, 0.1));
       expect(recipRect.height, closeTo(46.0, 0.1));
+      expect(qtyInputRect.center.dy, closeTo(qtyRect.center.dy, 2.0));
+      expect(qtyLabelRect.center.dy, closeTo(qtyRect.center.dy, 2.0));
 
       // User changes 1 -> 0.5
       final qtyField = find.byType(TextField).first;
@@ -277,6 +299,15 @@ void main() {
       MappedInvoiceResult? mappedResult;
       await tester.pumpWidget(
         MaterialApp(
+          theme: ThemeData(
+            useMaterial3: true,
+            inputDecorationTheme: const InputDecorationTheme(
+              filled: true,
+              isDense: true,
+              constraints: BoxConstraints(minHeight: 46),
+              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            ),
+          ),
           home: Builder(
             builder: (ctx) => Scaffold(
               body: ElevatedButton(

@@ -450,28 +450,32 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                                   const SizedBox(height: 1),
                                   SizedBox(
                                     height: 22,
-                                    child: TextField(
-                                      controller: _denomControllers[denom],
-                                      keyboardType: const TextInputType.numberWithOptions(signed: true),
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
-                                      ),
-                                      decoration: InputDecoration(
-                                        hintText: '0',
-                                        hintStyle: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                                    child: Center(
+                                      child: TextField(
+                                        controller: _denomControllers[denom],
+                                        keyboardType: const TextInputType.numberWithOptions(signed: true),
+                                        textAlign: TextAlign.center,
+                                        textAlignVertical: TextAlignVertical.center,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
                                         ),
-                                        border: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.zero,
-                                      ),
+                                        decoration: InputDecoration(
+                                          hintText: '0',
+                                          hintStyle: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                                          ),
+                                          border: InputBorder.none,
+                                          enabledBorder: InputBorder.none,
+                                          focusedBorder: InputBorder.none,
+                                          isCollapsed: true,
+                                          constraints: const BoxConstraints(minHeight: 0),
+                                          filled: false,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
                                       onChanged: (val) {
                                         final trimmed = val.trim();
                                         if (trimmed == '-' || trimmed.isEmpty) {
@@ -486,6 +490,7 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                                           _onDenominationChanged(denom, parsed);
                                         }
                                       },
+                                    ),
                                     ),
                                   ),
                                 ],
