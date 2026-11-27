@@ -44,7 +44,7 @@ android {
 
     packaging {
         jniLibs {
-            keepDebugSymbols += "**/*.so"
+            excludes += listOf("**/x86/*.so", "**/x86_64/*.so")
         }
     }
 }

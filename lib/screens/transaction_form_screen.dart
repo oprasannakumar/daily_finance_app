@@ -6249,7 +6249,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                                   },
                                                 ),
                                         ),
-                                        const SizedBox(width: 8),
+                                        const SizedBox(width: 6),
                                         SizedBox(
                                           width: 100,
                                           height: 46,
@@ -6293,13 +6293,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                     margin: const EdgeInsets.symmetric(vertical: 3),
                                     backgroundBorder: Border.all(color: inputBorder, width: 1.2),
                                     onDelete: () => _removeSplitRecipient(idx),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).cardColor,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: rowWidget,
-                                    ),
+                                    child: rowWidget,
                                   );
                                 }),
                                 const SizedBox(height: 8),
