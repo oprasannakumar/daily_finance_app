@@ -23,3 +23,11 @@
 
 # Preserve attributes
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+# ML Kit Text Recognition & DI Components
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
+-keep class com.google.android.gms.internal.mlkit_** { *; }
+-dontwarn com.google.android.gms.internal.mlkit_**
+-keep class * extends com.google.firebase.components.ComponentRegistrar { *; }
+-keepnames class com.google.firebase.components.ComponentRegistrar

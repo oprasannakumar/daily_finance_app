@@ -1673,6 +1673,10 @@ class StorageService {
   }
   static const String _keyGrokApiKey = 'grok_api_key';
   static const String _keyGeminiApiKey = 'gemini_api_key';
+  static const String _keyGrokModel = 'selected_grok_model';
+  static const String _keyGeminiModel = 'selected_gemini_model';
+  static const String _keyCachedGrokModels = 'cached_grok_models';
+  static const String _keyCachedGeminiModels = 'cached_gemini_models';
   String? _cachedGrokKey;
   String? _cachedGeminiKey;
 
@@ -1700,6 +1704,48 @@ class StorageService {
     _cachedGeminiKey = key.trim();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyGeminiApiKey, _cachedGeminiKey!);
+  }
+
+  Future<String?> getSelectedGrokModel() async {
+    final prefs = await SharedPreferences.getInstance();
+    final val = prefs.getString(_keyGrokModel)?.trim();
+    return (val != null && val.isNotEmpty) ? val : null;
+  }
+
+  Future<void> setSelectedGrokModel(String model) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyGrokModel, model.trim());
+  }
+
+  Future<String?> getSelectedGeminiModel() async {
+    final prefs = await SharedPreferences.getInstance();
+    final val = prefs.getString(_keyGeminiModel)?.trim();
+    return (val != null && val.isNotEmpty) ? val : null;
+  }
+
+  Future<void> setSelectedGeminiModel(String model) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyGeminiModel, model.trim());
+  }
+
+  Future<List<String>> getCachedGrokModels() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_keyCachedGrokModels) ?? const [];
+  }
+
+  Future<void> setCachedGrokModels(List<String> models) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_keyCachedGrokModels, models);
+  }
+
+  Future<List<String>> getCachedGeminiModels() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_keyCachedGeminiModels) ?? const [];
+  }
+
+  Future<void> setCachedGeminiModels(List<String> models) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_keyCachedGeminiModels, models);
   }
 
   Future<String?> getString(String key) async {

@@ -195,7 +195,25 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
   static const String grokModelName = 'qwen/qwen3.8-27b';
   static const String geminiModelName = 'gemini-3.6-flash';
 
-  // --- 1. Grok API Caller (qwen/qwen3.8-27b) ---
+  List<String> _grokEndpointsForKey(String key) {
+    final trimmed = key.trim();
+    if (trimmed.startsWith('gsk_')) {
+      return const ['https://api.groq.com/openai/v1/chat/completions'];
+    }
+    if (trimmed.startsWith('sk-or-')) {
+      return const ['https://openrouter.ai/api/v1/chat/completions'];
+    }
+    if (trimmed.startsWith('xai-')) {
+      return const ['https://api.x.ai/v1/chat/completions'];
+    }
+    return const [
+      'https://api.groq.com/openai/v1/chat/completions',
+      'https://openrouter.ai/api/v1/chat/completions',
+      'https://api.x.ai/v1/chat/completions',
+    ];
+  }
+
+  // --- 1. Grok API Caller ---
   Future<AiParsedTransaction?> _callGrok({
     required String apiKey,
     required String userInput,
@@ -203,6 +221,7 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
     required List<String> spentFors,
     required Map<String, List<String>> categoryAccounts,
   }) async {
+    final model = (await StorageService.instance.getSelectedGrokModel()) ?? grokModelName;
     final promptText = _buildSystemPrompt(
       userInput: userInput,
       purposes: purposes,
@@ -210,10 +229,7 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
       categoryAccounts: categoryAccounts,
     );
 
-    final endpoints = [
-      'https://api.groq.com/openai/v1/chat/completions',
-      'https://openrouter.ai/api/v1/chat/completions',
-    ];
+    final endpoints = _grokEndpointsForKey(apiKey);
 
     for (final endpoint in endpoints) {
       try {
@@ -224,7 +240,7 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
             'Authorization': 'Bearer $apiKey',
           },
           body: jsonEncode({
-            'model': grokModelName,
+            'model': model,
             'messages': [
               {
                 'role': 'system',
@@ -240,19 +256,19 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
           final content = data['choices']?[0]?['message']?['content']?.toString() ?? '';
-          final parsed = _extractJsonAndMap(content, 'grok ($grokModelName)');
+          final parsed = _extractJsonAndMap(content, 'grok ($model)');
           if (parsed != null) return parsed;
         } else {
-          debugPrint('Grok $endpoint with $grokModelName returned ${res.statusCode}: ${res.body}');
+          debugPrint('Grok $endpoint with $model returned ${res.statusCode}: ${res.body}');
         }
       } catch (e) {
-        debugPrint('Grok $endpoint with $grokModelName failed: $e');
+        debugPrint('Grok $endpoint with $model failed: $e');
       }
     }
     return null;
   }
 
-  // --- 2. Gemini API Caller (gemini-3.6-flash) ---
+  // --- 2. Gemini API Caller ---
   Future<AiParsedTransaction?> _callGemini({
     required String apiKey,
     required String userInput,
@@ -260,6 +276,7 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
     required List<String> spentFors,
     required Map<String, List<String>> categoryAccounts,
   }) async {
+    final model = (await StorageService.instance.getSelectedGeminiModel()) ?? geminiModelName;
     final promptText = _buildSystemPrompt(
       userInput: userInput,
       purposes: purposes,
@@ -268,7 +285,7 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
     );
 
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/$geminiModelName:generateContent?key=$apiKey',
+      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
     );
 
     final payload = jsonEncode({
@@ -301,7 +318,7 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
           final candidates = data['candidates'] as List?;
           if (candidates != null && candidates.isNotEmpty) {
             final text = candidates[0]?['content']?['parts']?[0]?['text']?.toString() ?? '';
-            final parsed = _extractJsonAndMap(text, 'gemini ($geminiModelName)');
+            final parsed = _extractJsonAndMap(text, 'gemini ($model)');
             if (parsed != null) return parsed;
           }
         } else if (res.statusCode == 503) {
@@ -321,15 +338,20 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
   Future<Map<String, String>> testConnection({
     String? grokKey,
     String? geminiKey,
+    String? grokModel,
+    String? geminiModel,
   }) async {
     final results = <String, String>{};
+    final chosenGrokModel = (grokModel != null && grokModel.trim().isNotEmpty)
+        ? grokModel.trim()
+        : ((await StorageService.instance.getSelectedGrokModel()) ?? grokModelName);
+    final chosenGeminiModel = (geminiModel != null && geminiModel.trim().isNotEmpty)
+        ? geminiModel.trim()
+        : ((await StorageService.instance.getSelectedGeminiModel()) ?? geminiModelName);
 
     if (grokKey != null && grokKey.trim().isNotEmpty) {
       final key = grokKey.trim();
-      final endpoints = [
-        'https://api.groq.com/openai/v1/chat/completions',
-        'https://openrouter.ai/api/v1/chat/completions',
-      ];
+      final endpoints = _grokEndpointsForKey(key);
 
       String? lastError;
       bool succeeded = false;
@@ -343,17 +365,16 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
               'Authorization': 'Bearer $key',
             },
             body: jsonEncode({
-              'model': grokModelName,
+              'model': chosenGrokModel,
               'messages': [
                 {'role': 'user', 'content': 'hi'}
               ],
-              'response_format': {'type': 'json_object'},
               'max_tokens': 5,
             }),
           ).timeout(const Duration(seconds: 15));
 
           if (res.statusCode == 200) {
-            results['grok'] = 'Connected successfully ($grokModelName)';
+            results['grok'] = 'Connected successfully ($chosenGrokModel)';
             succeeded = true;
             break;
           } else {
@@ -372,7 +393,7 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
     if (geminiKey != null && geminiKey.trim().isNotEmpty) {
       final key = geminiKey.trim();
       final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/$geminiModelName:generateContent?key=$key',
+        'https://generativelanguage.googleapis.com/v1beta/models/$chosenGeminiModel:generateContent?key=$key',
       );
 
       final payload = jsonEncode({
@@ -400,7 +421,7 @@ Determine the user's INTENT and return EXACTLY this JSON structure. Do NOT wrap 
         ).timeout(const Duration(seconds: 20));
 
         if (res.statusCode == 200) {
-          results['gemini'] = 'Connected successfully ($geminiModelName)';
+          results['gemini'] = 'Connected successfully ($chosenGeminiModel)';
         } else if (res.statusCode == 503) {
           results['gemini'] = 'Temporary high demand on Google servers (503). Retries automatically during usage.';
         } else {

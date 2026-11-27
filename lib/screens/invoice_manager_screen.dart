@@ -1,8 +1,16 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 import '../models/invoice_model.dart';
 import '../services/google_sheets_service.dart';
+import '../services/invoice_extractor_service.dart';
 import '../services/storage_service.dart';
+import '../widgets/ai_settings_dialog.dart';
+import '../widgets/popup_select_field.dart';
 import '../widgets/swipe_to_delete_wrapper.dart';
 
 class InvoiceManagerScreen extends StatefulWidget {
@@ -342,6 +350,15 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
   List<String> _knownRecipients = ['Self'];
   bool _isLoading = false;
   bool _isSaving = false;
+  bool _isExtracting = false;
+  bool _isLoadingModels = false;
+  String? _extractionStatus;
+  String _lastOcrText = '';
+  List<Uint8List> _extractedPreviewPages = [];
+  List<String> _grokModels = List<String>.from(InvoiceExtractorService.defaultGroqModels);
+  List<String> _geminiModels = List<String>.from(InvoiceExtractorService.defaultGeminiModels);
+  String _selectedGrokModel = InvoiceExtractorService.defaultGroqModels.first;
+  String _selectedGeminiModel = InvoiceExtractorService.defaultGeminiModels.first;
 
   final _currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
@@ -361,6 +378,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     ));
 
     _loadData();
+    _initAiModels();
   }
 
   void _generateDefaultBillNo() {
@@ -399,6 +417,364 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     if (targetDealer.isEmpty) return _dealerPrices;
     final matching = _dealerPrices.where((dp) => dp.dealer.trim().toLowerCase() == targetDealer).toList();
     return matching.isNotEmpty ? matching : _dealerPrices;
+  }
+
+  Future<void> _initAiModels() async {
+    final storage = StorageService.instance;
+    final grokKey = (await storage.getGrokApiKey()) ?? '';
+    final geminiKey = (await storage.getGeminiApiKey()) ?? '';
+    final savedGrok = await storage.getSelectedGrokModel();
+    final savedGemini = await storage.getSelectedGeminiModel();
+    final cachedGrok = await storage.getCachedGrokModels();
+    final cachedGemini = await storage.getCachedGeminiModels();
+
+    if (!mounted) return;
+    setState(() {
+      _grokModels = List<String>.from(
+        cachedGrok.isNotEmpty ? cachedGrok : InvoiceExtractorService.defaultGrokModelsForKey(grokKey),
+      );
+      _geminiModels = List<String>.from(
+        cachedGemini.isNotEmpty ? cachedGemini : InvoiceExtractorService.defaultGeminiModels,
+      );
+      _selectedGrokModel = (savedGrok != null && savedGrok.isNotEmpty) ? savedGrok : _grokModels.first;
+      if (!_grokModels.contains(_selectedGrokModel)) {
+        _grokModels = [_selectedGrokModel, ..._grokModels];
+      }
+      _selectedGeminiModel = (savedGemini != null && savedGemini.isNotEmpty) ? savedGemini : _geminiModels.first;
+      if (!_geminiModels.contains(_selectedGeminiModel)) {
+        _geminiModels = [_selectedGeminiModel, ..._geminiModels];
+      }
+    });
+
+    if (grokKey.trim().isNotEmpty || geminiKey.trim().isNotEmpty) {
+      await _refreshAvailableModels(silent: true);
+    }
+  }
+
+  Future<void> _refreshAvailableModels({bool silent = false}) async {
+    if (_isLoadingModels) return;
+    setState(() => _isLoadingModels = true);
+    try {
+      final storage = StorageService.instance;
+      final grokKey = (await storage.getGrokApiKey()) ?? '';
+      final geminiKey = (await storage.getGeminiApiKey()) ?? '';
+      final fetchedGrok = await InvoiceExtractorService.instance.fetchAvailableGrokModels(grokKey);
+      final fetchedGemini = await InvoiceExtractorService.instance.fetchAvailableGeminiModels(geminiKey);
+      if (!mounted) return;
+      setState(() {
+        if (fetchedGrok.isNotEmpty) {
+          _grokModels = List<String>.from(fetchedGrok);
+          if (!_grokModels.contains(_selectedGrokModel)) {
+            _selectedGrokModel = _grokModels.first;
+            storage.setSelectedGrokModel(_selectedGrokModel);
+          }
+        }
+        if (fetchedGemini.isNotEmpty) {
+          _geminiModels = List<String>.from(fetchedGemini);
+          if (!_geminiModels.contains(_selectedGeminiModel)) {
+            _selectedGeminiModel = _geminiModels.first;
+            storage.setSelectedGeminiModel(_selectedGeminiModel);
+          }
+        }
+      });
+      if (!silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Loaded ${_grokModels.length} Grok & ${_geminiModels.length} Gemini models.',
+              textAlign: TextAlign.center,
+            ),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingModels = false);
+      }
+    }
+  }
+
+  void _showOcrPreviewDialog(String ocrText) {
+    showDialog(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Extracted OCR Text', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              ocrText.isEmpty ? '(Empty OCR output)' : ocrText,
+              style: const TextStyle(fontSize: 11.5, fontFamily: 'monospace'),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openAiKeysAndModels() async {
+    final saved = await showAiSettingsDialog(context);
+    if (saved && mounted) {
+      await _initAiModels();
+    }
+  }
+
+  Future<void> _extractFromSource(String mode) async {
+    final pages = <Uint8List>[];
+
+    if (mode == 'doc') {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+      );
+      if (result.isEmpty || !mounted) return;
+      final file = result.first;
+      final fileBytes = file.path != null ? await File(file.path!).readAsBytes() : null;
+      if (fileBytes == null || fileBytes.isEmpty) return;
+
+      final isPdf = (file.extension ?? '').toLowerCase() == 'pdf' ||
+          file.name.toLowerCase().endsWith('.pdf');
+
+      if (isPdf) {
+        setState(() {
+          _isExtracting = true;
+          _extractionStatus = 'Rendering PDF pages...';
+        });
+        try {
+          int count = 0;
+          await for (final raster in Printing.raster(fileBytes, dpi: 220)) {
+            final png = await raster.toPng();
+            final opaque = await InvoiceExtractorService.instance.compositeOnWhiteBackground(png);
+            pages.add(opaque);
+            count++;
+            if (count >= 5) break;
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _isExtracting = false;
+              _extractionStatus = null;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to read PDF: $e', textAlign: TextAlign.center)),
+            );
+          }
+          return;
+        }
+      } else {
+        setState(() {
+          _isExtracting = true;
+          _extractionStatus = 'Preparing image...';
+        });
+        pages.add(fileBytes);
+      }
+    } else {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 90,
+        maxWidth: 1800,
+      );
+      if (picked == null || !mounted) return;
+      setState(() {
+        _isExtracting = true;
+        _extractionStatus = 'Preparing camera photo...';
+      });
+      pages.add(await picked.readAsBytes());
+    }
+
+    if (pages.isEmpty || !mounted) {
+      setState(() {
+        _isExtracting = false;
+        _extractionStatus = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _extractedPreviewPages = pages;
+      _lastOcrText = '';
+      _extractionStatus = 'Step 1/2: Extracting text with OCR...';
+    });
+
+    try {
+      final ocrText = await InvoiceExtractorService.instance.extractOcrText(pages);
+      if (!mounted) return;
+      setState(() {
+        _lastOcrText = ocrText;
+        _extractionStatus = 'Step 2/2: Feeding OCR text to AI agent...';
+      });
+
+      final extracted = await InvoiceExtractorService.instance.extractFromOcrText(
+        ocrText,
+        selectedGrokModel: _selectedGrokModel,
+        selectedGeminiModel: _selectedGeminiModel,
+        onStatus: (status) {
+          if (mounted) setState(() => _extractionStatus = 'Step 2/2: $status');
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _isExtracting = false;
+        _extractionStatus = null;
+      });
+
+      if (extracted.items.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No items returned by ${extracted.usedProvider}.', textAlign: TextAlign.center),
+            duration: const Duration(seconds: 6),
+            action: _lastOcrText.isNotEmpty
+                ? SnackBarAction(label: 'View OCR', onPressed: () => _showOcrPreviewDialog(_lastOcrText))
+                : null,
+          ),
+        );
+        return;
+      }
+
+      // Fuzzy-match dealer against known dealers
+      String mappedDealer = extracted.dealerName;
+      if (mappedDealer.isNotEmpty) {
+        final lower = mappedDealer.toLowerCase();
+        for (final known in _knownDealers) {
+          final kl = known.toLowerCase();
+          if (kl == lower || kl.contains(lower) || lower.contains(kl)) {
+            mappedDealer = known;
+            break;
+          }
+        }
+      }
+
+      final recipientOptions = <String>{
+        'Self',
+        ..._knownRecipients.where((r) => r.trim().isNotEmpty && r != 'Split'),
+      }.toList();
+
+      final mapped = await showDialog<MappedInvoiceResult>(
+        context: context,
+        builder: (_) => MapExtractedInvoiceDialog(
+          extracted: extracted,
+          initialDealer: mappedDealer,
+          initialBillNo: extracted.invoiceNumber.isNotEmpty
+              ? extracted.invoiceNumber
+              : _billNoController.text.trim(),
+          initialBillingDate: extracted.billingDate ?? _selectedDate,
+          knownDealers: _knownDealers,
+          recipientOptions: recipientOptions,
+          ocrText: _lastOcrText,
+        ),
+      );
+
+      if (mapped != null && mounted) {
+        final grouped = <String, List<_InvoiceItemDraft>>{};
+        for (int i = 0; i < extracted.items.length; i++) {
+          final it = extracted.items[i];
+          final recip = mapped.assignments[i];
+          grouped.putIfAbsent(recip, () => []).add(
+            _InvoiceItemDraft(
+              name: it.name,
+              qty: it.quantity,
+              price: it.unitPrice,
+            ),
+          );
+        }
+
+        setState(() {
+          _selectedDate = mapped.billingDate;
+          if (mapped.billNo.isNotEmpty) {
+            _billNoController.text = mapped.billNo;
+          }
+          _dealerController.text = mapped.dealer;
+          for (final g in _draftRecipients) {
+            for (final it in g.items) {
+              it.dispose();
+            }
+          }
+          _draftRecipients.clear();
+          if (grouped.containsKey('Self')) {
+            _draftRecipients.add(_InvoiceRecipientDraft(recipient: 'Self', items: grouped.remove('Self')!));
+          } else {
+            _draftRecipients.add(_InvoiceRecipientDraft(recipient: 'Self', items: []));
+          }
+          for (final entry in grouped.entries) {
+            _draftRecipients.add(_InvoiceRecipientDraft(recipient: entry.key, items: entry.value));
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Mapped ${extracted.items.length} items from invoice!', textAlign: TextAlign.center),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isExtracting = false;
+          _extractionStatus = null;
+        });
+        final msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Extraction failed:\n$msg',
+              maxLines: 6,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+            duration: const Duration(seconds: 7),
+            backgroundColor: const Color(0xFFEF4444),
+            action: SnackBarAction(
+              label: _lastOcrText.isNotEmpty ? 'Keys / OCR' : 'API Keys',
+              textColor: Colors.white,
+              onPressed: () {
+                if (_lastOcrText.isEmpty) {
+                  _openAiKeysAndModels();
+                } else {
+                  showDialog(
+                    context: context,
+                    builder: (dCtx) => AlertDialog(
+                      title: const Text('Extraction Diagnostics'),
+                      content: SizedBox(
+                        width: double.maxFinite,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SelectableText(msg, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+                              const Divider(height: 16),
+                              const Text('OCR Text:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              const SizedBox(height: 4),
+                              SelectableText(_lastOcrText, style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+                            ],
+                          ),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(dCtx);
+                            _openAiKeysAndModels();
+                          },
+                          child: const Text('API Keys & Models'),
+                        ),
+                        TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Close')),
+                      ],
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadData({bool forceRefresh = false}) async {
@@ -872,6 +1248,11 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.vpn_key_outlined),
+            tooltip: 'AI API Keys & Models',
+            onPressed: _openAiKeysAndModels,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh from Google Sheets',
             onPressed: _isLoading ? null : () => _loadData(forceRefresh: true),
@@ -900,6 +1281,252 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     );
   }
 
+  Widget _buildModelDropdown({
+    required String label,
+    required String selectedValue,
+    required List<String> options,
+    required ValueChanged<String> onChanged,
+    required Color bgInput,
+    required Color borderColor,
+    required Color textLabel,
+    required Color textMain,
+    required bool isDark,
+  }) {
+    final safeItems = options.contains(selectedValue) ? options : [selectedValue, ...options];
+    return DropdownButtonFormField<String>(
+      key: ValueKey('inv_model_${label}_${selectedValue}_${safeItems.length}'),
+      initialValue: selectedValue,
+      isExpanded: true,
+      menuMaxHeight: 320,
+      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: textMain),
+      dropdownColor: isDark ? const Color(0xFF1F1A3A) : Colors.white,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textLabel),
+        filled: true,
+        fillColor: bgInput,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(11)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(11),
+          borderSide: BorderSide(color: borderColor, width: 1.1),
+        ),
+      ),
+      items: safeItems
+          .map((m) => DropdownMenuItem<String>(
+                value: m,
+                child: Text(m, overflow: TextOverflow.ellipsis),
+              ))
+          .toList(),
+      onChanged: _isExtracting
+          ? null
+          : (val) {
+              if (val != null) onChanged(val);
+            },
+    );
+  }
+
+  Widget _buildAiExtractorCard(
+    Color primary,
+    Color secondary,
+    Color borderColor,
+    Color bgInput,
+    Color textLabel,
+    Color textMain,
+    bool isDark,
+  ) {
+    final cardSurface = isDark ? const Color(0xFF191530) : Colors.white;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cardSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Text('🤖', style: TextStyle(fontSize: 15)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'AI Invoice Extractor (OCR → AI)',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: textMain),
+                ),
+              ),
+              SizedBox(
+                width: 30,
+                height: 30,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  tooltip: 'Refresh available models',
+                  onPressed: (_isLoadingModels || _isExtracting) ? null : () => _refreshAvailableModels(),
+                  icon: _isLoadingModels
+                      ? SizedBox(
+                          width: 15,
+                          height: 15,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: primary),
+                        )
+                      : Icon(Icons.sync_rounded, size: 18, color: textLabel),
+                ),
+              ),
+              SizedBox(
+                width: 30,
+                height: 30,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  tooltip: 'AI API Keys & Models',
+                  onPressed: _isExtracting ? null : _openAiKeysAndModels,
+                  icon: Icon(Icons.vpn_key_outlined, size: 18, color: textLabel),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildModelDropdown(
+                  label: 'Grok Model',
+                  selectedValue: _selectedGrokModel,
+                  options: _grokModels,
+                  bgInput: bgInput,
+                  borderColor: borderColor,
+                  textLabel: textLabel,
+                  textMain: textMain,
+                  isDark: isDark,
+                  onChanged: (val) {
+                    setState(() => _selectedGrokModel = val);
+                    StorageService.instance.setSelectedGrokModel(val);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildModelDropdown(
+                  label: 'Gemini Model',
+                  selectedValue: _selectedGeminiModel,
+                  options: _geminiModels,
+                  bgInput: bgInput,
+                  borderColor: borderColor,
+                  textLabel: textLabel,
+                  textMain: textMain,
+                  isDark: isDark,
+                  onChanged: (val) {
+                    setState(() => _selectedGeminiModel = val);
+                    StorageService.instance.setSelectedGeminiModel(val);
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isExtracting ? null : () => _extractFromSource('doc'),
+                  icon: const Icon(Icons.upload_file_rounded, size: 18),
+                  label: const Text('PDF / Image', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: primary,
+                    side: BorderSide(color: primary.withValues(alpha: 0.6), width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isExtracting ? null : () => _extractFromSource('camera'),
+                  icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                  label: const Text('Camera', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: secondary,
+                    side: BorderSide(color: secondary.withValues(alpha: 0.7), width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (_isExtracting && _extractionStatus != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: primary.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: primary)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _extractionStatus!,
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: primary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (_extractedPreviewPages.isNotEmpty || _lastOcrText.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (_extractedPreviewPages.isNotEmpty)
+                  Expanded(
+                    child: SizedBox(
+                      height: 60,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _extractedPreviewPages.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (_, idx) => Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.memory(_extractedPreviewPages[idx], width: 48, height: 60, fit: BoxFit.cover),
+                            ),
+                            Positioned(
+                              bottom: 2,
+                              right: 2,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.65),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text('P${idx + 1}', style: const TextStyle(color: Colors.white, fontSize: 9)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_lastOcrText.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () => _showOcrPreviewDialog(_lastOcrText),
+                    icon: const Icon(Icons.text_snippet_outlined, size: 16),
+                    label: const Text('View OCR', style: TextStyle(fontSize: 11.5)),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildCreateMode(Color primary, Color secondary, Color purple, bool isDark) {
     final bgInput = isDark ? const Color(0xFF1F1A3A) : const Color(0xFFFFFAF5);
     final borderColor = isDark ? const Color(0xFF2D2A4A) : const Color(0xFFF0E8DC);
@@ -911,6 +1538,9 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _buildAiExtractorCard(primary, secondary, borderColor, bgInput, textLabel, textMain, isDark),
+          const SizedBox(height: 14),
+
           // Row 1: Date & Invoice No
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1497,6 +2127,279 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                     );
                   },
                 ),
+        ),
+      ],
+    );
+  }
+}
+
+class MappedInvoiceResult {
+  final String dealer;
+  final String billNo;
+  final DateTime billingDate;
+  final List<String> assignments;
+
+  MappedInvoiceResult({
+    required this.dealer,
+    required this.billNo,
+    required this.billingDate,
+    required this.assignments,
+  });
+}
+
+class MapExtractedInvoiceDialog extends StatefulWidget {
+  final ExtractedInvoiceData extracted;
+  final String initialDealer;
+  final String initialBillNo;
+  final DateTime initialBillingDate;
+  final List<String> knownDealers;
+  final List<String> recipientOptions;
+  final String ocrText;
+
+  const MapExtractedInvoiceDialog({
+    super.key,
+    required this.extracted,
+    required this.initialDealer,
+    required this.initialBillNo,
+    required this.initialBillingDate,
+    required this.knownDealers,
+    required this.recipientOptions,
+    this.ocrText = '',
+  });
+
+  @override
+  State<MapExtractedInvoiceDialog> createState() => _MapExtractedInvoiceDialogState();
+}
+
+class _MapExtractedInvoiceDialogState extends State<MapExtractedInvoiceDialog> {
+  late final TextEditingController _dealerCtrl;
+  late final TextEditingController _billNoCtrl;
+  late DateTime _mappedDate;
+  late final List<String> _assignments;
+
+  @override
+  void initState() {
+    super.initState();
+    _dealerCtrl = TextEditingController(text: widget.initialDealer);
+    _billNoCtrl = TextEditingController(text: widget.initialBillNo);
+    _mappedDate = widget.initialBillingDate;
+    _assignments = List<String>.filled(widget.extracted.items.length, 'Self');
+  }
+
+  @override
+  void dispose() {
+    _dealerCtrl.dispose();
+    _billNoCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: Row(
+        children: [
+          const Icon(Icons.receipt_long_rounded, color: Color(0xFFFF7A5C), size: 22),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Map Extracted Invoice', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  'via ${widget.extracted.usedProvider}',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
+                ),
+              ],
+            ),
+          ),
+          if (widget.ocrText.isNotEmpty)
+            IconButton(
+              tooltip: 'View OCR Text',
+              icon: const Icon(Icons.text_snippet_outlined, size: 19),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (dCtx) => AlertDialog(
+                    title: const Text('Extracted OCR Text', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    content: SizedBox(
+                      width: double.maxFinite,
+                      child: SingleChildScrollView(
+                        child: SelectableText(
+                          widget.ocrText,
+                          style: const TextStyle(fontSize: 11.5, fontFamily: 'monospace'),
+                        ),
+                      ),
+                    ),
+                    actions: [TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Close'))],
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: _billNoCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Invoice No',
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _mappedDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2035),
+                      );
+                      if (picked != null && mounted) {
+                        setState(() => _mappedDate = picked);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: 'Billing Date',
+                        isDense: true,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        DateFormat('dd-MMM-yy').format(_mappedDate),
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _dealerCtrl,
+              decoration: InputDecoration(
+                labelText: 'Dealer Name',
+                isDense: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            if (widget.knownDealers.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 30,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: widget.knownDealers.take(10).map((d) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ActionChip(
+                        label: Text(d, style: const TextStyle(fontSize: 11)),
+                        padding: EdgeInsets.zero,
+                        onPressed: () => setState(() => _dealerCtrl.text = d),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Items (${widget.extracted.items.length}) • Assign Self / Others',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                TextButton(
+                  onPressed: () => setState(() {
+                    for (int i = 0; i < _assignments.length; i++) {
+                      _assignments[i] = 'Self';
+                    }
+                  }),
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  child: const Text('All Self', style: TextStyle(fontSize: 11.5)),
+                ),
+              ],
+            ),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 280),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: widget.extracted.items.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (_, idx) {
+                  final item = widget.extracted.items[idx];
+                  final lineTotal = item.quantity * item.unitPrice;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                'Qty ${item.quantity} × ₹${item.unitPrice.toStringAsFixed(2)} = ₹${lineTotal.toStringAsFixed(2)}',
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 112,
+                          child: PopupSelectField(
+                            key: ValueKey('map_item_${idx}_${_assignments[idx]}'),
+                            label: 'Assign Item To',
+                            placeholder: 'Self',
+                            items: widget.recipientOptions,
+                            selectedValue: _assignments[idx],
+                            onSelected: (val) => setState(() => _assignments[idx] = val),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF7A5C)),
+          onPressed: () => Navigator.pop(
+            context,
+            MappedInvoiceResult(
+              dealer: _dealerCtrl.text.trim(),
+              billNo: _billNoCtrl.text.trim(),
+              billingDate: _mappedDate,
+              assignments: List<String>.from(_assignments),
+            ),
+          ),
+          child: const Text('Apply to Invoice'),
         ),
       ],
     );
