@@ -1889,12 +1889,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
           return;
         }
       }
-      // Fallback to AI engine for unstructured bank/UPI SMS or natural text in clipboard
-      await _processAiAutoFill(textToParse, updateNarration: true, isSilent: false);
-      return;
     }
 
-    // Nothing in narration or clipboard: inform user without modifying the form
+    // Nothing structured found in clipboard: inform user without modifying the form
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -5140,7 +5137,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                                     ),
                                                     const SizedBox(height: 1),
                                                     Text(
-                                                      'Paste SMS / UPI alert or use narration',
+                                                      'Paste copied transaction or use narration',
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                       style: TextStyle(

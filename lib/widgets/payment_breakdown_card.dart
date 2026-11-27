@@ -376,15 +376,15 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
 
                         Center(
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 270),
+                            constraints: const BoxConstraints(maxWidth: 295),
                             child: GridView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 3,
-                                mainAxisSpacing: 4,
-                                crossAxisSpacing: 4,
-                                childAspectRatio: 2.05,
+                                mainAxisSpacing: 8,
+                                crossAxisSpacing: 8,
+                                childAspectRatio: 1.95,
                               ),
                           itemCount: PaymentBreakdown.supportedDenominations.length,
                           itemBuilder: (context, idx) {
