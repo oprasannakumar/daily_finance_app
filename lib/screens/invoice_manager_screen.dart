@@ -351,14 +351,10 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
   bool _isLoading = false;
   bool _isSaving = false;
   bool _isExtracting = false;
-  bool _isLoadingModels = false;
+  bool _isScanFabExpanded = false;
   String? _extractionStatus;
   String _lastOcrText = '';
   List<Uint8List> _extractedPreviewPages = [];
-  List<String> _grokModels = List<String>.from(InvoiceExtractorService.defaultGroqModels);
-  List<String> _geminiModels = List<String>.from(InvoiceExtractorService.defaultGeminiModels);
-  String _selectedGrokModel = InvoiceExtractorService.defaultGroqModels.first;
-  String _selectedGeminiModel = InvoiceExtractorService.defaultGeminiModels.first;
 
   final _currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
@@ -366,6 +362,13 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) {
+        setState(() {
+          if (_isScanFabExpanded) _isScanFabExpanded = false;
+        });
+      }
+    });
     _selectedDate = widget.initialDate ?? DateTime.now();
 
     // Generate initial Bill No suggestion
@@ -378,7 +381,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     ));
 
     _loadData();
-    _initAiModels();
   }
 
   void _generateDefaultBillNo() {
@@ -419,82 +421,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     return matching.isNotEmpty ? matching : _dealerPrices;
   }
 
-  Future<void> _initAiModels() async {
-    final storage = StorageService.instance;
-    final grokKey = (await storage.getGrokApiKey()) ?? '';
-    final geminiKey = (await storage.getGeminiApiKey()) ?? '';
-    final savedGrok = await storage.getSelectedGrokModel();
-    final savedGemini = await storage.getSelectedGeminiModel();
-    final cachedGrok = await storage.getCachedGrokModels();
-    final cachedGemini = await storage.getCachedGeminiModels();
-
-    if (!mounted) return;
-    setState(() {
-      _grokModels = List<String>.from(
-        cachedGrok.isNotEmpty ? cachedGrok : InvoiceExtractorService.defaultGrokModelsForKey(grokKey),
-      );
-      _geminiModels = List<String>.from(
-        cachedGemini.isNotEmpty ? cachedGemini : InvoiceExtractorService.defaultGeminiModels,
-      );
-      _selectedGrokModel = (savedGrok != null && savedGrok.isNotEmpty) ? savedGrok : _grokModels.first;
-      if (!_grokModels.contains(_selectedGrokModel)) {
-        _grokModels = [_selectedGrokModel, ..._grokModels];
-      }
-      _selectedGeminiModel = (savedGemini != null && savedGemini.isNotEmpty) ? savedGemini : _geminiModels.first;
-      if (!_geminiModels.contains(_selectedGeminiModel)) {
-        _geminiModels = [_selectedGeminiModel, ..._geminiModels];
-      }
-    });
-
-    if (grokKey.trim().isNotEmpty || geminiKey.trim().isNotEmpty) {
-      await _refreshAvailableModels(silent: true);
-    }
-  }
-
-  Future<void> _refreshAvailableModels({bool silent = false}) async {
-    if (_isLoadingModels) return;
-    setState(() => _isLoadingModels = true);
-    try {
-      final storage = StorageService.instance;
-      final grokKey = (await storage.getGrokApiKey()) ?? '';
-      final geminiKey = (await storage.getGeminiApiKey()) ?? '';
-      final fetchedGrok = await InvoiceExtractorService.instance.fetchAvailableGrokModels(grokKey);
-      final fetchedGemini = await InvoiceExtractorService.instance.fetchAvailableGeminiModels(geminiKey);
-      if (!mounted) return;
-      setState(() {
-        if (fetchedGrok.isNotEmpty) {
-          _grokModels = List<String>.from(fetchedGrok);
-          if (!_grokModels.contains(_selectedGrokModel)) {
-            _selectedGrokModel = _grokModels.first;
-            storage.setSelectedGrokModel(_selectedGrokModel);
-          }
-        }
-        if (fetchedGemini.isNotEmpty) {
-          _geminiModels = List<String>.from(fetchedGemini);
-          if (!_geminiModels.contains(_selectedGeminiModel)) {
-            _selectedGeminiModel = _geminiModels.first;
-            storage.setSelectedGeminiModel(_selectedGeminiModel);
-          }
-        }
-      });
-      if (!silent && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Loaded ${_grokModels.length} Grok & ${_geminiModels.length} Gemini models.',
-              textAlign: TextAlign.center,
-            ),
-            backgroundColor: const Color(0xFF10B981),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingModels = false);
-      }
-    }
-  }
-
   void _showOcrPreviewDialog(String ocrText) {
     showDialog(
       context: context,
@@ -515,13 +441,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
         ],
       ),
     );
-  }
-
-  Future<void> _openAiKeysAndModels() async {
-    final saved = await showAiSettingsDialog(context);
-    if (saved && mounted) {
-      await _initAiModels();
-    }
   }
 
   Future<void> _extractFromSource(String mode) async {
@@ -611,8 +530,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
       final extracted = await InvoiceExtractorService.instance.extractFromOcrText(
         ocrText,
-        selectedGrokModel: _selectedGrokModel,
-        selectedGeminiModel: _selectedGeminiModel,
         onStatus: (status) {
           if (mounted) setState(() => _extractionStatus = 'Step 2/2: $status');
         },
@@ -671,16 +588,23 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
       if (mapped != null && mounted) {
         final grouped = <String, List<_InvoiceItemDraft>>{};
+        int mappedEntryCount = 0;
         for (int i = 0; i < extracted.items.length; i++) {
           final it = extracted.items[i];
-          final recip = mapped.assignments[i];
-          grouped.putIfAbsent(recip, () => []).add(
-            _InvoiceItemDraft(
-              name: it.name,
-              qty: it.quantity,
-              price: it.unitPrice,
-            ),
-          );
+          final allocs = i < mapped.allocationsPerItem.length
+              ? mapped.allocationsPerItem[i]
+              : [ItemAllocationSplit(recipient: 'Self', quantity: it.quantity)];
+          for (final alloc in allocs) {
+            if (alloc.quantity <= 0) continue;
+            grouped.putIfAbsent(alloc.recipient, () => []).add(
+              _InvoiceItemDraft(
+                name: it.name,
+                qty: alloc.quantity,
+                price: it.unitPrice,
+              ),
+            );
+            mappedEntryCount++;
+          }
         }
 
         setState(() {
@@ -707,7 +631,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Mapped ${extracted.items.length} items from invoice!', textAlign: TextAlign.center),
+            content: Text('✅ Mapped $mappedEntryCount item entries from invoice!', textAlign: TextAlign.center),
             backgroundColor: const Color(0xFF10B981),
           ),
         );
@@ -734,7 +658,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
               textColor: Colors.white,
               onPressed: () {
                 if (_lastOcrText.isEmpty) {
-                  _openAiKeysAndModels();
+                  showAiSettingsDialog(context);
                 } else {
                   showDialog(
                     context: context,
@@ -760,7 +684,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                         TextButton(
                           onPressed: () {
                             Navigator.pop(dCtx);
-                            _openAiKeysAndModels();
+                            showAiSettingsDialog(context);
                           },
                           child: const Text('API Keys & Models'),
                         ),
@@ -1248,11 +1172,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.vpn_key_outlined),
-            tooltip: 'AI API Keys & Models',
-            onPressed: _openAiKeysAndModels,
-          ),
-          IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh from Google Sheets',
             onPressed: _isLoading ? null : () => _loadData(forceRefresh: true),
@@ -1271,197 +1190,105 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
+          : Stack(
               children: [
-                _buildCreateMode(primaryColor, secondaryColor, purpleColor, isDark),
-                _buildViewMode(primaryColor, secondaryColor, purpleColor, isDark),
+                TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildCreateMode(primaryColor, secondaryColor, purpleColor, isDark),
+                    _buildViewMode(primaryColor, secondaryColor, purpleColor, isDark),
+                  ],
+                ),
+                if (_isScanFabExpanded && _tabController.index == 0)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isScanFabExpanded = false),
+                      child: Container(color: Colors.black.withValues(alpha: 0.2)),
+                    ),
+                  ),
               ],
             ),
+      floatingActionButton: _tabController.index == 0
+          ? _buildScanFabMenu(primaryColor, secondaryColor, isDark)
+          : null,
     );
   }
 
-  Widget _buildModelDropdown({
-    required String label,
-    required String selectedValue,
-    required List<String> options,
-    required ValueChanged<String> onChanged,
-    required Color bgInput,
-    required Color borderColor,
-    required Color textLabel,
-    required Color textMain,
-    required bool isDark,
-  }) {
-    final safeItems = options.contains(selectedValue) ? options : [selectedValue, ...options];
-    return DropdownButtonFormField<String>(
-      key: ValueKey('inv_model_${label}_${selectedValue}_${safeItems.length}'),
-      initialValue: selectedValue,
-      isExpanded: true,
-      menuMaxHeight: 320,
-      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: textMain),
-      dropdownColor: isDark ? const Color(0xFF1F1A3A) : Colors.white,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textLabel),
-        filled: true,
-        fillColor: bgInput,
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(11)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(11),
-          borderSide: BorderSide(color: borderColor, width: 1.1),
+  Widget _buildScanFabMenu(Color primary, Color secondary, bool isDark) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (_isScanFabExpanded) ...[
+          FloatingActionButton.extended(
+            heroTag: 'invoice_scan_pdf_fab',
+            onPressed: _isExtracting
+                ? null
+                : () {
+                    setState(() => _isScanFabExpanded = false);
+                    _extractFromSource('doc');
+                  },
+            backgroundColor: primary,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.upload_file_rounded, size: 19),
+            label: const Text('PDF / Image', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
+            heroTag: 'invoice_scan_camera_fab',
+            onPressed: _isExtracting
+                ? null
+                : () {
+                    setState(() => _isScanFabExpanded = false);
+                    _extractFromSource('camera');
+                  },
+            backgroundColor: secondary,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.camera_alt_rounded, size: 19),
+            label: const Text('Camera', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+          ),
+          const SizedBox(height: 12),
+        ],
+        FloatingActionButton.extended(
+          heroTag: 'invoice_scan_main_fab',
+          onPressed: _isExtracting ? null : () => setState(() => _isScanFabExpanded = !_isScanFabExpanded),
+          backgroundColor: _isScanFabExpanded
+              ? (isDark ? const Color(0xFF2D2A4A) : Colors.blueGrey.shade700)
+              : primary,
+          foregroundColor: Colors.white,
+          icon: _isExtracting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : Icon(_isScanFabExpanded ? Icons.close_rounded : Icons.document_scanner_rounded, size: 20),
+          label: Text(
+            _isExtracting ? 'Scanning...' : (_isScanFabExpanded ? 'Close' : 'Scan'),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+          ),
         ),
-      ),
-      items: safeItems
-          .map((m) => DropdownMenuItem<String>(
-                value: m,
-                child: Text(m, overflow: TextOverflow.ellipsis),
-              ))
-          .toList(),
-      onChanged: _isExtracting
-          ? null
-          : (val) {
-              if (val != null) onChanged(val);
-            },
+      ],
     );
   }
 
-  Widget _buildAiExtractorCard(
-    Color primary,
-    Color secondary,
-    Color borderColor,
-    Color bgInput,
-    Color textLabel,
-    Color textMain,
-    bool isDark,
-  ) {
-    final cardSurface = isDark ? const Color(0xFF191530) : Colors.white;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cardSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 1.2),
-      ),
+  Widget _buildCreateMode(Color primary, Color secondary, Color purple, bool isDark) {
+    final bgInput = isDark ? const Color(0xFF1F1A3A) : const Color(0xFFFFFAF5);
+    final borderColor = isDark ? const Color(0xFF2D2A4A) : const Color(0xFFF0E8DC);
+    final textLabel = isDark ? const Color(0xFFA89BB8) : const Color(0xFF6B5E7E);
+    final textMain = isDark ? const Color(0xFFF0E8F0) : const Color(0xFF2D2A3E);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 92),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              const Text('🤖', style: TextStyle(fontSize: 15)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'AI Invoice Extractor (OCR → AI)',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: textMain),
-                ),
-              ),
-              SizedBox(
-                width: 30,
-                height: 30,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  tooltip: 'Refresh available models',
-                  onPressed: (_isLoadingModels || _isExtracting) ? null : () => _refreshAvailableModels(),
-                  icon: _isLoadingModels
-                      ? SizedBox(
-                          width: 15,
-                          height: 15,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: primary),
-                        )
-                      : Icon(Icons.sync_rounded, size: 18, color: textLabel),
-                ),
-              ),
-              SizedBox(
-                width: 30,
-                height: 30,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  tooltip: 'AI API Keys & Models',
-                  onPressed: _isExtracting ? null : _openAiKeysAndModels,
-                  icon: Icon(Icons.vpn_key_outlined, size: 18, color: textLabel),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildModelDropdown(
-                  label: 'Grok Model',
-                  selectedValue: _selectedGrokModel,
-                  options: _grokModels,
-                  bgInput: bgInput,
-                  borderColor: borderColor,
-                  textLabel: textLabel,
-                  textMain: textMain,
-                  isDark: isDark,
-                  onChanged: (val) {
-                    setState(() => _selectedGrokModel = val);
-                    StorageService.instance.setSelectedGrokModel(val);
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildModelDropdown(
-                  label: 'Gemini Model',
-                  selectedValue: _selectedGeminiModel,
-                  options: _geminiModels,
-                  bgInput: bgInput,
-                  borderColor: borderColor,
-                  textLabel: textLabel,
-                  textMain: textMain,
-                  isDark: isDark,
-                  onChanged: (val) {
-                    setState(() => _selectedGeminiModel = val);
-                    StorageService.instance.setSelectedGeminiModel(val);
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isExtracting ? null : () => _extractFromSource('doc'),
-                  icon: const Icon(Icons.upload_file_rounded, size: 18),
-                  label: const Text('PDF / Image', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: primary,
-                    side: BorderSide(color: primary.withValues(alpha: 0.6), width: 1.2),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isExtracting ? null : () => _extractFromSource('camera'),
-                  icon: const Icon(Icons.camera_alt_rounded, size: 18),
-                  label: const Text('Camera', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: secondary,
-                    side: BorderSide(color: secondary.withValues(alpha: 0.7), width: 1.2),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ],
-          ),
           if (_isExtracting && _extractionStatus != null) ...[
-            const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: primary.withValues(alpha: 0.3)),
               ),
               child: Row(
@@ -1477,9 +1304,9 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                 ],
               ),
             ),
+            const SizedBox(height: 12),
           ],
           if (_extractedPreviewPages.isNotEmpty || _lastOcrText.isNotEmpty) ...[
-            const SizedBox(height: 10),
             Row(
               children: [
                 if (_extractedPreviewPages.isNotEmpty)
@@ -1521,25 +1348,8 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                   ),
               ],
             ),
+            const SizedBox(height: 12),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCreateMode(Color primary, Color secondary, Color purple, bool isDark) {
-    final bgInput = isDark ? const Color(0xFF1F1A3A) : const Color(0xFFFFFAF5);
-    final borderColor = isDark ? const Color(0xFF2D2A4A) : const Color(0xFFF0E8DC);
-    final textLabel = isDark ? const Color(0xFFA89BB8) : const Color(0xFF6B5E7E);
-    final textMain = isDark ? const Color(0xFFF0E8F0) : const Color(0xFF2D2A3E);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildAiExtractorCard(primary, secondary, borderColor, bgInput, textLabel, textMain, isDark),
-          const SizedBox(height: 14),
 
           // Row 1: Date & Invoice No
           Row(
@@ -1805,6 +1615,142 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     );
   }
 
+  List<String> _availableRecipientOptions() {
+    return <String>{
+      'Self',
+      ..._knownRecipients.where((r) => r.trim().isNotEmpty && r != 'Split'),
+      ..._draftRecipients.map((g) => g.recipient.trim()).where((r) => r.isNotEmpty && r != 'Split'),
+    }.toList();
+  }
+
+  Future<void> _remapDraftItem(_InvoiceRecipientDraft sourceGroup, int index, _InvoiceItemDraft item) async {
+    final itemName = item.itemName.isNotEmpty ? item.itemName : 'Item #${index + 1}';
+    final totalQty = item.quantity > 0 ? item.quantity : 1.0;
+    final unitPrice = item.price;
+
+    final result = await showDialog<List<ItemAllocationSplit>>(
+      context: context,
+      builder: (_) => RemapItemSplitDialog(
+        itemName: itemName,
+        billedQty: totalQty,
+        unitPrice: unitPrice,
+        initialAllocations: [
+          ItemAllocationSplit(recipient: sourceGroup.recipient, quantity: totalQty),
+        ],
+        recipientOptions: _availableRecipientOptions(),
+      ),
+    );
+    if (result == null || result.isEmpty || !mounted) return;
+
+    final valid = result.where((a) => a.quantity > 0).toList();
+    if (valid.isEmpty) return;
+
+    setState(() {
+      final keepSelfIdx = valid.indexWhere(
+        (a) => a.recipient.trim().toLowerCase() == sourceGroup.recipient.trim().toLowerCase(),
+      );
+
+      if (keepSelfIdx != -1) {
+        final selfAlloc = valid[keepSelfIdx];
+        item.qtyController.text = _formatCleanQty(selfAlloc.quantity);
+        item._onQtyOrPriceChanged();
+      } else {
+        sourceGroup.items.removeAt(index).dispose();
+        if (sourceGroup.recipient.toLowerCase() != 'self' && sourceGroup.items.isEmpty) {
+          _draftRecipients.remove(sourceGroup);
+        }
+      }
+
+      for (int i = 0; i < valid.length; i++) {
+        if (i == keepSelfIdx) continue;
+        final alloc = valid[i];
+        var targetGroup = _draftRecipients.cast<_InvoiceRecipientDraft?>().firstWhere(
+              (g) => g!.recipient.trim().toLowerCase() == alloc.recipient.trim().toLowerCase(),
+              orElse: () => null,
+            );
+        if (targetGroup == null) {
+          targetGroup = _InvoiceRecipientDraft(recipient: alloc.recipient, items: []);
+          _draftRecipients.add(targetGroup);
+        }
+        targetGroup.items.add(
+          _InvoiceItemDraft(
+            name: item.itemName,
+            qty: alloc.quantity,
+            price: unitPrice,
+          ),
+        );
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Updated mapping for "$itemName".', textAlign: TextAlign.center),
+        backgroundColor: const Color(0xFF10B981),
+      ),
+    );
+  }
+
+  Future<void> _remapSavedInvoiceItem(InvoiceSummary inv, int itemIndex) async {
+    final targetItem = inv.items[itemIndex];
+    final totalQty = targetItem.quantity > 0 ? targetItem.quantity : 1.0;
+
+    final result = await showDialog<List<ItemAllocationSplit>>(
+      context: context,
+      builder: (_) => RemapItemSplitDialog(
+        itemName: targetItem.itemName,
+        billedQty: totalQty,
+        unitPrice: targetItem.price,
+        initialAllocations: [
+          ItemAllocationSplit(recipient: targetItem.recipient, quantity: totalQty),
+        ],
+        recipientOptions: _availableRecipientOptions(),
+      ),
+    );
+    if (result == null || result.isEmpty || !mounted) return;
+
+    final valid = result.where((a) => a.quantity > 0).toList();
+    if (valid.isEmpty) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final updatedItems = <InvoiceItemRecord>[];
+      for (int i = 0; i < inv.items.length; i++) {
+        if (i != itemIndex) {
+          updatedItems.add(inv.items[i]);
+          continue;
+        }
+        for (int s = 0; s < valid.length; s++) {
+          final alloc = valid[s];
+          final splitQty = alloc.quantity;
+          final splitTotal = splitQty * targetItem.price;
+          updatedItems.add(
+            InvoiceItemRecord(
+              id: '${inv.billNo}_${DateTime.now().millisecondsSinceEpoch}_${i}_$s',
+              billDate: inv.billDate,
+              shopName: inv.shopName,
+              billNo: inv.billNo,
+              itemName: targetItem.itemName,
+              quantity: splitQty,
+              price: targetItem.price,
+              total: splitTotal,
+              recipient: alloc.recipient,
+            ),
+          );
+        }
+      }
+      await GoogleSheetsService.instance.deleteInvoice(inv.billNo);
+      await GoogleSheetsService.instance.appendInvoiceItems(updatedItems);
+      await _loadData();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to remap item: $e', textAlign: TextAlign.center)),
+        );
+      }
+    }
+  }
+
   Widget _buildItemRow(_InvoiceRecipientDraft group, _InvoiceItemDraft item, int index, Color secondary, bool isDark) {
     final bgInput = isDark ? const Color(0xFF1F1A3A) : const Color(0xFFFFFAF5);
     final borderColor = isDark ? const Color(0xFF2D2A4A) : const Color(0xFFF0E8DC);
@@ -1818,6 +1764,34 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
       ),
       child: Column(
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Item #${index + 1}',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+              ),
+              InkWell(
+                onTap: () => _remapDraftItem(group, index, item),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.call_split_rounded, size: 14, color: primaryColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Remap / Split',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: primaryColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
           // Item Name with attached vertical dropdown list (No delete button icon)
           SearchableDropdownField(
             controller: item.nameController,
@@ -2051,11 +2025,12 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                                 const Divider(height: 20),
 
                                 // Items list
-                                ...inv.items.map((it) {
+                                ...inv.items.asMap().entries.map((entry) {
+                                  final itemIdx = entry.key;
+                                  final it = entry.value;
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 4),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Expanded(
                                           child: Text(
@@ -2066,6 +2041,17 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                                         Text(
                                           '${it.quantity} × ${_currencyFormat.format(it.price)} = ${_currencyFormat.format(it.total)}',
                                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        SizedBox(
+                                          width: 28,
+                                          height: 28,
+                                          child: IconButton(
+                                            padding: EdgeInsets.zero,
+                                            tooltip: 'Remap / Split Item',
+                                            icon: Icon(Icons.call_split_rounded, size: 16, color: purple),
+                                            onPressed: () => _remapSavedInvoiceItem(inv, itemIdx),
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -2133,18 +2119,285 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
   }
 }
 
+String _formatCleanQty(double q) {
+  if ((q - q.roundToDouble()).abs() < 0.0001) {
+    return q.round().toString();
+  }
+  var s = q.toStringAsFixed(3);
+  s = s.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+  return s;
+}
+
+class ItemAllocationSplit {
+  String recipient;
+  double quantity;
+
+  ItemAllocationSplit({
+    required this.recipient,
+    required this.quantity,
+  });
+
+  ItemAllocationSplit copy() => ItemAllocationSplit(recipient: recipient, quantity: quantity);
+}
+
+class RemapItemSplitDialog extends StatefulWidget {
+  final String itemName;
+  final double billedQty;
+  final double unitPrice;
+  final List<ItemAllocationSplit> initialAllocations;
+  final List<String> recipientOptions;
+
+  const RemapItemSplitDialog({
+    super.key,
+    required this.itemName,
+    required this.billedQty,
+    required this.unitPrice,
+    required this.initialAllocations,
+    required this.recipientOptions,
+  });
+
+  @override
+  State<RemapItemSplitDialog> createState() => _RemapItemSplitDialogState();
+}
+
+class _RemapItemSplitDialogState extends State<RemapItemSplitDialog> {
+  late final List<ItemAllocationSplit> _allocs;
+  late final List<TextEditingController> _qtyCtrls;
+
+  @override
+  void initState() {
+    super.initState();
+    _allocs = widget.initialAllocations.isNotEmpty
+        ? widget.initialAllocations.map((e) => e.copy()).toList()
+        : [ItemAllocationSplit(recipient: 'Self', quantity: widget.billedQty)];
+    _qtyCtrls = _allocs.map((a) => TextEditingController(text: _formatCleanQty(a.quantity))).toList();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _qtyCtrls) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  double get _allocatedSum => _allocs.fold(0.0, (s, a) => s + a.quantity);
+  double get _remainingQty => widget.billedQty - _allocatedSum;
+
+  void _syncQtyControllers() {
+    for (int i = 0; i < _allocs.length; i++) {
+      _qtyCtrls[i].text = _formatCleanQty(_allocs[i].quantity);
+    }
+  }
+
+  void _addAllocationRow(double qty) {
+    final used = _allocs.map((a) => a.recipient.toLowerCase()).toSet();
+    final nextRecip = widget.recipientOptions.firstWhere(
+      (r) => !used.contains(r.toLowerCase()),
+      orElse: () => 'Self',
+    );
+    setState(() {
+      _allocs.add(ItemAllocationSplit(recipient: nextRecip, quantity: qty));
+      _qtyCtrls.add(TextEditingController(text: _formatCleanQty(qty)));
+    });
+  }
+
+  void _splitEqually() {
+    if (_allocs.length < 2) {
+      _addAllocationRow(0.0);
+    }
+    final perPerson = widget.billedQty / _allocs.length;
+    setState(() {
+      for (int i = 0; i < _allocs.length; i++) {
+        _allocs[i].quantity = double.parse(perPerson.toStringAsFixed(3));
+      }
+      _syncQtyControllers();
+    });
+  }
+
+  void _removeAllocationRow(int idx) {
+    if (_allocs.length <= 1) return;
+    setState(() {
+      _allocs.removeAt(idx);
+      _qtyCtrls.removeAt(idx).dispose();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rem = _remainingQty;
+    final isExactMatch = rem.abs() < 0.005;
+    final hasRemaining = rem >= 0.005;
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: Row(
+        children: [
+          const Icon(Icons.call_split_rounded, color: Color(0xFFFF7A5C), size: 22),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Remap / Split Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  widget.itemName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: (isExactMatch ? const Color(0xFF10B981) : Colors.amber.shade700).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: (isExactMatch ? const Color(0xFF10B981) : Colors.amber.shade700).withValues(alpha: 0.4),
+                ),
+              ),
+              child: Text(
+                'Billed Qty: ${_formatCleanQty(widget.billedQty)} × ₹${widget.unitPrice.toStringAsFixed(2)} = ₹${(widget.billedQty * widget.unitPrice).toStringAsFixed(2)}\n'
+                '${isExactMatch ? 'Allocated cleanly (${_formatCleanQty(_allocatedSum)} / ${_formatCleanQty(widget.billedQty)})' : (hasRemaining ? 'Remaining to map: ${_formatCleanQty(rem)}' : 'Total mapped: ${_formatCleanQty(_allocatedSum)} (billed: ${_formatCleanQty(widget.billedQty)})')}',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: isExactMatch ? const Color(0xFF047857) : Colors.amber.shade900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                ActionChip(
+                  avatar: const Icon(Icons.balance_rounded, size: 15),
+                  label: const Text('Split Equally', style: TextStyle(fontSize: 11.5)),
+                  onPressed: _splitEqually,
+                ),
+                if (hasRemaining)
+                  ActionChip(
+                    avatar: const Icon(Icons.add_circle_outline_rounded, size: 15),
+                    label: Text('+ Map Left (${_formatCleanQty(rem)})', style: const TextStyle(fontSize: 11.5)),
+                    onPressed: () => _addAllocationRow(rem),
+                  )
+                else
+                  ActionChip(
+                    avatar: const Icon(Icons.person_add_alt_1_rounded, size: 15),
+                    label: const Text('+ Add Person', style: TextStyle(fontSize: 11.5)),
+                    onPressed: () => _addAllocationRow(0.0),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 260),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _allocs.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                itemBuilder: (_, idx) {
+                  final alloc = _allocs[idx];
+                  final rowTotal = alloc.quantity * widget.unitPrice;
+                  return Row(
+                    key: ObjectKey(alloc),
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: PopupSelectField(
+                          key: ValueKey('split_alloc_recip_${idx}_${alloc.recipient}'),
+                          label: 'Map To',
+                          placeholder: 'Self',
+                          items: widget.recipientOptions,
+                          selectedValue: alloc.recipient,
+                          onSelected: (val) => setState(() => alloc.recipient = val),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 3,
+                        child: TextField(
+                          controller: _qtyCtrls[idx],
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          decoration: InputDecoration(
+                            labelText: 'Qty',
+                            helperText: '₹${rowTotal.toStringAsFixed(0)}',
+                            helperStyle: const TextStyle(fontSize: 10),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onChanged: (v) {
+                            setState(() {
+                              alloc.quantity = double.tryParse(v.trim()) ?? 0.0;
+                            });
+                          },
+                        ),
+                      ),
+                      if (_allocs.length > 1)
+                        SizedBox(
+                          width: 28,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            tooltip: 'Remove share',
+                            icon: const Icon(Icons.close_rounded, size: 18, color: Colors.redAccent),
+                            onPressed: () => _removeAllocationRow(idx),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF7A5C)),
+          onPressed: _allocatedSum > 0
+              ? () => Navigator.pop(
+                    context,
+                    _allocs.where((a) => a.quantity > 0).map((a) => a.copy()).toList(),
+                  )
+              : null,
+          child: const Text('Apply Remap'),
+        ),
+      ],
+    );
+  }
+}
+
 class MappedInvoiceResult {
   final String dealer;
   final String billNo;
   final DateTime billingDate;
-  final List<String> assignments;
+  final List<List<ItemAllocationSplit>> allocationsPerItem;
 
   MappedInvoiceResult({
     required this.dealer,
     required this.billNo,
     required this.billingDate,
-    required this.assignments,
+    required this.allocationsPerItem,
   });
+
+  List<String> get assignments => allocationsPerItem
+      .map((list) => list.isNotEmpty ? list.first.recipient : 'Self')
+      .toList();
 }
 
 class MapExtractedInvoiceDialog extends StatefulWidget {
@@ -2175,7 +2428,7 @@ class _MapExtractedInvoiceDialogState extends State<MapExtractedInvoiceDialog> {
   late final TextEditingController _dealerCtrl;
   late final TextEditingController _billNoCtrl;
   late DateTime _mappedDate;
-  late final List<String> _assignments;
+  late final List<List<ItemAllocationSplit>> _allocationsPerItem;
 
   @override
   void initState() {
@@ -2183,7 +2436,9 @@ class _MapExtractedInvoiceDialogState extends State<MapExtractedInvoiceDialog> {
     _dealerCtrl = TextEditingController(text: widget.initialDealer);
     _billNoCtrl = TextEditingController(text: widget.initialBillNo);
     _mappedDate = widget.initialBillingDate;
-    _assignments = List<String>.filled(widget.extracted.items.length, 'Self');
+    _allocationsPerItem = widget.extracted.items
+        .map((it) => [ItemAllocationSplit(recipient: 'Self', quantity: it.quantity)])
+        .toList();
   }
 
   @override
@@ -2191,6 +2446,25 @@ class _MapExtractedInvoiceDialogState extends State<MapExtractedInvoiceDialog> {
     _dealerCtrl.dispose();
     _billNoCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _openSplitRemapForItem(int idx) async {
+    final item = widget.extracted.items[idx];
+    final result = await showDialog<List<ItemAllocationSplit>>(
+      context: context,
+      builder: (_) => RemapItemSplitDialog(
+        itemName: item.name,
+        billedQty: item.quantity,
+        unitPrice: item.unitPrice,
+        initialAllocations: _allocationsPerItem[idx],
+        recipientOptions: widget.recipientOptions,
+      ),
+    );
+    if (result != null && result.isNotEmpty && mounted) {
+      setState(() {
+        _allocationsPerItem[idx] = result;
+      });
+    }
   }
 
   @override
@@ -2321,13 +2595,15 @@ class _MapExtractedInvoiceDialogState extends State<MapExtractedInvoiceDialog> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Items (${widget.extracted.items.length}) • Assign Self / Others',
+                  'Items (${widget.extracted.items.length}) • Map or Split',
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 ),
                 TextButton(
                   onPressed: () => setState(() {
-                    for (int i = 0; i < _assignments.length; i++) {
-                      _assignments[i] = 'Self';
+                    for (int i = 0; i < _allocationsPerItem.length; i++) {
+                      _allocationsPerItem[i] = [
+                        ItemAllocationSplit(recipient: 'Self', quantity: widget.extracted.items[i].quantity),
+                      ];
                     }
                   }),
                   style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
@@ -2343,40 +2619,91 @@ class _MapExtractedInvoiceDialogState extends State<MapExtractedInvoiceDialog> {
                 separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (_, idx) {
                   final item = widget.extracted.items[idx];
+                  final allocs = _allocationsPerItem[idx];
+                  final isSplit = allocs.length > 1 ||
+                      (allocs.isNotEmpty && (allocs.first.quantity - item.quantity).abs() > 0.005);
                   final lineTotal = item.quantity * item.unitPrice;
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                  ),
+                                  Text(
+                                    'Qty ${_formatCleanQty(item.quantity)} × ₹${item.unitPrice.toStringAsFixed(2)} = ₹${lineTotal.toStringAsFixed(2)}',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                'Qty ${item.quantity} × ₹${item.unitPrice.toStringAsFixed(2)} = ₹${lineTotal.toStringAsFixed(2)}',
-                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                            ),
+                            const SizedBox(width: 4),
+                            if (!isSplit && allocs.length == 1)
+                              SizedBox(
+                                width: 102,
+                                child: PopupSelectField(
+                                  key: ValueKey('map_item_${idx}_${allocs.first.recipient}'),
+                                  label: 'Assign Item To',
+                                  placeholder: 'Self',
+                                  items: widget.recipientOptions,
+                                  selectedValue: allocs.first.recipient,
+                                  onSelected: (val) => setState(() => allocs.first.recipient = val),
+                                ),
                               ),
-                            ],
-                          ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              tooltip: 'Split / Partial Remap',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                              icon: Icon(
+                                Icons.call_split_rounded,
+                                size: 18,
+                                color: isSplit ? const Color(0xFFFF7A5C) : Colors.grey.shade600,
+                              ),
+                              onPressed: () => _openSplitRemapForItem(idx),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          width: 112,
-                          child: PopupSelectField(
-                            key: ValueKey('map_item_${idx}_${_assignments[idx]}'),
-                            label: 'Assign Item To',
-                            placeholder: 'Self',
-                            items: widget.recipientOptions,
-                            selectedValue: _assignments[idx],
-                            onSelected: (val) => setState(() => _assignments[idx] = val),
+                        if (isSplit)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: InkWell(
+                              onTap: () => _openSplitRemapForItem(idx),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: allocs.map((a) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFF7A5C).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFFF7A5C).withValues(alpha: 0.35)),
+                                    ),
+                                    child: Text(
+                                      '${a.recipient}: ${_formatCleanQty(a.quantity)} (₹${(a.quantity * item.unitPrice).toStringAsFixed(0)})',
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFFC2410C),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   );
@@ -2396,7 +2723,9 @@ class _MapExtractedInvoiceDialogState extends State<MapExtractedInvoiceDialog> {
               dealer: _dealerCtrl.text.trim(),
               billNo: _billNoCtrl.text.trim(),
               billingDate: _mappedDate,
-              assignments: List<String>.from(_assignments),
+              allocationsPerItem: _allocationsPerItem
+                  .map((list) => list.map((a) => a.copy()).toList())
+                  .toList(),
             ),
           ),
           child: const Text('Apply to Invoice'),

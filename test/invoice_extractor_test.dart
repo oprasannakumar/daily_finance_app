@@ -106,25 +106,38 @@ void main() {
     });
   });
 
-  group('InvoiceManagerScreen AI model dropdown widget tests', () {
-    testWidgets('Shows Grok and Gemini model dropdowns and extractor controls', (tester) async {
-      SharedPreferences.setMockInitialValues({
-        'cached_grok_models': ['llama-3.3-70b-versatile', 'qwen/qwen3.8-27b'],
-        'cached_gemini_models': ['gemini-2.5-flash', 'gemini-3.6-flash'],
-        'selected_grok_model': 'qwen/qwen3.8-27b',
-        'selected_gemini_model': 'gemini-3.6-flash',
-      });
+  group('InvoiceManagerScreen Scan FAB & mapping dialog tests', () {
+    testWidgets('Hides inline extractor card and expands Scan FAB into PDF/Image and Camera FABs', (tester) async {
+      SharedPreferences.setMockInitialValues({});
 
       await tester.pumpWidget(const MaterialApp(home: InvoiceManagerScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.text('AI Invoice Extractor (OCR → AI)'), findsOneWidget);
-      expect(find.text('Grok Model'), findsOneWidget);
-      expect(find.text('Gemini Model'), findsOneWidget);
-      expect(find.text('PDF / Image'), findsOneWidget);
-      expect(find.text('Camera'), findsOneWidget);
-      expect(find.text('qwen/qwen3.8-27b'), findsOneWidget);
-      expect(find.text('gemini-3.6-flash'), findsOneWidget);
+      // Inline extractor & model dropdowns must not be inside Invoice Manager form
+      expect(find.text('AI Invoice Extractor (OCR → AI)'), findsNothing);
+      expect(find.text('Grok Model'), findsNothing);
+      expect(find.text('Gemini Model'), findsNothing);
+
+      // Scan FAB visible on Create Invoice tab
+      expect(find.widgetWithText(FloatingActionButton, 'Scan'), findsOneWidget);
+      expect(find.widgetWithText(FloatingActionButton, 'PDF / Image'), findsNothing);
+      expect(find.widgetWithText(FloatingActionButton, 'Camera'), findsNothing);
+
+      // Tap Scan FAB -> reveals PDF / Image and Camera FABs
+      await tester.tap(find.widgetWithText(FloatingActionButton, 'Scan'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FloatingActionButton, 'PDF / Image'), findsOneWidget);
+      expect(find.widgetWithText(FloatingActionButton, 'Camera'), findsOneWidget);
+      expect(find.widgetWithText(FloatingActionButton, 'Close'), findsOneWidget);
+
+      // Tap Close FAB -> hides PDF / Image and Camera FABs
+      await tester.tap(find.widgetWithText(FloatingActionButton, 'Close'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FloatingActionButton, 'PDF / Image'), findsNothing);
+      expect(find.widgetWithText(FloatingActionButton, 'Camera'), findsNothing);
+      expect(find.widgetWithText(FloatingActionButton, 'Scan'), findsOneWidget);
     });
 
     testWidgets('MapExtractedInvoiceDialog maps billing date, invoice no, and Self/Others assignment', (tester) async {
@@ -187,6 +200,123 @@ void main() {
       expect(mappedResult!.billNo, '2106/26/S-9185');
       expect(mappedResult!.billingDate, DateTime(2026, 11, 26));
       expect(mappedResult!.assignments, ['Self', 'Family']);
+    });
+
+    testWidgets('RemapItemSplitDialog supports partial remapping (1 -> 0.5 Self + 0.5 Other)', (tester) async {
+      List<ItemAllocationSplit>? splitResult;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) => Scaffold(
+              body: ElevatedButton(
+                onPressed: () async {
+                  splitResult = await showDialog<List<ItemAllocationSplit>>(
+                    context: ctx,
+                    builder: (_) => RemapItemSplitDialog(
+                      itemName: 'Rasgulla',
+                      billedQty: 1.0,
+                      unitPrice: 120.0,
+                      initialAllocations: [
+                        ItemAllocationSplit(recipient: 'Self', quantity: 1.0),
+                      ],
+                      recipientOptions: const ['Self', 'Family', 'Friends'],
+                    ),
+                  );
+                },
+                child: const Text('Remap'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Remap'));
+      await tester.pumpAndSettle();
+
+      // User changes 1 -> 0.5
+      final qtyField = find.byType(TextField).first;
+      await tester.enterText(qtyField, '0.5');
+      await tester.pumpAndSettle();
+
+      // Tap "+ Map Left (0.5)" button
+      expect(find.text('+ Map Left (0.5)'), findsOneWidget);
+      await tester.tap(find.text('+ Map Left (0.5)'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Allocated cleanly'), findsOneWidget);
+      await tester.tap(find.text('Apply Remap'));
+      await tester.pumpAndSettle();
+
+      expect(splitResult, isNotNull);
+      expect(splitResult!.length, 2);
+      expect(splitResult![0].recipient, 'Self');
+      expect(splitResult![0].quantity, closeTo(0.5, 0.001));
+      expect(splitResult![1].recipient, 'Family');
+      expect(splitResult![1].quantity, closeTo(0.5, 0.001));
+    });
+
+    testWidgets('MapExtractedInvoiceDialog splits extracted item partially across Self and Other', (tester) async {
+      final extracted = ExtractedInvoiceData(
+        dealerName: 'SWEET HOUSE',
+        invoiceNumber: 'INV-99',
+        billingDate: DateTime(2026, 11, 27),
+        currency: '₹',
+        items: [
+          ExtractedInvoiceItem(name: 'Rasgulla', quantity: 1.0, unitPrice: 120.0),
+        ],
+        usedProvider: 'Groq (llama-3.3-70b-versatile)',
+      );
+
+      MappedInvoiceResult? mappedResult;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) => Scaffold(
+              body: ElevatedButton(
+                onPressed: () async {
+                  mappedResult = await showDialog<MappedInvoiceResult>(
+                    context: ctx,
+                    builder: (_) => MapExtractedInvoiceDialog(
+                      extracted: extracted,
+                      initialDealer: extracted.dealerName,
+                      initialBillNo: extracted.invoiceNumber,
+                      initialBillingDate: extracted.billingDate!,
+                      knownDealers: const ['SWEET HOUSE'],
+                      recipientOptions: const ['Self', 'Family'],
+                    ),
+                  );
+                },
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Split / Partial Remap'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Split Equally'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Apply Remap'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Self: 0.5'), findsOneWidget);
+      expect(find.textContaining('Family: 0.5'), findsOneWidget);
+
+      await tester.tap(find.text('Apply to Invoice'));
+      await tester.pumpAndSettle();
+
+      expect(mappedResult, isNotNull);
+      expect(mappedResult!.allocationsPerItem.length, 1);
+      expect(mappedResult!.allocationsPerItem[0].length, 2);
+      expect(mappedResult!.allocationsPerItem[0][0].recipient, 'Self');
+      expect(mappedResult!.allocationsPerItem[0][0].quantity, closeTo(0.5, 0.001));
+      expect(mappedResult!.allocationsPerItem[0][1].recipient, 'Family');
+      expect(mappedResult!.allocationsPerItem[0][1].quantity, closeTo(0.5, 0.001));
     });
   });
 }

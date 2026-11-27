@@ -429,13 +429,14 @@ class _AiSettingsDialogContentState extends State<_AiSettingsDialogContent> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
           onPressed: () async {
+            final navigator = Navigator.of(context);
             final storage = StorageService.instance;
             await storage.setGrokApiKey(_grokController.text.trim());
             await storage.setGeminiApiKey(_geminiController.text.trim());
             await storage.setSelectedGrokModel(_selectedGrokModel);
             await storage.setSelectedGeminiModel(_selectedGeminiModel);
             if (mounted) {
-              Navigator.of(context).pop(true);
+              navigator.pop(true);
             }
           },
           child: const Text('Save Keys'),
