@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/account_balance_model.dart';
@@ -212,6 +213,10 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
                     _buildMonthSwitcherBar(isDark),
                     const SizedBox(height: 14),
 
+                    // 0.5 Dual Radial Savings & Credit Telemetry Gauges
+                    _buildRadialTelemetryCard(isDark),
+                    const SizedBox(height: 16),
+
                     // 1. Month Cash Flow & Velocity Grid (with MoM deltas)
                     _buildCashFlowGrid(isDark),
                     const SizedBox(height: 16),
@@ -400,10 +405,9 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
 
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.12)),
+      decoration: glassTileDecoration(
+        context,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1239,10 +1243,10 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
   }) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.12)),
+      decoration: glassTileDecoration(
+        context,
+        borderRadius: BorderRadius.circular(18),
+        borderColor: iconColor.withValues(alpha: 0.25),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1307,10 +1311,9 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
 
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.12)),
+      decoration: glassTileDecoration(
+        context,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1417,10 +1420,9 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
 
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.12)),
+      decoration: glassTileDecoration(
+        context,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1498,10 +1500,9 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
 
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.12)),
+      decoration: glassTileDecoration(
+        context,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1694,5 +1695,246 @@ class _FinancialHealthDashboardScreenState extends State<FinancialHealthDashboar
         ],
       ),
     );
+  }
+
+  Widget _buildRadialTelemetryCard(bool isDark) {
+    final h = _healthSummary!;
+    final savingsRate = h.monthlySavingsRatePercent;
+    final savingsProgress = (savingsRate / 100.0).clamp(0.0, 1.0);
+    final creditUtil = h.creditUtilizationPercent;
+    final creditProgress = (creditUtil / 100.0).clamp(0.0, 1.0);
+    final creditColor = creditUtil < 30
+        ? const Color(0xFF10B981)
+        : (creditUtil <= 50 ? const Color(0xFFF59E0B) : const Color(0xFFEF4444));
+    final savingsColor = savingsRate >= 20
+        ? const Color(0xFF10B981)
+        : (savingsRate > 0 ? const Color(0xFF6366F1) : const Color(0xFFEF4444));
+
+    final totalFlow = h.currentMonthInflow + h.currentMonthOutflow;
+    final inflowShare = totalFlow > 0 ? (h.currentMonthInflow / totalFlow).clamp(0.0, 1.0) : 0.5;
+
+    return GlassContainer(
+      borderRadius: BorderRadius.circular(22),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.radar_rounded, size: 16, color: Color(0xFF0F766E)),
+              const SizedBox(width: 6),
+              Text(
+                'TELEMETRY PULSE',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.7,
+                  color: isDark ? Colors.white70 : const Color(0xFF0F766E),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: savingsColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  savingsRate >= 0 ? '+${savingsRate.toStringAsFixed(0)}% Saved' : 'Deficit Month',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: savingsColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _buildRadialGaugeTile(
+                  isDark: isDark,
+                  label: 'Savings Rate',
+                  centerText: '${savingsRate.toStringAsFixed(0)}%',
+                  subText: '₹${IndianCurrency.format(h.netMonthlySavings)} net',
+                  progress: savingsProgress,
+                  ringColor: savingsColor,
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 68,
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
+              ),
+              Expanded(
+                child: _buildRadialGaugeTile(
+                  isDark: isDark,
+                  label: 'Credit Usage',
+                  centerText: '${creditUtil.toStringAsFixed(0)}%',
+                  subText: creditUtil < 30 ? 'Healthy (<30%)' : 'Target <30%',
+                  progress: creditProgress,
+                  ringColor: creditColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: SizedBox(
+              height: 7,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: math.max(1, (inflowShare * 100).round()),
+                    child: Container(color: const Color(0xFF10B981)),
+                  ),
+                  Expanded(
+                    flex: math.max(1, ((1.0 - inflowShare) * 100).round()),
+                    child: Container(color: const Color(0xFFEF4444)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Inflow: ₹${IndianCurrency.format(h.currentMonthInflow)}',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.grey.shade700,
+                ),
+              ),
+              Text(
+                'Outflow: ₹${IndianCurrency.format(h.currentMonthOutflow)}',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.grey.shade700,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRadialGaugeTile({
+    required bool isDark,
+    required String label,
+    required String centerText,
+    required String subText,
+    required double progress,
+    required Color ringColor,
+  }) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 60,
+          height: 60,
+          child: CustomPaint(
+            painter: _RadialRingPainter(
+              progress: progress,
+              color: ringColor,
+              trackColor: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
+            ),
+            child: Center(
+              child: Text(
+                centerText,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: ringColor,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  color: isDark ? Colors.white60 : Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RadialRingPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final Color trackColor;
+
+  _RadialRingPainter({
+    required this.progress,
+    required this.color,
+    required this.trackColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const strokeWidth = 6.5;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (math.min(size.width, size.height) - strokeWidth) / 2;
+
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final arcPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(center, radius, trackPaint);
+    final sweepAngle = 2 * math.pi * progress.clamp(0.0, 1.0);
+    if (sweepAngle > 0) {
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -math.pi / 2,
+        sweepAngle,
+        false,
+        arcPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RadialRingPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.color != color ||
+        oldDelegate.trackColor != trackColor;
   }
 }

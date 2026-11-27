@@ -1185,15 +1185,65 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
               onPressed: _isLoading ? null : () => _loadData(forceRefresh: true),
             ),
           ],
-          bottom: TabBar(
-            controller: _tabController,
-            indicatorColor: primaryColor,
-            labelColor: isDark ? Colors.white : primaryColor,
-            unselectedLabelColor: colors.textSecondary,
-            tabs: const [
-              Tab(icon: Icon(Icons.note_add_outlined), text: 'Create Invoice'),
-              Tab(icon: Icon(Icons.receipt_long_outlined), text: 'View Invoices'),
-            ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(54),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
+                ),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                dividerColor: Colors.transparent,
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicator: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [primaryColor, secondaryColor],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryColor.withValues(alpha: 0.28),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                labelColor: Colors.white,
+                labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                unselectedLabelColor: colors.textSecondary,
+                unselectedLabelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                tabs: const [
+                  Tab(
+                    height: 36,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.note_add_outlined, size: 16),
+                        SizedBox(width: 6),
+                        Text('Create Invoice'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    height: 36,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.receipt_long_outlined, size: 16),
+                        SizedBox(width: 6),
+                        Text('View Invoices'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         body: _isLoading
@@ -1977,12 +2027,15 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                     final inv = filtered[index];
                     final formattedDate = DateFormat('dd-MMM-yyyy').format(inv.billDate);
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 2,
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: glassTileDecoration(
+                        context,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
                       child: ExpansionTile(
                         shape: const Border(),
+                        collapsedShape: const Border(),
                         leading: CircleAvatar(
                           backgroundColor: primary.withValues(alpha: 0.15),
                           child: Text(

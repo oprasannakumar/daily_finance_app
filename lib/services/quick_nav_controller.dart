@@ -54,6 +54,7 @@ class QuickNavController extends ChangeNotifier {
     'Masters': '⚙️',
     'Balances': '💰',
     'Invoices': '🧾',
+    'Hub': '🧩',
   };
 
   late final NavigatorObserver observer = _QuickNavObserver(this);
@@ -75,6 +76,7 @@ class QuickNavController extends ChangeNotifier {
   }
 
   void Function(String label)? _rootNavigationHandler;
+  bool Function(String label)? _shellTabHandler;
 
   void registerRootHandler(void Function(String label) handler) {
     _rootNavigationHandler = handler;
@@ -83,6 +85,30 @@ class QuickNavController extends ChangeNotifier {
   void unregisterRootHandler(void Function(String label) handler) {
     if (_rootNavigationHandler == handler) {
       _rootNavigationHandler = null;
+    }
+  }
+
+  void registerShellTabHandler(bool Function(String label) handler) {
+    _shellTabHandler = handler;
+  }
+
+  void unregisterShellTabHandler(bool Function(String label) handler) {
+    if (_shellTabHandler == handler) {
+      _shellTabHandler = null;
+    }
+  }
+
+  void syncShellScreen(String label) {
+    if (_currentScreen != label) {
+      _currentScreen = label;
+      notifyListeners();
+    }
+  }
+
+  /// Switches the root MainShell tab to [label] without calling Navigator.popUntil.
+  void switchShellTab(String label) {
+    if (_shellTabHandler != null && _shellTabHandler!(label)) {
+      syncShellScreen(label);
     }
   }
 
@@ -119,19 +145,23 @@ class QuickNavController extends ChangeNotifier {
     final nav = QuickActionsService.instance.navigatorKey.currentState;
     if (nav == null) return;
 
-    // API Keys is a dialog on the root screen rather than a full-screen route.
-    if (label == 'API Keys') {
-      nav.popUntil((route) => route.isFirst);
-      _currentScreen = 'Entry';
-      notifyListeners();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _rootNavigationHandler?.call('API Keys');
-      });
+    // API Keys & Google Sheets are modal sheets/dialogs triggered on root without switching shell tabs.
+    if (label == 'API Keys' || label == 'Google Sheets') {
+      if (nav.canPop()) {
+        nav.popUntil((route) => route.isFirst);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _rootNavigationHandler?.call(label);
+        });
+        WidgetsBinding.instance.scheduleFrame();
+      } else {
+        _rootNavigationHandler?.call(label);
+      }
       return;
     }
 
     if (label == 'Entry') {
       nav.popUntil((route) => route.isFirst);
+      _shellTabHandler?.call('Entry');
       _currentScreen = 'Entry';
       notifyListeners();
       return;
@@ -139,13 +169,25 @@ class QuickNavController extends ChangeNotifier {
 
     if (label == _currentScreen) return;
 
+    final didPop = nav.canPop();
     nav.popUntil((route) => route.isFirst);
+
+    if (_shellTabHandler != null && _shellTabHandler!(label)) {
+      _currentScreen = label;
+      notifyListeners();
+      return;
+    }
 
     _currentScreen = label;
     notifyListeners();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (didPop) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _rootNavigationHandler?.call(label);
+      });
+      WidgetsBinding.instance.scheduleFrame();
+    } else {
       _rootNavigationHandler?.call(label);
-    });
+    }
   }
 
   /// Cycles through [cycleOrder] when the user flicks the pill left (+1) or right (-1).

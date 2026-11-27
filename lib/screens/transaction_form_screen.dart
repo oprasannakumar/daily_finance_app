@@ -39,6 +39,7 @@ class TransactionFormScreen extends StatefulWidget {
   final VoidCallback? onTemplateSaved;
   final ValueNotifier<TransactionTemplate?>? templateToLoadNotifier;
   final Listenable? mastersRefreshListenable;
+  final double bottomContentPadding;
 
   const TransactionFormScreen({
     super.key,
@@ -46,6 +47,7 @@ class TransactionFormScreen extends StatefulWidget {
     this.onTemplateSaved,
     this.templateToLoadNotifier,
     this.mastersRefreshListenable,
+    this.bottomContentPadding = 0.0,
   });
 
   @override
@@ -1671,6 +1673,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
       _matchingTemplates = [];
     });
 
+    QuickNavController.instance.switchShellTab('Entry');
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(isForEdit
@@ -1758,6 +1762,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
         _initDefaultSplitRecipients();
       }
     });
+
+    QuickNavController.instance.switchShellTab('Entry');
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -4675,6 +4681,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
 
   Widget _buildModeCard({
     required String emoji,
+    String? label,
     required bool isSelected,
     required bool isDark,
     Color? activeColor,
@@ -4699,18 +4706,19 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
-          height: 44,
+          height: label != null ? 58 : 44,
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: gradColors,
             ),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: borderColor,
               width: isSelected ? 1.6 : 1.15,
@@ -4733,11 +4741,89 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                     ),
                   ],
           ),
-          child: Center(
-            child: Text(
-              emoji,
-              style: const TextStyle(fontSize: 20),
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                emoji,
+                style: TextStyle(fontSize: label != null ? 18 : 20),
+              ),
+              if (label != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    color: isSelected
+                        ? (isDark ? Colors.white : accent)
+                        : themeColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntentPill({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required List<Color> gradientColors,
+    required VoidCallback onTap,
+  }) {
+    final themeColors = AppThemeColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            gradient: isSelected
+                ? LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: gradientColors)
+                : null,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: gradientColors.first.withValues(alpha: 0.28),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? themeColors.textSecondary : const Color(0xFF64748B)),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? themeColors.textSecondary : const Color(0xFF475569)),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -4792,81 +4878,64 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
     final double splitDiff = (_totalAmount - splitSum).abs();
     final double transferDiff = (_totalFromAmount - _totalToAmount).abs();
 
+    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 80;
+    final nowDate = DateTime.now();
+    final endOfToday = DateTime(nowDate.year, nowDate.month, nowDate.day, 23, 59, 59);
+    final dueRecurringCount = _recurringTransactions
+        .where((r) => !r.isPaused && !r.nextDueDate.isAfter(endOfToday))
+        .length;
+    final dueBillsCount = _liveBalancesSummary?.totalDueBillsCount ?? 0;
+    final totalDueCount = dueRecurringCount + dueBillsCount;
+    final heroAmount = _isSelfTransferMode ? _totalFromAmount : _totalAmount;
+    final liquidBalance = _liveBalancesSummary != null
+        ? (_liveBalancesSummary!.totalBankBalance +
+            _liveBalancesSummary!.totalCashBalance +
+            _liveBalancesSummary!.totalWalletBalance)
+        : null;
+
     return GlassBackdrop(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
-        child: GestureDetector(
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          behavior: HitTestBehavior.translucent,
-          child: Stack(
-          children: [
-            Center(
+          child: GestureDetector(
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            behavior: HitTestBehavior.translucent,
+            child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
-                child: RefreshIndicator(
-                  color: coralAccent,
-                  backgroundColor: isDark ? const Color(0xFF1B2042) : Colors.white,
-                  onRefresh: () async {
-                    setState(() {
-                      _resetEntireForm();
-                      _draftTransactions.clear();
-                      _currentDraftIndex = 0;
-                    });
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text(
-                            'Form cleared',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                            textAlign: TextAlign.center,
-                          ),
-                          backgroundColor: isDark ? const Color(0xFF2C3360) : const Color(0xFF64748B),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          duration: const Duration(seconds: 1),
-                        ),
-                      );
-                    }
-                  },
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 20),
-                    children: [
-                    // Main Container Card matching reference image
-                    GlassContainer(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      borderRadius: BorderRadius.circular(28),
-                      blurSigma: 20,
-                      borderWidth: 1.4,
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // 1. Top Bar: Profile | ✨ Smart Entry | 🌙/☀️
-                            Row(
-                              children: [
-                                ValueListenableBuilder<GoogleUserProfile?>(
-                                  valueListenable: GoogleAuthService.instance.currentUserNotifier,
-                                  builder: (context, gUser, _) {
-                                    return InkWell(
-                                      onTap: _showGoogleAccountSheet,
-                                      borderRadius: BorderRadius.circular(18),
-                                      child: Container(
-                                        width: 36,
-                                        height: 36,
-                                        decoration: BoxDecoration(
-                                          color: isDark ? const Color(0xFF1B2042) : const Color(0xFFF8FAFC),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: gUser != null
-                                                ? const Color(0xFF10B981)
-                                                : (isDark ? const Color(0xFF2C3360) : const Color(0xFFE2E8F0)),
-                                            width: gUser != null ? 1.8 : 1.2,
-                                          ),
-                                        ),
+                child: Column(
+                  children: [
+                    // 1. Floating App Command Header (over Aurora Mesh)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+                      child: Row(
+                        children: [
+                          ValueListenableBuilder<GoogleUserProfile?>(
+                            valueListenable: GoogleAuthService.instance.currentUserNotifier,
+                            builder: (context, gUser, _) {
+                              return InkWell(
+                                onTap: _showGoogleAccountSheet,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  height: 36,
+                                  padding: const EdgeInsets.only(left: 3, right: 10),
+                                  decoration: BoxDecoration(
+                                    color: colors.inputBg,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: gUser != null
+                                          ? const Color(0xFF10B981).withValues(alpha: 0.65)
+                                          : colors.inputBorder,
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 28,
+                                        height: 28,
+                                        decoration: const BoxDecoration(shape: BoxShape.circle),
                                         clipBehavior: Clip.antiAlias,
                                         child: gUser?.photoBytes != null
                                             ? Image.memory(
@@ -4887,131 +4956,345 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                                           'G',
                                                           style: TextStyle(
                                                             fontWeight: FontWeight.bold,
-                                                            fontSize: 16,
+                                                            fontSize: 15,
                                                             color: Color(0xFF4285F4),
                                                           ),
                                                         ),
                                                       ))),
                                       ),
-                                    );
-                                  },
-                                ),
-                                Expanded(
-                                  child: Center(
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '✨ ',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            color: isDark ? const Color(0xFFC084FC) : const Color(0xFFA855F7),
-                                          ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        width: 7,
+                                        height: 7,
+                                        decoration: BoxDecoration(
+                                          color: gUser != null ? const Color(0xFF10B981) : colors.textSecondary,
+                                          shape: BoxShape.circle,
                                         ),
-                                        GradientText(
-                                          'Smart Entry',
-                                          gradient: LinearGradient(
-                                            begin: Alignment.centerLeft,
-                                            end: Alignment.centerRight,
-                                            colors: isDark
-                                                ? [colors.purpleAccent, colors.secondaryGradStart]
-                                                : [colors.purpleAccent, colors.primaryGradEnd],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          Expanded(
+                            child: Center(
+                              child: GradientText(
+                                'Smart Entry',
+                                gradient: LinearGradient(
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                  colors: isDark
+                                      ? [colors.purpleAccent, colors.secondaryGradStart]
+                                      : [colors.purpleAccent, colors.primaryGradEnd],
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (totalDueCount > 0) ...[
+                            InkWell(
+                              onTap: _showNotificationsPopup,
+                              borderRadius: BorderRadius.circular(18),
+                              child: Container(
+                                height: 36,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  gradient: colors.heroGradient,
+                                  borderRadius: BorderRadius.circular(18),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: colors.heroGradStart.withValues(alpha: 0.30),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('🔔', style: TextStyle(fontSize: 15)),
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEF4444),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '$totalDueCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          ThemeToggleRotatingButton(
+                            isDark: isDark,
+                            onToggle: () => StorageService.instance.toggleDarkMode(),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // 2. Scrollable Multi-Card Bento Workspace
+                    Expanded(
+                      child: RefreshIndicator(
+                        color: coralAccent,
+                        backgroundColor: isDark ? const Color(0xFF1B2042) : Colors.white,
+                        onRefresh: () async {
+                          setState(() {
+                            _resetEntireForm();
+                            _draftTransactions.clear();
+                            _currentDraftIndex = 0;
+                          });
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text(
+                                  'Form cleared',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                  textAlign: TextAlign.center,
+                                ),
+                                backgroundColor: isDark ? const Color(0xFF2C3360) : const Color(0xFF64748B),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                duration: const Duration(seconds: 1),
+                              ),
+                            );
+                          }
+                        },
+                        child: Form(
+                          key: _formKey,
+                          child: ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                            children: [
+                              // BENTO CARD 1: Hero Amount Pulse, 3-Way Intent Switcher & Labeled Modes
+                              GlassContainer(
+                                padding: const EdgeInsets.all(14),
+                                borderRadius: BorderRadius.circular(24),
+                                blurSigma: 20,
+                                gradientColors: isDark
+                                    ? [
+                                        colors.heroGradStart.withValues(alpha: 0.42),
+                                        colors.glassSurfaceBottom,
+                                      ]
+                                    : [
+                                        const Color(0xECFFFFFF),
+                                        const Color(0xDEFFF4EE),
+                                      ],
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _isSelfTransferMode
+                                                  ? 'TRANSFER AMOUNT'
+                                                  : (_flow == 'Deposit' ? 'INFLOW AMOUNT' : 'TRANSACTION TOTAL'),
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.9,
+                                                color: textSecondary,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '₹${IndianCurrency.format(heroAmount)}',
+                                              style: TextStyle(
+                                                fontSize: 27,
+                                                fontWeight: FontWeight.w900,
+                                                letterSpacing: -0.6,
+                                                color: _isSelfTransferMode
+                                                    ? purpleAccent
+                                                    : (_flow == 'Deposit'
+                                                        ? const Color(0xFF10B981)
+                                                        : textPrimary),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (liquidBalance != null)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                            decoration: BoxDecoration(
+                                              color: colors.inputBg,
+                                              borderRadius: BorderRadius.circular(14),
+                                              border: Border.all(color: colors.inputBorder, width: 1),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.account_balance_wallet_rounded,
+                                                  size: 13,
+                                                  color: colors.secondaryGradStart,
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  '₹${IndianCurrency.formatSmart(liquidBalance)}',
+                                                  style: TextStyle(
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: textPrimary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                          style: const TextStyle(
-                                            fontSize: 18.5,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.2,
-                                            color: Colors.white,
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // 3-Way Segmented Intent Switcher
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? Colors.black.withValues(alpha: 0.25)
+                                            : const Color(0xFFF1F5F9).withValues(alpha: 0.85),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          _buildIntentPill(
+                                            label: 'Expense',
+                                            icon: Icons.north_east_rounded,
+                                            isSelected: !_isSelfTransferMode && _flow == 'Withdraw',
+                                            gradientColors: [colors.primaryGradStart, colors.primaryGradEnd],
+                                            onTap: () {
+                                              if (_isSelfTransferMode) _toggleSelfTransferMode(false);
+                                              _onFlowSelected('Withdraw');
+                                            },
                                           ),
+                                          _buildIntentPill(
+                                            label: 'Income',
+                                            icon: Icons.south_west_rounded,
+                                            isSelected: !_isSelfTransferMode && _flow == 'Deposit',
+                                            gradientColors: [colors.secondaryGradStart, colors.secondaryGradEnd],
+                                            onTap: () {
+                                              if (_isSelfTransferMode) _toggleSelfTransferMode(false);
+                                              _onFlowSelected('Deposit');
+                                            },
+                                          ),
+                                          _buildIntentPill(
+                                            label: 'Transfer',
+                                            icon: Icons.swap_horiz_rounded,
+                                            isSelected: _isSelfTransferMode,
+                                            gradientColors: [purpleAccent, colors.heroGradEnd],
+                                            onTap: () => _toggleSelfTransferMode(!_isSelfTransferMode),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+
+                                    // Labeled 5-Mode Quick Strip
+                                    Row(
+                                      children: [
+                                        _buildModeCard(
+                                          emoji: '🏍️',
+                                          label: 'Fuel',
+                                          isSelected: _selectedPurpose == 'Fuel',
+                                          isDark: isDark,
+                                          activeColor: coralAccent,
+                                          activeBg: isDark ? const Color(0xFF38201E) : const Color(0xFFFFF1ED),
+                                          onTap: () {
+                                            setState(() => _selectedPurpose = 'Fuel');
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Purpose set to Fuel / Travel', textAlign: TextAlign.center),
+                                                behavior: SnackBarBehavior.floating,
+                                                duration: Duration(milliseconds: 900),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(width: 6),
+                                        _buildModeCard(
+                                          emoji: '🧾',
+                                          label: 'Scan',
+                                          isSelected: false,
+                                          isDark: isDark,
+                                          onTap: () {
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                settings: const RouteSettings(name: 'Invoices'),
+                                                builder: (_) => const InvoiceManagerScreen(),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(width: 6),
+                                        _buildModeCard(
+                                          emoji: '⌛',
+                                          label: 'Recur',
+                                          isSelected: _isRecurrenceMode,
+                                          isDark: isDark,
+                                          activeColor: const Color(0xFFF59E0B),
+                                          activeBg: isDark ? const Color(0xFF382914) : const Color(0xFFFEF3C7),
+                                          onTap: () {
+                                            setState(() {
+                                              _isRecurrenceMode = !_isRecurrenceMode;
+                                              if (_isRecurrenceMode) {
+                                                _editingRecurringId = null;
+                                              }
+                                            });
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text(_isRecurrenceMode ? 'Recurrence mode enabled (⏳)' : 'Recurrence mode disabled', textAlign: TextAlign.center),
+                                                behavior: SnackBarBehavior.floating,
+                                                duration: const Duration(milliseconds: 900),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(width: 6),
+                                        _buildModeCard(
+                                          emoji: '💸',
+                                          label: 'Split',
+                                          isSelected: _isSplitModeEnabled,
+                                          isDark: isDark,
+                                          activeColor: const Color(0xFFF43F5E),
+                                          activeBg: isDark ? const Color(0xFF381A2D) : const Color(0xFFFFF1F2),
+                                          onTap: () => _toggleDedicatedSplitMode(!_isSplitModeEnabled),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        _buildModeCard(
+                                          emoji: '🏦',
+                                          label: 'Self',
+                                          isSelected: _isSelfTransferMode,
+                                          isDark: isDark,
+                                          activeColor: const Color(0xFFA78BFA),
+                                          activeBg: isDark ? const Color(0xFF231C48) : const Color(0xFFF5F3FF),
+                                          onTap: () => _toggleSelfTransferMode(!_isSelfTransferMode),
                                         ),
                                       ],
                                     ),
-                                  ),
+                                  ],
                                 ),
-                                ThemeToggleRotatingButton(
-                                  isDark: isDark,
-                                  onToggle: () => StorageService.instance.toggleDarkMode(),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-
-                            // 2. 5-Mode Selector Card Row
-                            Row(
-                              children: [
-                                _buildModeCard(
-                                  emoji: '🏍️',
-                                  isSelected: false,
-                                  isDark: isDark,
-                                  onTap: () {
-                                    setState(() => _selectedPurpose = 'Fuel');
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Purpose set to Fuel / Travel', textAlign: TextAlign.center),
-                                        behavior: SnackBarBehavior.floating,
-                                        duration: Duration(milliseconds: 900),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(width: 6),
-                                _buildModeCard(
-                                  emoji: '🧾',
-                                  isSelected: false,
-                                  isDark: isDark,
-                                  onTap: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        settings: const RouteSettings(name: 'Invoices'),
-                                        builder: (_) => const InvoiceManagerScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(width: 6),
-                                _buildModeCard(
-                                  emoji: '⌛',
-                                  isSelected: _isRecurrenceMode,
-                                  isDark: isDark,
-                                  activeColor: const Color(0xFFF59E0B),
-                                  activeBg: isDark ? const Color(0xFF382914) : const Color(0xFFFEF3C7),
-                                  onTap: () {
-                                    setState(() {
-                                      _isRecurrenceMode = !_isRecurrenceMode;
-                                      if (_isRecurrenceMode) {
-                                        _editingRecurringId = null;
-                                      }
-                                    });
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(_isRecurrenceMode ? 'Recurrence mode enabled (⏳)' : 'Recurrence mode disabled', textAlign: TextAlign.center),
-                                        behavior: SnackBarBehavior.floating,
-                                        duration: const Duration(milliseconds: 900),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(width: 6),
-                                _buildModeCard(
-                                  emoji: '💸',
-                                  isSelected: _isSplitModeEnabled,
-                                  isDark: isDark,
-                                  activeColor: const Color(0xFFF43F5E),
-                                  activeBg: isDark ? const Color(0xFF381A2D) : const Color(0xFFFFF1F2),
-                                  onTap: () => _toggleDedicatedSplitMode(!_isSplitModeEnabled),
-                                ),
-                                const SizedBox(width: 6),
-                                _buildModeCard(
-                                  emoji: '🏦',
-                                  isSelected: _isSelfTransferMode,
-                                  isDark: isDark,
-                                  activeColor: const Color(0xFFA78BFA),
-                                  activeBg: isDark ? const Color(0xFF231C48) : const Color(0xFFF5F3FF),
-                                  onTap: () => _toggleSelfTransferMode(!_isSelfTransferMode),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
+                              ),
+                              const SizedBox(height: 10),
 
                             // Template Editing Banner
                             if (_editingTemplateId != null) ...[
@@ -5144,6 +5427,14 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                               ),
                             ],
 
+                            // BENTO CARD 2: Timing, Narration & Classification
+                            GlassContainer(
+                              padding: const EdgeInsets.all(14),
+                              borderRadius: BorderRadius.circular(22),
+                              blurSigma: 18,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
                             // 4. 📅 DATE & 🔖 REFERENCE Row
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -5305,8 +5596,21 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                             ],
                             const SizedBox(height: 12),
 
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+
                             // 6. Conditional Section: Self Transfer vs Normal / Split Mode
                             if (_isSelfTransferMode) ...[
+                            // BENTO CARD 3 (Transfer Mode): Visual Source -> Destination Card
+                            GlassContainer(
+                              padding: const EdgeInsets.all(14),
+                              borderRadius: BorderRadius.circular(22),
+                              blurSigma: 18,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
                               // 🏦 FROM (SOURCES)
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -5363,7 +5667,40 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                   onDelete: () => _removePaymentMode(index),
                                 );
                               }),
-                              const SizedBox(height: 14),
+
+                              // Visual Transfer Bridge Connector
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                child: Row(
+                                  children: [
+                                    Expanded(child: Divider(color: colors.inputBorder)),
+                                    Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 10),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        gradient: colors.heroGradient,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.south_rounded, size: 13, color: Colors.white),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Transfer To',
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(child: Divider(color: colors.inputBorder)),
+                                  ],
+                                ),
+                              ),
 
                               // 🏦 TO (DESTINATIONS)
                               Row(
@@ -5464,7 +5801,18 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                   ],
                                 ),
                               ),
+                                ],
+                              ),
+                            ),
                             ] else ...[
+                              // BENTO CARD 3A: Classification (Flow, Invoice, Purpose, Spent For)
+                              GlassContainer(
+                                padding: const EdgeInsets.all(14),
+                                borderRadius: BorderRadius.circular(22),
+                                blurSigma: 18,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
                               // 💧 FLOW & 🧾 INVOICE (OPT)
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -5674,8 +6022,19 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 14),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
 
+                            // BENTO CARD 3: Wallet & Payment Modes Studio
+                            GlassContainer(
+                              padding: const EdgeInsets.all(14),
+                              borderRadius: BorderRadius.circular(22),
+                              blurSigma: 18,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
                               // 💳 PAYMENT BREAKDOWN Section
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -5687,8 +6046,15 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                                       decoration: BoxDecoration(
-                                        color: cyanAccent,
+                                        gradient: colors.secondaryGradient,
                                         borderRadius: BorderRadius.circular(14),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: colors.secondaryGradStart.withValues(alpha: 0.25),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
                                       ),
                                       child: const Text(
                                         '+ Add Mode',
@@ -5738,10 +6104,21 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                   onDelete: () => _removePaymentMode(index),
                                 );
                               }),
+                                ],
+                              ),
+                            ),
 
-                              // 💸 SPLIT / LOAN Section (Only visible when Split mode is enabled at top AND selected in Spent For)
+                              // 💸 SPLIT / LOAN Studio (Only visible when Split mode is enabled at top AND selected in Spent For)
                               if (_isSplitModeEnabled && _selectedSpentFor == 'Split') ...[
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 12),
+                                GlassContainer(
+                                  padding: const EdgeInsets.all(14),
+                                  borderRadius: BorderRadius.circular(22),
+                                  blurSigma: 18,
+                                  borderColor: const Color(0xFFF43F5E).withValues(alpha: 0.30),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -5953,9 +6330,24 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                     ),
                                   );
                                 }),
+                                const SizedBox(height: 8),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: LinearProgressIndicator(
+                                    value: _totalAmount > 0 ? (splitSum / _totalAmount).clamp(0.0, 1.0) : 0.0,
+                                    minHeight: 6,
+                                    backgroundColor: colors.inputBorder.withValues(alpha: 0.4),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      splitDiff <= 0.01 ? const Color(0xFF10B981) : coralAccent,
+                                    ),
+                                  ),
+                                ),
+                                    ],
+                                  ),
+                                ),
                               ],
 
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 12),
 
                               // TOTAL AMOUNT & DIFFERENCE Box
                               Container(
@@ -6214,207 +6606,158 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                               const SizedBox(height: 12),
                             ],
 
-                            // 7. Action Buttons: Save & Repeat
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 5,
-                                  child: GlassGradientButton(
-                                    height: 46,
-                                    borderRadius: BorderRadius.circular(14),
-                                    colors: [colors.primaryGradStart, colors.primaryGradEnd],
-                                    onPressed: _saveTransaction,
-                                    child: const Row(
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // 3. Docked Frosted Action Capsule (Always reachable with 1 thumb)
+                    if (!isKeyboardOpen)
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          12,
+                          4,
+                          12,
+                          widget.bottomContentPadding > 0 ? widget.bottomContentPadding - 8 : 10,
+                        ),
+                        child: GlassContainer(
+                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                          borderRadius: BorderRadius.circular(22),
+                          blurSigma: 20,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 5,
+                                    child: GlassGradientButton(
+                                      height: 44,
+                                      borderRadius: BorderRadius.circular(14),
+                                      colors: [colors.primaryGradStart, colors.primaryGradEnd],
+                                      onPressed: _saveTransaction,
+                                      child: const Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          SaveThemeEmoji(size: 19),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'Save',
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 4,
+                                    child: Container(
+                                      height: 44,
+                                      decoration: glassTileDecoration(
+                                        context,
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderColor: colors.secondaryGradStart.withValues(alpha: 0.45),
+                                        gradientColors: isDark
+                                            ? [
+                                                colors.secondaryGradStart.withValues(alpha: 0.20),
+                                                colors.secondaryGradEnd.withValues(alpha: 0.12),
+                                              ]
+                                            : [
+                                                const Color(0xFFECFEFF).withValues(alpha: 0.90),
+                                                const Color(0xFFF0FDF4).withValues(alpha: 0.85),
+                                              ],
+                                      ),
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(14),
+                                          onTap: _repeatLastTransaction,
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              RepeatThemeEmoji(
+                                                size: 17,
+                                                color: colors.secondaryGradStart,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'Repeat',
+                                                style: TextStyle(
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: textPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                height: 34,
+                                width: double.infinity,
+                                decoration: glassTileDecoration(
+                                  context,
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderColor: colors.purpleAccent.withValues(alpha: 0.35),
+                                  gradientColors: isDark
+                                      ? [
+                                          colors.purpleAccent.withValues(alpha: 0.18),
+                                          colors.primaryGradEnd.withValues(alpha: 0.10),
+                                        ]
+                                      : [
+                                          const Color(0xFFF5F3FF).withValues(alpha: 0.92),
+                                          const Color(0xFFFCE7F3).withValues(alpha: 0.80),
+                                        ],
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: _showSaveAsTemplateDialog,
+                                    child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        SaveThemeEmoji(size: 20),
-                                        SizedBox(width: 8),
+                                        Text(_editingTemplateId != null ? '💾' : '⭐', style: const TextStyle(fontSize: 13)),
+                                        const SizedBox(width: 6),
                                         Text(
-                                          'Save',
+                                          _editingTemplateId != null
+                                              ? 'Update Template'
+                                              : 'Save as Template',
                                           style: TextStyle(
-                                            fontSize: 15,
+                                            fontSize: 12,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.white,
+                                            color: colors.purpleAccent,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  flex: 5,
-                                  child: Container(
-                                    height: 46,
-                                    decoration: glassTileDecoration(
-                                      context,
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderColor: colors.secondaryGradStart.withValues(alpha: 0.45),
-                                      gradientColors: isDark
-                                          ? [
-                                              colors.secondaryGradStart.withValues(alpha: 0.20),
-                                              colors.secondaryGradEnd.withValues(alpha: 0.12),
-                                            ]
-                                          : [
-                                              const Color(0xFFECFEFF).withValues(alpha: 0.90),
-                                              const Color(0xFFF0FDF4).withValues(alpha: 0.85),
-                                            ],
-                                    ),
-                                    child: Material(
-                                      color: Colors.transparent,
-                                      child: InkWell(
-                                        borderRadius: BorderRadius.circular(14),
-                                        onTap: _repeatLastTransaction,
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            RepeatThemeEmoji(
-                                              size: 18,
-                                              color: colors.secondaryGradStart,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              'Repeat',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: textPrimary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-
-                            // 8. Save as Template Button
-                            Container(
-                              height: 44,
-                              width: double.infinity,
-                              decoration: glassTileDecoration(
-                                context,
-                                borderRadius: BorderRadius.circular(14),
-                                borderColor: colors.purpleAccent.withValues(alpha: 0.45),
-                                gradientColors: isDark
-                                    ? [
-                                        colors.purpleAccent.withValues(alpha: 0.22),
-                                        colors.primaryGradEnd.withValues(alpha: 0.14),
-                                      ]
-                                    : [
-                                        const Color(0xFFF5F3FF).withValues(alpha: 0.92),
-                                        const Color(0xFFFCE7F3).withValues(alpha: 0.80),
-                                      ],
-                              ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(14),
-                                  onTap: _showSaveAsTemplateDialog,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(_editingTemplateId != null ? '💾' : '⭐', style: const TextStyle(fontSize: 14)),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        _editingTemplateId != null
-                                            ? 'Update Template'
-                                            : 'Save as Template',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: colors.purpleAccent,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                ),
-              ),
-            ),
-
-            // Multi-purpose Floating Bell with due notifications badge (recurring + credit card bills)
-            Builder(
-              builder: (context) {
-                final now = DateTime.now();
-                final endOfToday = DateTime(now.year, now.month, now.day, 23, 59, 59);
-                final dueRecurringCount = _recurringTransactions.where((r) => !r.isPaused && !r.nextDueDate.isAfter(endOfToday)).length;
-                final dueBillsCount = _liveBalancesSummary?.totalDueBillsCount ?? 0;
-                final totalDueCount = dueRecurringCount + dueBillsCount;
-
-                if (totalDueCount <= 0) return const SizedBox.shrink();
-
-                return Positioned(
-                  bottom: 18,
-                  right: 14,
-                  child: InkWell(
-                    onTap: _showNotificationsPopup,
-                    borderRadius: BorderRadius.circular(24),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            gradient: colors.heroGradient,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.35),
-                              width: 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: colors.heroGradStart.withValues(alpha: 0.42),
-                                blurRadius: 14,
-                                offset: const Offset(0, 5),
                               ),
                             ],
                           ),
-                          child: const Center(
-                            child: Text('🔔', style: TextStyle(fontSize: 22)),
-                          ),
                         ),
-                        if (totalDueCount > 0)
-                          Positioned(
-                            top: -2,
-                            right: -2,
-                            child: Container(
-                              padding: const EdgeInsets.all(5),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFEF4444),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                '$totalDueCount',
-                                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ],
+          ),
         ),
       ),
-    ),
-    ),
-  );
-}
+    );
+  }
 
   Future<void> _openPendingSyncSheet(BuildContext sheetCtx) async {
     final details = await _storage.getPendingSyncDetails();

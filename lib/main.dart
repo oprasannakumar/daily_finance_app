@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'screens/transaction_form_screen.dart';
+import 'screens/main_shell_screen.dart';
 import 'services/quick_actions_service.dart';
 import 'services/quick_nav_controller.dart';
 import 'services/storage_service.dart';
@@ -242,7 +242,7 @@ class DailyFinanceApp extends StatelessWidget {
               ),
             );
           },
-          home: const TransactionFormScreen(),
+          home: const MainShellScreen(),
         );
       },
     );

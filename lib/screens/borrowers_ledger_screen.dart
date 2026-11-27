@@ -13,8 +13,13 @@ import 'borrower_detail_screen.dart';
 
 class BorrowersLedgerScreen extends StatefulWidget {
   final String? initialBorrowerName;
+  final double bottomContentPadding;
 
-  const BorrowersLedgerScreen({super.key, this.initialBorrowerName});
+  const BorrowersLedgerScreen({
+    super.key,
+    this.initialBorrowerName,
+    this.bottomContentPadding = 0.0,
+  });
 
   @override
   State<BorrowersLedgerScreen> createState() => _BorrowersLedgerScreenState();
@@ -22,6 +27,7 @@ class BorrowersLedgerScreen extends StatefulWidget {
 
 class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
   bool _isLoading = true;
+  bool _isFetchingEntries = false;
   List<LoanEntry> _entries = [];
 
   // Flipkart & Amazon style Faceted Filter Criteria
@@ -65,16 +71,23 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
   }
 
   void _onLoansChanged() {
-    _loadEntries();
+    if (!_isFetchingEntries && mounted) {
+      _loadEntries();
+    }
   }
 
   Future<void> _loadEntries({bool forceRefresh = false}) async {
-    final list = await StorageService.instance.getLoanEntries(forceRefresh: forceRefresh);
-    if (mounted) {
-      setState(() {
-        _entries = list;
-        _isLoading = false;
-      });
+    _isFetchingEntries = true;
+    try {
+      final list = await StorageService.instance.getLoanEntries(forceRefresh: forceRefresh);
+      if (mounted) {
+        setState(() {
+          _entries = list;
+          _isLoading = false;
+        });
+      }
+    } finally {
+      _isFetchingEntries = false;
     }
   }
 
@@ -543,7 +556,7 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
                         ? _buildEmptyState(context, hasActiveFilter, textSecondary, primaryColor)
                         : ListView.separated(
                             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                            padding: const EdgeInsets.fromLTRB(14, 6, 14, 28),
+                            padding: EdgeInsets.fromLTRB(14, 6, 14, 28 + widget.bottomContentPadding),
                             itemCount: filtered.length,
                             separatorBuilder: (_, _) => const SizedBox(height: 10),
                             itemBuilder: (ctx, index) {
@@ -634,7 +647,7 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
 
     return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
+      padding: EdgeInsets.fromLTRB(14, 4, 14, 28 + widget.bottomContentPadding),
       children: [
         // Portfolio Hero Card
         Container(
@@ -647,7 +660,14 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4F46E5).withValues(alpha: isDark ? 0.35 : 0.25),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -774,22 +794,45 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
               child: Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: borderColor),
+                decoration: glassTileDecoration(
+                  context,
+                  borderRadius: BorderRadius.circular(18),
+                  borderColor: borderColor,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: primaryColor.withValues(alpha: 0.14),
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: isReceivable
+                                  ? [const Color(0xFF10B981), const Color(0xFF059669)]
+                                  : (isPayable
+                                      ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                                      : [primaryColor, primaryColor.withValues(alpha: 0.7)]),
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isReceivable
+                                        ? const Color(0xFF10B981)
+                                        : (isPayable ? const Color(0xFFEF4444) : primaryColor))
+                                    .withValues(alpha: 0.25),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          alignment: Alignment.center,
                           child: Text(
                             p.name.substring(0, 1).toUpperCase(),
-                            style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -873,111 +916,127 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
     required Color textSecondary,
     required Color borderColor,
   }) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+    final totalFlow = totalGiven + totalReceived;
+    final givenRatio = totalFlow > 0 ? (totalGiven / totalFlow).clamp(0.0, 1.0) : 0.5;
+
+    return GlassContainer(
+      margin: const EdgeInsets.fromLTRB(14, 6, 14, 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
+      borderRadius: BorderRadius.circular(20),
+      borderColor: borderColor,
+      child: Column(
         children: [
-          // Total Given
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              // Total Given
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.arrow_upward_rounded, size: 13, color: Color(0xFFF97316)),
-                    const SizedBox(width: 3),
+                    Row(
+                      children: [
+                        const Icon(Icons.arrow_upward_rounded, size: 13, color: Color(0xFFF97316)),
+                        const SizedBox(width: 3),
+                        Text(
+                          'Total Given',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
                     Text(
-                      'Total Given',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textSecondary),
+                      '₹${IndianCurrency.format(totalGiven)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFF97316),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  '₹${IndianCurrency.format(totalGiven)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFF97316),
+              ),
+              Container(width: 1, height: 32, color: borderColor),
+              // Total Received
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.arrow_downward_rounded, size: 13, color: Color(0xFF10B981)),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Received',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textSecondary),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '₹${IndianCurrency.format(totalReceived)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          Container(width: 1, height: 32, color: borderColor),
-          // Total Received
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.arrow_downward_rounded, size: 13, color: Color(0xFF10B981)),
-                      const SizedBox(width: 3),
-                      Text(
-                        'Received',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textSecondary),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '₹${IndianCurrency.format(totalReceived)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF10B981),
-                    ),
-                  ),
-                ],
               ),
-            ),
-          ),
-          Container(width: 1, height: 32, color: borderColor),
-          // Net Balance
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+              Container(width: 1, height: 32, color: borderColor),
+              // Net Balance
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        netDue > 0 ? Icons.pending_actions_rounded : Icons.check_circle_outline,
-                        size: 13,
-                        color: netDue > 0 ? const Color(0xFFE11D48) : const Color(0xFF0F766E),
+                      Row(
+                        children: [
+                          Icon(
+                            netDue > 0 ? Icons.pending_actions_rounded : Icons.check_circle_outline,
+                            size: 13,
+                            color: netDue > 0 ? const Color(0xFFE11D48) : const Color(0xFF0F766E),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            netDue >= 0 ? 'To Collect' : 'Surplus',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textSecondary),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 3),
+                      const SizedBox(height: 3),
                       Text(
-                        netDue >= 0 ? 'To Collect' : 'Surplus',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textSecondary),
+                        '₹${IndianCurrency.format(netDue.abs())}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: netDue > 0 ? const Color(0xFFE11D48) : const Color(0xFF0F766E),
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '₹${IndianCurrency.format(netDue.abs())}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: netDue > 0 ? const Color(0xFFE11D48) : const Color(0xFF0F766E),
-                    ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: SizedBox(
+              height: 5,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: (givenRatio * 100).round().clamp(1, 100),
+                    child: Container(color: const Color(0xFFF97316)),
+                  ),
+                  Expanded(
+                    flex: ((1.0 - givenRatio) * 100).round().clamp(1, 100),
+                    child: Container(color: const Color(0xFF10B981)),
                   ),
                 ],
               ),
@@ -1007,20 +1066,13 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
           _showLoanDetailSheet(context, item);
         }
       },
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
+        padding: const EdgeInsets.all(14),
+        decoration: glassTileDecoration(
+          context,
+          borderRadius: BorderRadius.circular(18),
+          borderColor: borderColor,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1028,15 +1080,34 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
             // Top Row: Borrower Avatar & Name + Status Badge + Amount
             Row(
               children: [
-                CircleAvatar(
-                  radius: 17,
-                  backgroundColor: (isGiven ? const Color(0xFFF97316) : const Color(0xFF10B981)).withValues(alpha: 0.15),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isGiven
+                          ? [const Color(0xFFF97316), const Color(0xFFEA580C)]
+                          : [const Color(0xFF10B981), const Color(0xFF059669)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isGiven ? const Color(0xFFF97316) : const Color(0xFF10B981))
+                            .withValues(alpha: 0.25),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
                   child: Text(
                     item.borrower.isNotEmpty ? item.borrower[0].toUpperCase() : '?',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
                       fontSize: 14,
-                      color: isGiven ? const Color(0xFFF97316) : const Color(0xFF10B981),
+                      color: Colors.white,
                     ),
                   ),
                 ),

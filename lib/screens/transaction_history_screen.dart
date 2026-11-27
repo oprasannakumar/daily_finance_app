@@ -22,6 +22,7 @@ class TransactionHistoryScreen extends StatefulWidget {
   final String? initialPaymentTypeFilter;
   final DateTime? initialStartDate;
   final DateTime? initialEndDate;
+  final double bottomContentPadding;
 
   const TransactionHistoryScreen({
     super.key,
@@ -32,6 +33,7 @@ class TransactionHistoryScreen extends StatefulWidget {
     this.initialPaymentTypeFilter,
     this.initialStartDate,
     this.initialEndDate,
+    this.bottomContentPadding = 0.0,
   });
 
   @override
@@ -1229,79 +1231,101 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                       ),
 
                 // ==========================================
-                // SUMMARY STATS ROW (Dynamic based on selection)
+                // HERO CASHFLOW PULSE & PROPORTIONAL SPLIT BAR
                 // ==========================================
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _isSelectionActive
-                        ? (isDark ? const Color(0xFF1E284A) : const Color(0xFFEFF6FF))
-                        : (isDark ? const Color(0xFF161A30) : Colors.white),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _isSelectionActive
-                          ? const Color(0xFF3B82F6)
-                          : (isDark ? const Color(0xFF2C3360) : const Color(0xFFE2E8F0)),
-                      width: _isSelectionActive ? 1.5 : 1.0,
-                    ),
-                  ),
+                GlassContainer(
+                  margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  borderRadius: BorderRadius.circular(18),
+                  blurSigma: 16,
+                  borderColor: _isSelectionActive
+                      ? const Color(0xFF3B82F6)
+                      : null,
+                  borderWidth: _isSelectionActive ? 1.6 : 1.2,
                   child: Column(
                     children: [
+                      if ((totalOutflow + totalInflow + totalTransfer) > 0) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: SizedBox(
+                            height: 6,
+                            child: Row(
+                              children: [
+                                if (totalOutflow > 0)
+                                  Expanded(
+                                    flex: (totalOutflow * 100).round().clamp(1, 1000000),
+                                    child: Container(color: const Color(0xFFF43F5E)),
+                                  ),
+                                if (totalInflow > 0)
+                                  Expanded(
+                                    flex: (totalInflow * 100).round().clamp(1, 1000000),
+                                    child: Container(color: const Color(0xFF10B981)),
+                                  ),
+                                if (totalTransfer > 0)
+                                  Expanded(
+                                    flex: (totalTransfer * 100).round().clamp(1, 1000000),
+                                    child: Container(color: const Color(0xFF8B5CF6)),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       Row(
                         children: [
                           Expanded(
                             child: Column(
                               children: [
-                                const Text('Outflow', style: TextStyle(fontSize: 10, color: Colors.red)),
+                                const Text('Outflow', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFF43F5E))),
                                 Text(
                                   '₹${IndianCurrency.formatSmart(totalOutflow)}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red),
+                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFFF43F5E)),
                                 ),
                               ],
                             ),
                           ),
-                          Container(height: 20, width: 1, color: Colors.grey.shade300),
+                          Container(height: 22, width: 1, color: colors.inputBorder),
                           Expanded(
                             child: Column(
                               children: [
-                                const Text('Inflow', style: TextStyle(fontSize: 10, color: Colors.green)),
+                                const Text('Inflow', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF10B981))),
                                 Text(
                                   '₹${IndianCurrency.formatSmart(totalInflow)}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.green),
+                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFF10B981)),
                                 ),
                               ],
                             ),
                           ),
-                          Container(height: 20, width: 1, color: Colors.grey.shade300),
+                          Container(height: 22, width: 1, color: colors.inputBorder),
                           Expanded(
                             child: Column(
                               children: [
-                                const Text('Transfer', style: TextStyle(fontSize: 10, color: Color(0xFF4F46E5))),
+                                const Text('Transfer', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF8B5CF6))),
                                 Text(
                                   '₹${IndianCurrency.formatSmart(totalTransfer)}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4F46E5)),
+                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFF8B5CF6)),
                                 ),
                               ],
                             ),
                           ),
-                          Container(height: 20, width: 1, color: Colors.grey.shade300),
+                          Container(height: 22, width: 1, color: colors.inputBorder),
                           Expanded(
                             child: Column(
                               children: [
-                                Text(_isSelectionActive ? 'Selected' : 'Count', style: const TextStyle(fontSize: 10)),
+                                Text(_isSelectionActive ? 'Selected' : 'Count', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colors.textSecondary)),
                                 Text(
                                   '$summaryCount',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                    color: _isSelectionActive ? const Color(0xFF2563EB) : null,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12.5,
+                                    color: _isSelectionActive ? const Color(0xFF3B82F6) : colors.textPrimary,
                                   ),
                                 ),
                               ],
@@ -1344,7 +1368,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                           builder: (context, pendingSyncSet, _) {
                             return ListView.builder(
                               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                              padding: const EdgeInsets.fromLTRB(14, 4, 14, 64),
+                              padding: EdgeInsets.fromLTRB(14, 4, 14, 64 + widget.bottomContentPadding),
                               itemCount: filtered.length,
                               itemBuilder: (context, index) {
                                 final tx = filtered[index];
@@ -1389,26 +1413,16 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
                                 return AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
-                                    margin: const EdgeInsets.symmetric(vertical: 3.5),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? (isDark ? const Color(0xFF1E284A) : const Color(0xFFEFF6FF))
-                                          : (isDark ? const Color(0xFF161A30) : Colors.white),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? const Color(0xFF3B82F6)
-                                            : (isDark ? const Color(0xFF2C3360) : const Color(0xFFE2E8F0)),
-                                        width: isSelected ? 1.8 : 1.0,
-                                      ),
-                                      boxShadow: isSelected
-                                          ? [
-                                              BoxShadow(
-                                                color: const Color(0xFF3B82F6).withValues(alpha: isDark ? 0.35 : 0.15),
-                                                blurRadius: 6,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                            ]
+                                    margin: const EdgeInsets.symmetric(vertical: 4),
+                                    decoration: glassTileDecoration(
+                                      context,
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderColor: isSelected ? const Color(0xFF3B82F6) : null,
+                                      borderWidth: isSelected ? 1.8 : 1.1,
+                                      gradientColors: isSelected
+                                          ? (isDark
+                                              ? [const Color(0xCC1E284A), const Color(0xBA172554)]
+                                              : [const Color(0xE8EFF6FF), const Color(0xD8E0F2FE)])
                                           : null,
                                     ),
                                     child: Material(

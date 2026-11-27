@@ -791,10 +791,13 @@ class StorageService {
 
     // 3. Fallback or explicit force refresh: Fetch from Google Sheets live
     try {
+      final hadPreviousEntries = _cachedLoanEntries?.isNotEmpty ?? false;
       final remoteEntries = await GoogleSheetsService.instance.fetchLoanEntries(forceRefresh: forceRefresh);
       _cachedLoanEntries = remoteEntries;
       await saveLocalLoanEntries(remoteEntries);
-      loansNotifier.value++;
+      if (remoteEntries.isNotEmpty || hadPreviousEntries) {
+        loansNotifier.value++;
+      }
       return List<LoanEntry>.from(remoteEntries);
     } catch (e) {
       debugPrint('Error fetching loan entries from remote: $e');

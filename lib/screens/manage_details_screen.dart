@@ -554,19 +554,23 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
 
         return SwipeToDeleteWrapper(
           key: ValueKey('template_box_${t.id}'),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           margin: const EdgeInsets.symmetric(vertical: 4),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
           rightLabel: 'LOAD',
           onSwipeRight: () {
             widget.onEditTemplate?.call(t);
             if (mounted) Navigator.of(context).pop();
           },
           onDelete: () => _onSwipeDeleteTemplate(t),
-          child: Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            child: ListTile(
+          child: Container(
+            decoration: glassTileDecoration(
+              context,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+              child: ListTile(
                 dense: true,
                 onTap: () {
                   if (widget.onSelectTemplate != null) {
@@ -607,6 +611,7 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
                 ),
               ),
             ),
+          ),
         );
     },
   ),
@@ -691,100 +696,108 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
             await _storage.deleteRecurringTransaction(r.id);
             await _loadData();
           },
-          child: Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            child: ListTile(
-                dense: true,
-                onTap: () {
-                  if (widget.onSelectRecurring != null) {
-                    widget.onSelectRecurring!(r);
-                  } else {
-                    widget.onEditRecurring?.call(r);
-                  }
-                  if (mounted) Navigator.of(context).pop();
-                },
-                leading: CircleAvatar(
-                  radius: 14,
-                  backgroundColor: r.isPaused
-                      ? const Color(0xFF94A3B8).withValues(alpha: 0.15)
-                      : (isDue
-                          ? const Color(0xFFF59E0B).withValues(alpha: 0.18)
-                          : const Color(0xFF0F766E).withValues(alpha: 0.12)),
-                  child: Text(
-                    r.isPaused ? '⏸️' : (isDue ? '⏰' : '⏳'),
-                    style: const TextStyle(fontSize: 14),
+          child: Container(
+            decoration: glassTileDecoration(
+              context,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+              child: ListTile(
+                  dense: true,
+                  onTap: () {
+                    if (widget.onSelectRecurring != null) {
+                      widget.onSelectRecurring!(r);
+                    } else {
+                      widget.onEditRecurring?.call(r);
+                    }
+                    if (mounted) Navigator.of(context).pop();
+                  },
+                  leading: CircleAvatar(
+                    radius: 14,
+                    backgroundColor: r.isPaused
+                        ? const Color(0xFF94A3B8).withValues(alpha: 0.15)
+                        : (isDue
+                            ? const Color(0xFFF59E0B).withValues(alpha: 0.18)
+                            : const Color(0xFF0F766E).withValues(alpha: 0.12)),
+                    child: Text(
+                      r.isPaused ? '⏸️' : (isDue ? '⏰' : '⏳'),
+                      style: const TextStyle(fontSize: 14),
+                    ),
                   ),
-                ),
-                title: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        r.narration.isNotEmpty ? r.narration : 'Recurring',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: r.isPaused ? const Color(0xFF64748B) : Colors.black87,
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          r.narration.isNotEmpty ? r.narration : 'Recurring',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: r.isPaused
+                                ? const Color(0xFF64748B)
+                                : Theme.of(context).colorScheme.onSurface,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: r.isPaused
-                            ? const Color(0xFF64748B).withValues(alpha: 0.15)
-                            : (isDue
-                                ? const Color(0xFFF59E0B).withValues(alpha: 0.18)
-                                : const Color(0xFF0F766E).withValues(alpha: 0.15)),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        r.isPaused ? 'PAUSED' : (isDue ? 'DUE' : 'ACTIVE'),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
                           color: r.isPaused
-                              ? const Color(0xFF64748B)
-                              : (isDue ? const Color(0xFFB45309) : const Color(0xFF0F766E)),
+                              ? const Color(0xFF64748B).withValues(alpha: 0.15)
+                              : (isDue
+                                  ? const Color(0xFFF59E0B).withValues(alpha: 0.18)
+                                  : const Color(0xFF0F766E).withValues(alpha: 0.15)),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          r.isPaused ? 'PAUSED' : (isDue ? 'DUE' : 'ACTIVE'),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: r.isPaused
+                                ? const Color(0xFF64748B)
+                                : (isDue ? const Color(0xFFB45309) : const Color(0xFF0F766E)),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                subtitle: Text(
-                  '${r.frequency} • Next: ${FinanceTransaction.formatDate(r.nextDueDate)}${r.totalAmount > 0 ? " • ₹${IndianCurrency.format(r.totalAmount)}" : ""}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: r.isPaused ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ],
                   ),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        r.isPaused ? Icons.play_circle_fill_rounded : Icons.pause_circle_filled_rounded,
-                        color: r.isPaused ? const Color(0xFF0F766E) : const Color(0xFFF59E0B),
-                        size: 26,
-                      ),
-                      tooltip: r.isPaused ? 'Resume recurrence' : 'Pause recurrence',
-                      onPressed: () async {
-                        await _storage.togglePauseRecurringTransaction(r.id);
-                        await _loadData();
-                      },
+                  subtitle: Text(
+                    '${r.frequency} • Next: ${FinanceTransaction.formatDate(r.nextDueDate)}${r.totalAmount > 0 ? " • ₹${IndianCurrency.format(r.totalAmount)}" : ""}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: r.isPaused ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                     ),
-                    ReorderableDragStartListener(
-                      index: index,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4),
-                        child: Icon(Icons.drag_handle, color: Color(0xFF94A3B8), size: 20),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          r.isPaused ? Icons.play_circle_fill_rounded : Icons.pause_circle_filled_rounded,
+                          color: r.isPaused ? const Color(0xFF0F766E) : const Color(0xFFF59E0B),
+                          size: 26,
+                        ),
+                        tooltip: r.isPaused ? 'Resume recurrence' : 'Pause recurrence',
+                        onPressed: () async {
+                          await _storage.togglePauseRecurringTransaction(r.id);
+                          await _loadData();
+                        },
                       ),
-                    ),
-                  ],
+                      ReorderableDragStartListener(
+                        index: index,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Icon(Icons.drag_handle, color: Color(0xFF94A3B8), size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+          ),
         );
       },
     ),
@@ -854,10 +867,9 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
           return Container(
             key: ValueKey('${category}_$item'),
             margin: const EdgeInsets.symmetric(vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+            decoration: glassTileDecoration(
+              context,
+              borderRadius: BorderRadius.circular(14),
             ),
             child: ListTile(
               dense: true,
@@ -877,14 +889,13 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
         return SwipeToDeleteWrapper(
           key: ValueKey('${category}_$item'),
           enabled: _isEditMode,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           margin: const EdgeInsets.symmetric(vertical: 4),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
           onDelete: () => _onSwipeDelete(category, item),
           child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+            decoration: glassTileDecoration(
+              context,
+              borderRadius: BorderRadius.circular(14),
             ),
             child: ListTile(
               dense: true,

@@ -14,10 +14,12 @@ import 'transaction_history_screen.dart';
 
 class AccountBalancesScreen extends StatefulWidget {
   final bool isInitialSetup;
+  final double bottomContentPadding;
 
   const AccountBalancesScreen({
     super.key,
     this.isInitialSetup = false,
+    this.bottomContentPadding = 0.0,
   });
 
   @override
@@ -653,7 +655,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     return RefreshIndicator(
       onRefresh: _loadInitialData,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+        padding: EdgeInsets.fromLTRB(14, 12, 14, 24 + widget.bottomContentPadding),
         children: [
           // Total Bank Available Header Card
           Container(
@@ -901,7 +903,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     final bankList = _bankControllers.keys.toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+      padding: EdgeInsets.fromLTRB(14, 12, 14, 24 + widget.bottomContentPadding),
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1050,26 +1052,16 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     return RefreshIndicator(
       onRefresh: _loadInitialData,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+        padding: EdgeInsets.fromLTRB(14, 12, 14, 24 + widget.bottomContentPadding),
         children: [
           // Total Cards Overview Header Card
-          Container(
+          GlassContainer(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF312E81).withValues(alpha: 0.35) : const Color(0xFFEEF2FF),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isDark ? const Color(0xFF4F46E5).withValues(alpha: 0.4) : const Color(0xFFC7D2FE),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
+            borderRadius: BorderRadius.circular(20),
+            borderColor: isDark ? const Color(0xFF4F46E5).withValues(alpha: 0.45) : const Color(0xFFC7D2FE),
+            gradientColors: isDark
+                ? [const Color(0xFF312E81).withValues(alpha: 0.55), const Color(0xFF1E1B4B).withValues(alpha: 0.4)]
+                : [const Color(0xFFEEF2FF), const Color(0xFFE0E7FF).withValues(alpha: 0.7)],
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1109,7 +1101,47 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                         ],
                       ),
                     ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: (totalCreditLimit > 0 && (totalUsedLimit / totalCreditLimit) > 0.5
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFF4F46E5))
+                            .withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        totalCreditLimit > 0
+                            ? '${((totalUsedLimit / totalCreditLimit) * 100).toStringAsFixed(0)}% Used'
+                            : '0% Used',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: totalCreditLimit > 0 && (totalUsedLimit / totalCreditLimit) > 0.5
+                              ? const Color(0xFFEF4444)
+                              : (isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4F46E5)),
+                        ),
+                      ),
+                    ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    minHeight: 7,
+                    value: totalCreditLimit > 0
+                        ? (totalUsedLimit / totalCreditLimit).clamp(0.0, 1.0)
+                        : 0.0,
+                    backgroundColor: (isDark ? Colors.white : const Color(0xFF4F46E5)).withValues(alpha: 0.12),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      totalCreditLimit > 0 && (totalUsedLimit / totalCreditLimit) > 0.5
+                          ? const Color(0xFFEF4444)
+                          : (totalCreditLimit > 0 && (totalUsedLimit / totalCreditLimit) > 0.3
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFF10B981)),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -1848,7 +1880,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     final ccList = _ccTotalControllers.keys.toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+      padding: EdgeInsets.fromLTRB(14, 12, 14, 24 + widget.bottomContentPadding),
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2124,7 +2156,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     return RefreshIndicator(
       onRefresh: _loadInitialData,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+        padding: EdgeInsets.fromLTRB(14, 12, 14, 24 + widget.bottomContentPadding),
         children: [
           // Total Cash Header Card
           Container(
@@ -2333,7 +2365,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     final liveCash = _liveSummary?.totalCashInHand;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+      padding: EdgeInsets.fromLTRB(14, 12, 14, 24 + widget.bottomContentPadding),
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -2515,7 +2547,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     return RefreshIndicator(
       onRefresh: _loadInitialData,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+        padding: EdgeInsets.fromLTRB(14, 12, 14, 24 + widget.bottomContentPadding),
         children: [
           // Total Wallet Available Header Card
           Container(
@@ -2762,7 +2794,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     final walletList = _walletControllers.keys.toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+      padding: EdgeInsets.fromLTRB(14, 12, 14, 24 + widget.bottomContentPadding),
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2891,7 +2923,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     return RefreshIndicator(
       onRefresh: _loadInitialData,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+        padding: EdgeInsets.fromLTRB(14, 12, 14, 24 + widget.bottomContentPadding),
         children: [
           // Total Rewards Header Card
           Container(
@@ -3138,7 +3170,7 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
     final rewardList = _rewardControllers.keys.toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+      padding: EdgeInsets.fromLTRB(14, 12, 14, 24 + widget.bottomContentPadding),
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3252,53 +3284,66 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
   // BOTTOM BAR (EDIT BUTTON OR SAVE BUTTON)
   // ==========================================
   Widget _buildBottomBar(Color primaryColor, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+    final colors = AppThemeColors.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        6,
+        16,
+        widget.bottomContentPadding > 0 ? widget.bottomContentPadding : 14,
       ),
-      child: SafeArea(
-        top: false,
+      child: GlassContainer(
+        padding: const EdgeInsets.all(8),
+        borderRadius: BorderRadius.circular(20),
+        blurSigma: 18,
         child: SizedBox(
           width: double.infinity,
-          height: 48,
+          height: 46,
           child: _isEditing
-              ? ElevatedButton.icon(
+              ? GlassGradientButton(
+                  height: 46,
+                  borderRadius: BorderRadius.circular(14),
+                  colors: [colors.secondaryGradStart, colors.secondaryGradEnd],
                   onPressed: _isSaving ? null : _saveBalances,
-                  icon: _isSaving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_isSaving)
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : const Icon(Icons.check_circle_rounded, color: Colors.white),
-                  label: Text(
-                    _isSaving
-                        ? 'Saving Balances...'
-                        : (widget.isInitialSetup ? 'Save & Start Tracking' : 'Save Balances & Limits'),
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 2,
+                      else
+                        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 19),
+                      const SizedBox(width: 8),
+                      Text(
+                        _isSaving
+                            ? 'Saving Balances...'
+                            : (widget.isInitialSetup ? 'Save & Start Tracking' : 'Save Balances & Limits'),
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ],
                   ),
                 )
-              : ElevatedButton.icon(
+              : GlassGradientButton(
+                  height: 46,
+                  borderRadius: BorderRadius.circular(14),
+                  colors: [colors.primaryGradStart, colors.primaryGradEnd],
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     setState(() => _isEditing = true);
                   },
-                  icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 18),
-                  label: const Text(
-                    'Edit Balances & Limits',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 2,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.edit_rounded, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Edit Balances & Limits',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ],
                   ),
                 ),
         ),
