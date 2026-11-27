@@ -29,6 +29,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
   int _currentIndex = 0;
   final Set<int> _visitedTabs = {0};
+  final List<int> _tabHistory = [0];
   final ValueNotifier<int> _historyRefreshNotifier = ValueNotifier<int>(0);
 
   @override
@@ -44,6 +45,15 @@ class _MainShellScreenState extends State<MainShellScreen> {
     super.dispose();
   }
 
+  void _pushTabHistory(int idx) {
+    if (_tabHistory.isEmpty || _tabHistory.last != idx) {
+      _tabHistory.add(idx);
+      if (_tabHistory.length > 20) {
+        _tabHistory.removeAt(0);
+      }
+    }
+  }
+
   bool _handleShellTabRequest(String label) {
     final idx = _tabLabels.indexOf(label);
     if (idx == -1) return false;
@@ -51,6 +61,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
       setState(() {
         _currentIndex = idx;
         _visitedTabs.add(idx);
+        _pushTabHistory(idx);
       });
     }
     return true;
@@ -62,8 +73,30 @@ class _MainShellScreenState extends State<MainShellScreen> {
       setState(() {
         _currentIndex = idx;
         _visitedTabs.add(idx);
+        _pushTabHistory(idx);
       });
       QuickNavController.instance.syncShellScreen(_tabLabels[idx]);
+    }
+  }
+
+  void _handleBackNavigation() {
+    HapticFeedback.selectionClick();
+    if (_tabHistory.length > 1) {
+      setState(() {
+        _tabHistory.removeLast();
+        final prevIdx = _tabHistory.last;
+        _currentIndex = prevIdx;
+        _visitedTabs.add(prevIdx);
+      });
+      QuickNavController.instance.syncShellScreen(_tabLabels[_currentIndex]);
+    } else if (_currentIndex != 0) {
+      setState(() {
+        _currentIndex = 0;
+        _tabHistory
+          ..clear()
+          ..add(0);
+      });
+      QuickNavController.instance.syncShellScreen(_tabLabels[0]);
     }
   }
 
@@ -74,8 +107,14 @@ class _MainShellScreenState extends State<MainShellScreen> {
     const dockHeight = 64.0;
     final bottomPad = dockHeight + 24.0;
 
-    return Stack(
-      children: [
+    return PopScope(
+      canPop: _currentIndex == 0 && _tabHistory.length <= 1,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _handleBackNavigation();
+      },
+      child: Stack(
+        children: [
         IndexedStack(
           index: _currentIndex,
           children: [
@@ -115,6 +154,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
           ),
         ),
       ],
+      ),
     );
   }
 }

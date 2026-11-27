@@ -6,6 +6,7 @@ import 'package:daily_finance_app/models/transaction_model.dart';
 import 'package:daily_finance_app/services/google_sheets_service.dart';
 import 'package:daily_finance_app/services/quick_nav_controller.dart';
 import 'package:daily_finance_app/services/storage_service.dart';
+import 'package:daily_finance_app/screens/borrowers_ledger_screen.dart';
 import 'package:daily_finance_app/screens/workspace_hub_screen.dart';
 import 'package:daily_finance_app/widgets/swipe_to_delete_wrapper.dart';
 
@@ -198,5 +199,78 @@ void main() {
     await tester.tap(find.text('LOAD'));
     await tester.pumpAndSettle();
     expect(loaded, isTrue);
+  });
+
+  testWidgets('MainShellScreen back navigation steps back through visited tabs instead of closing', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(const DailyFinanceApp());
+    await tester.pumpAndSettle();
+
+    // Navigate Entry -> History -> Wallet -> People -> Hub
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 1);
+
+    await tester.tap(find.text('Wallet'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 2);
+
+    await tester.tap(find.text('People'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 3);
+
+    await tester.tap(find.text('Hub'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 4);
+
+    // Back from Hub -> People -> Wallet -> History -> Entry
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 3);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 2);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 1);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 0);
+  });
+
+  testWidgets('BorrowersLedgerScreen switches between Dashboard and All Entries via gradient TabBar and swipe', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: BorrowersLedgerScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Gradient TabBar is present
+    final tabBar = tester.widget<TabBar>(find.byType(TabBar));
+    final indicator = tabBar.indicator as BoxDecoration;
+    expect(indicator.gradient, isA<LinearGradient>());
+
+    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('All Entries (0)'), findsOneWidget);
+
+    // Swipe left to switch to All Entries tab
+    await tester.fling(find.byType(TabBarView), const Offset(-400, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(find.text('Filters'), findsOneWidget);
+
+    // Swipe right back to Dashboard tab
+    await tester.fling(find.byType(TabBarView), const Offset(400, 0), 1000);
+    await tester.pumpAndSettle();
   });
 }

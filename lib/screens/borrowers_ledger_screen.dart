@@ -25,7 +25,8 @@ class BorrowersLedgerScreen extends StatefulWidget {
   State<BorrowersLedgerScreen> createState() => _BorrowersLedgerScreenState();
 }
 
-class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
+class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen>
+    with SingleTickerProviderStateMixin {
   bool _isLoading = true;
   bool _isFetchingEntries = false;
   List<LoanEntry> _entries = [];
@@ -37,7 +38,7 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
   String _quickType = 'All';
 
   // Dashboard vs Ledger View Toggle
-  bool _showDashboardView = true;
+  late TabController _tabController;
   String _dashboardStatusFilter = 'All'; // All, Pending, Settled
 
   // Search Query
@@ -47,6 +48,7 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     final initial = widget.initialBorrowerName?.trim();
     if (initial != null && initial.isNotEmpty) {
       _searchQuery = initial;
@@ -64,6 +66,7 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _searchCtrl.dispose();
     StorageService.instance.loansNotifier.removeListener(_onLoansChanged);
     StorageService.instance.transactionsNotifier.removeListener(_onLoansChanged);
@@ -172,6 +175,8 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
     final isDark = theme.brightness == Brightness.dark;
     final colors = AppThemeColors.of(context);
     final primaryColor = isDark ? colors.secondaryGradStart : const Color(0xFF0F766E);
+    final gradStart = colors.primaryGradStart;
+    final gradEnd = colors.secondaryGradStart;
     final cardBg = colors.cardBg;
     final textPrimary = colors.textPrimary;
     final textSecondary = colors.textSecondary;
@@ -272,66 +277,67 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
               onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
               behavior: HitTestBehavior.translucent,
               child: RefreshIndicator(
+                notificationPredicate: (notification) =>
+                    notification.metrics.axis == Axis.vertical && notification.depth <= 1,
                 onRefresh: () => _loadEntries(forceRefresh: true),
                 child: Column(
                   children: [
-                    // Mode Switcher: Dashboard vs Ledger
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
-                          borderRadius: BorderRadius.circular(11),
+                    // Mode Switcher: Dashboard vs All Entries (Invoice Manager gradient style)
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
                         ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(9),
-                                onTap: () => setState(() => _showDashboardView = true),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 7),
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: _showDashboardView ? cardBg : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(9),
-                                  ),
-                                  child: Text(
-                                    '📊 Dashboard',
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: _showDashboardView ? primaryColor : textSecondary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(9),
-                                onTap: () => setState(() => _showDashboardView = false),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 7),
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: !_showDashboardView ? cardBg : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(9),
-                                  ),
-                                  child: Text(
-                                    '📜 All Entries (${filtered.length})',
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: !_showDashboardView ? primaryColor : textSecondary,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                      ),
+                      child: TabBar(
+                        controller: _tabController,
+                        dividerColor: Colors.transparent,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        indicator: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [gradStart, gradEnd],
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: gradStart.withValues(alpha: 0.28),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
+                        labelColor: Colors.white,
+                        labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                        unselectedLabelColor: textSecondary,
+                        unselectedLabelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                        tabs: [
+                          const Tab(
+                            height: 36,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.dashboard_outlined, size: 16),
+                                SizedBox(width: 6),
+                                Text('Dashboard'),
+                              ],
+                            ),
+                          ),
+                          Tab(
+                            height: 36,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.receipt_long_outlined, size: 16),
+                                const SizedBox(width: 6),
+                                Text('All Entries (${filtered.length})'),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
@@ -375,19 +381,21 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
                       ),
                     ),
 
-                  if (_showDashboardView)
-                    Expanded(
-                      child: _buildBorrowerDashboard(
-                        context,
-                        isDark: isDark,
-                        cardBg: cardBg,
-                        borderColor: borderColor,
-                        textPrimary: textPrimary,
-                        textSecondary: textSecondary,
-                        primaryColor: primaryColor,
-                      ),
-                    )
-                  else ...[
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildBorrowerDashboard(
+                          context,
+                          isDark: isDark,
+                          cardBg: cardBg,
+                          borderColor: borderColor,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                          primaryColor: primaryColor,
+                        ),
+                        Column(
+                          children: [
                   // Filter Action Bar: Filters trigger button + Type quick chips
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
@@ -572,7 +580,11 @@ class _BorrowersLedgerScreenState extends State<BorrowersLedgerScreen> {
                             },
                           ),
                   ),
-                  ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
