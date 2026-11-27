@@ -357,6 +357,10 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
   String? _extractionStatus;
   String _lastOcrText = '';
   List<Uint8List> _extractedPreviewPages = [];
+  ExtractedInvoiceData? _cachedExtractedInvoice;
+  String _cachedMappedDealer = '';
+  String _cachedMappedBillNo = '';
+  DateTime? _cachedMappedBillingDate;
 
   final _currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
@@ -568,76 +572,16 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
         }
       }
 
-      final recipientOptions = <String>{
-        'Self',
-        ..._knownRecipients.where((r) => r.trim().isNotEmpty && r != 'Split'),
-      }.toList();
+      setState(() {
+        _cachedExtractedInvoice = extracted;
+        _cachedMappedDealer = mappedDealer;
+        _cachedMappedBillNo = extracted.invoiceNumber.isNotEmpty
+            ? extracted.invoiceNumber
+            : _billNoController.text.trim();
+        _cachedMappedBillingDate = extracted.billingDate ?? _selectedDate;
+      });
 
-      final mapped = await showDialog<MappedInvoiceResult>(
-        context: context,
-        builder: (_) => MapExtractedInvoiceDialog(
-          extracted: extracted,
-          initialDealer: mappedDealer,
-          initialBillNo: extracted.invoiceNumber.isNotEmpty
-              ? extracted.invoiceNumber
-              : _billNoController.text.trim(),
-          initialBillingDate: extracted.billingDate ?? _selectedDate,
-          knownDealers: _knownDealers,
-          recipientOptions: recipientOptions,
-          ocrText: _lastOcrText,
-        ),
-      );
-
-      if (mapped != null && mounted) {
-        final grouped = <String, List<_InvoiceItemDraft>>{};
-        int mappedEntryCount = 0;
-        for (int i = 0; i < extracted.items.length; i++) {
-          final it = extracted.items[i];
-          final allocs = i < mapped.allocationsPerItem.length
-              ? mapped.allocationsPerItem[i]
-              : [ItemAllocationSplit(recipient: 'Self', quantity: it.quantity)];
-          for (final alloc in allocs) {
-            if (alloc.quantity <= 0) continue;
-            grouped.putIfAbsent(alloc.recipient, () => []).add(
-              _InvoiceItemDraft(
-                name: it.name,
-                qty: alloc.quantity,
-                price: it.unitPrice,
-              ),
-            );
-            mappedEntryCount++;
-          }
-        }
-
-        setState(() {
-          _selectedDate = mapped.billingDate;
-          if (mapped.billNo.isNotEmpty) {
-            _billNoController.text = mapped.billNo;
-          }
-          _dealerController.text = mapped.dealer;
-          for (final g in _draftRecipients) {
-            for (final it in g.items) {
-              it.dispose();
-            }
-          }
-          _draftRecipients.clear();
-          if (grouped.containsKey('Self')) {
-            _draftRecipients.add(_InvoiceRecipientDraft(recipient: 'Self', items: grouped.remove('Self')!));
-          } else {
-            _draftRecipients.add(_InvoiceRecipientDraft(recipient: 'Self', items: []));
-          }
-          for (final entry in grouped.entries) {
-            _draftRecipients.add(_InvoiceRecipientDraft(recipient: entry.key, items: entry.value));
-          }
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Mapped $mappedEntryCount item entries from invoice!', textAlign: TextAlign.center),
-            backgroundColor: const Color(0xFF10B981),
-          ),
-        );
-      }
+      await _openCachedMappingDialog();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -700,6 +644,84 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
           ),
         );
       }
+    }
+  }
+
+  Future<void> _openCachedMappingDialog() async {
+    final extracted = _cachedExtractedInvoice;
+    if (extracted == null || !mounted) return;
+
+    final recipientOptions = <String>{
+      'Self',
+      ..._knownRecipients.where((r) => r.trim().isNotEmpty && r != 'Split'),
+    }.toList();
+
+    final mapped = await showDialog<MappedInvoiceResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => MapExtractedInvoiceDialog(
+        extracted: extracted,
+        initialDealer: _cachedMappedDealer,
+        initialBillNo: _cachedMappedBillNo,
+        initialBillingDate: _cachedMappedBillingDate ?? _selectedDate,
+        knownDealers: _knownDealers,
+        recipientOptions: recipientOptions,
+        ocrText: _lastOcrText,
+      ),
+    );
+
+    if (mapped != null && mounted) {
+      final grouped = <String, List<_InvoiceItemDraft>>{};
+      int mappedEntryCount = 0;
+      for (int i = 0; i < extracted.items.length; i++) {
+        final it = extracted.items[i];
+        final allocs = i < mapped.allocationsPerItem.length
+            ? mapped.allocationsPerItem[i]
+            : [ItemAllocationSplit(recipient: 'Self', quantity: it.quantity)];
+        for (final alloc in allocs) {
+          if (alloc.quantity <= 0) continue;
+          grouped.putIfAbsent(alloc.recipient, () => []).add(
+            _InvoiceItemDraft(
+              name: it.name,
+              qty: alloc.quantity,
+              price: it.unitPrice,
+            ),
+          );
+          mappedEntryCount++;
+        }
+      }
+
+      setState(() {
+        _cachedMappedDealer = mapped.dealer;
+        _cachedMappedBillNo = mapped.billNo;
+        _cachedMappedBillingDate = mapped.billingDate;
+        _selectedDate = mapped.billingDate;
+        if (mapped.billNo.isNotEmpty) {
+          _billNoController.text = mapped.billNo;
+        }
+        _dealerController.text = mapped.dealer;
+        for (final g in _draftRecipients) {
+          for (final it in g.items) {
+            it.dispose();
+          }
+        }
+        _draftRecipients.clear();
+        if (grouped.containsKey('Self')) {
+          _draftRecipients.add(_InvoiceRecipientDraft(recipient: 'Self', items: grouped.remove('Self')!));
+        } else {
+          _draftRecipients.add(_InvoiceRecipientDraft(recipient: 'Self', items: []));
+        }
+        for (final entry in grouped.entries) {
+          _draftRecipients.add(_InvoiceRecipientDraft(recipient: entry.key, items: entry.value));
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Mapped $mappedEntryCount item entries from invoice!', textAlign: TextAlign.center),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
     }
   }
 
@@ -945,6 +967,14 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
     setState(() => _isSaving = false);
 
     if (success) {
+      setState(() {
+        _cachedExtractedInvoice = null;
+        _cachedMappedDealer = '';
+        _cachedMappedBillNo = '';
+        _cachedMappedBillingDate = null;
+        _extractedPreviewPages = [];
+        _lastOcrText = '';
+      });
       final summary = InvoiceSummary(
         billNo: billNo,
         shopName: shopName,
@@ -1266,7 +1296,7 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
                     ),
                 ],
               ),
-        floatingActionButton: _tabController.index == 0
+        floatingActionButton: (_tabController.index == 0 && MediaQuery.of(context).viewInsets.bottom <= 80)
             ? _buildScanFabMenu(primaryColor, secondaryColor, isDark)
             : null,
       ),
@@ -1518,7 +1548,38 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
               elevation: 3,
             ),
           ),
-          if (_extractedPreviewPages.isNotEmpty || _lastOcrText.isNotEmpty) ...[
+          if (_cachedExtractedInvoice != null) ...[
+            const SizedBox(height: 12),
+            GlassContainer(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              borderRadius: BorderRadius.circular(14),
+              borderColor: secondary.withValues(alpha: 0.35),
+              child: Row(
+                children: [
+                  Icon(Icons.auto_awesome_rounded, size: 16, color: secondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Cached AI Scan (${_cachedExtractedInvoice!.items.length} items)',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: textMain),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _openCachedMappingDialog,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: secondary,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Resume Mapping', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (_extractedPreviewPages.isNotEmpty || _lastOcrText.isNotEmpty || _cachedExtractedInvoice != null) ...[
             const SizedBox(height: 16),
             GlassContainer(
               padding: const EdgeInsets.all(14),

@@ -24,6 +24,8 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
   bool _hasError = false;
   bool _showPinDigits = false;
   bool _isAuthenticatingBio = false;
+  DateTime? _pausedAt;
+  static const Duration _relockGracePeriod = Duration(seconds: 60);
 
   @override
   void initState() {
@@ -62,9 +64,16 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
-      _lockIfConfigured();
+      _pausedAt ??= DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
-      _refreshLockState();
+      final pausedAt = _pausedAt;
+      _pausedAt = null;
+      if (pausedAt != null &&
+          DateTime.now().difference(pausedAt) >= _relockGracePeriod) {
+        _lockIfConfigured();
+      } else {
+        _refreshLockState();
+      }
     }
   }
 

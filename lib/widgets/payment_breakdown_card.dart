@@ -379,9 +379,9 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 3,
-                            mainAxisSpacing: 5,
-                            crossAxisSpacing: 5,
-                            childAspectRatio: 1.75,
+                            mainAxisSpacing: 4,
+                            crossAxisSpacing: 4,
+                            childAspectRatio: 2.35,
                           ),
                           itemCount: PaymentBreakdown.supportedDenominations.length,
                           itemBuilder: (context, idx) {
@@ -390,7 +390,7 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                             final hasValue = count != 0;
 
                             return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   begin: Alignment.topLeft,
@@ -439,7 +439,7 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                                     child: Text(
                                       '₹$denom',
                                       style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.w800,
                                         color: hasValue
                                             ? (isDark ? const Color(0xFF00D2B4) : const Color(0xFF059669))
@@ -449,7 +449,7 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                                   ),
                                   const SizedBox(height: 1),
                                   SizedBox(
-                                    height: 22,
+                                    height: 18,
                                     child: Center(
                                       child: TextField(
                                         controller: _denomControllers[denom],
@@ -457,14 +457,14 @@ class _PaymentBreakdownCardState extends State<PaymentBreakdownCard> {
                                         textAlign: TextAlign.center,
                                         textAlignVertical: TextAlignVertical.center,
                                         style: TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 12.5,
                                           fontWeight: FontWeight.w700,
                                           color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
                                         ),
                                         decoration: InputDecoration(
                                           hintText: '0',
                                           hintStyle: TextStyle(
-                                            fontSize: 13,
+                                            fontSize: 12,
                                             fontWeight: FontWeight.w600,
                                             color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                                           ),

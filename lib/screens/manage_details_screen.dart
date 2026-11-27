@@ -1118,7 +1118,9 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
                   ),
                 ],
               ),
-        floatingActionButton: Container(
+        floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 80
+            ? null
+            : Container(
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: colors.primaryGradient,

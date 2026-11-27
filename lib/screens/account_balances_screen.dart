@@ -619,7 +619,8 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
                     ],
                   ),
                 ),
-                _buildBottomBar(primaryColor, isDark),
+                if (MediaQuery.of(context).viewInsets.bottom <= 80)
+                  _buildBottomBar(primaryColor, isDark),
               ],
             ),
       ),
@@ -2264,9 +2265,9 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 1.45,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+              childAspectRatio: 1.75,
             ),
             itemCount: PaymentBreakdown.supportedDenominations.length,
             itemBuilder: (context, idx) {
@@ -2428,9 +2429,9 @@ class _AccountBalancesScreenState extends State<AccountBalancesScreen> with Sing
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            mainAxisSpacing: 6,
-            crossAxisSpacing: 6,
-            childAspectRatio: 1.65,
+            mainAxisSpacing: 4,
+            crossAxisSpacing: 4,
+            childAspectRatio: 2.05,
           ),
           itemCount: PaymentBreakdown.supportedDenominations.length,
           itemBuilder: (context, idx) {

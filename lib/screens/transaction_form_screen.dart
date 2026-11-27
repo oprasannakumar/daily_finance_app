@@ -1889,9 +1889,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
           return;
         }
       }
+      // Fallback to AI engine for unstructured bank/UPI SMS or natural text in clipboard
+      await _processAiAutoFill(textToParse, updateNarration: true, isSilent: false);
+      return;
     }
 
-    // Nothing structured found in clipboard: inform user without modifying the form
+    // Nothing in narration or clipboard: inform user without modifying the form
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
