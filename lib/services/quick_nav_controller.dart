@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../models/transaction_model.dart';
 import 'quick_actions_service.dart';
 
 class EntryDraft {
@@ -69,10 +70,20 @@ class QuickNavController extends ChangeNotifier {
   bool get isQuickSheetOpen => _isQuickSheetOpen;
 
   final ValueNotifier<EntryDraft?> pendingEntryDraft = ValueNotifier<EntryDraft?>(null);
+  final ValueNotifier<List<FinanceTransaction>?> pendingEditTransactions =
+      ValueNotifier<List<FinanceTransaction>?>(null);
 
   void openEntryWithDraft(EntryDraft draft) {
     pendingEntryDraft.value = draft;
     navigateTo('Entry');
+  }
+
+  void requestEditTransactions(List<FinanceTransaction> transactions) {
+    if (transactions.isEmpty) return;
+    pendingEditTransactions.value = List<FinanceTransaction>.from(transactions);
+    if (!switchShellTab('Entry')) {
+      navigateTo('Entry');
+    }
   }
 
   void Function(String label)? _rootNavigationHandler;
@@ -106,10 +117,12 @@ class QuickNavController extends ChangeNotifier {
   }
 
   /// Switches the root MainShell tab to [label] without calling Navigator.popUntil.
-  void switchShellTab(String label) {
+  bool switchShellTab(String label) {
     if (_shellTabHandler != null && _shellTabHandler!(label)) {
       syncShellScreen(label);
+      return true;
     }
+    return false;
   }
 
   void setQuickSheetOpen(bool open) {

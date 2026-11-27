@@ -684,9 +684,9 @@ class _ManageDetailsScreenState extends State<ManageDetailsScreen> with SingleTi
 
         return SwipeToDeleteWrapper(
           key: ValueKey('recurring_box_${r.id}'),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           margin: const EdgeInsets.symmetric(vertical: 4),
-          border: recBorder,
+          backgroundBorder: recBorder,
           rightLabel: 'EDIT',
           onSwipeRight: () {
             widget.onEditRecurring?.call(r);

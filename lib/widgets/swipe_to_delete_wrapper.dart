@@ -109,119 +109,154 @@ class _SwipeToDeleteWrapperState extends State<SwipeToDeleteWrapper>
             child: Stack(
               children: [
                 if (_dragOffset > 0.5 && widget.onSwipeRight != null)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: _dragOffset > 20 ? () {
-                        _animateTo(0.0);
-                        widget.onSwipeRight?.call();
-                      } : null,
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                        ),
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              widget.rightIcon,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              widget.rightLabel,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12,
-                                letterSpacing: 0.7,
+                  Positioned(
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    width: _dragOffset.clamp(0.0, maxWidth),
+                    child: Padding(
+                      padding: EdgeInsets.only(right: _dragOffset > 8 ? 6 : 0),
+                      child: GestureDetector(
+                        onTap: _dragOffset > 20 ? () {
+                          _animateTo(0.0);
+                          widget.onSwipeRight?.call();
+                        } : null,
+                        child: ClipRRect(
+                          borderRadius: widget.borderRadius,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: widget.borderRadius,
+                              border: widget.backgroundBorder,
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF0D9488), Color(0xFF14B8A6)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
                               ),
                             ),
-                          ],
+                            alignment: Alignment.centerLeft,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const NeverScrollableScrollPhysics(),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      widget.rightIcon,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      widget.rightLabel,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                        letterSpacing: 0.7,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 if (_dragOffset < -0.5)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: _dragOffset < -20 ? _triggerDelete : null,
-                      child: Container(
-                        decoration: BoxDecoration(
+                  Positioned(
+                    top: 0,
+                    bottom: 0,
+                    right: 0,
+                    width: (-_dragOffset).clamp(0.0, maxWidth),
+                    child: Padding(
+                      padding: EdgeInsets.only(left: _dragOffset < -8 ? 6 : 0),
+                      child: GestureDetector(
+                        onTap: _dragOffset < -20 ? _triggerDelete : null,
+                        child: ClipRRect(
                           borderRadius: widget.borderRadius,
-                          border: widget.backgroundBorder,
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFB91C1C), Color(0xFFEF4444)],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                        ),
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'DELETE',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12,
-                                letterSpacing: 0.7,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: widget.borderRadius,
+                              border: widget.backgroundBorder,
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
                               ),
                             ),
-                            SizedBox(width: 6),
-                            Icon(
-                              Icons.delete_outline_rounded,
-                              color: Colors.white,
-                              size: 20,
+                            alignment: Alignment.centerRight,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              reverse: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'DELETE',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                        letterSpacing: 0.7,
+                                      ),
+                                    ),
+                                    SizedBox(width: 6),
+                                    Icon(
+                                      Icons.delete_outline_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: _dragOffset.abs() > 10 ? () => _animateTo(0.0) : null,
-                  onHorizontalDragStart: (_) => _controller.stop(),
-                  onHorizontalDragUpdate: (details) {
-                    final minDrag = -maxWidth;
-                    final maxDrag = widget.onSwipeRight != null ? maxWidth : 0.0;
-                    setState(() {
-                      _dragOffset =
-                          (_dragOffset + details.delta.dx).clamp(minDrag, maxDrag);
-                    });
-                  },
-                  onHorizontalDragEnd: (details) {
-                    final vx = details.primaryVelocity ?? 0.0;
-                    if (_dragOffset <= -maxWidth * (widget.allowPartialReveal ? 0.35 : 0.25) ||
-                        vx < (widget.allowPartialReveal ? -550 : -350)) {
-                      _animateTo(-maxWidth);
-                      _triggerDelete();
-                    } else if (widget.allowPartialReveal &&
-                        (_dragOffset <= -36 || (vx < -200 && _dragOffset < 0))) {
-                      _animateTo(-_revealWidth);
-                    } else if (widget.onSwipeRight != null &&
-                        (_dragOffset >= 80 || vx > 300)) {
-                      _animateTo(0.0);
-                      widget.onSwipeRight!();
-                    } else if (widget.onSwipeRight != null &&
-                        (_dragOffset >= 36 || (vx > 200 && _dragOffset > 0))) {
-                      _animateTo(_revealWidth);
-                    } else {
-                      _animateTo(0.0);
-                    }
-                  },
-                  onHorizontalDragCancel: () => _animateTo(0.0),
-                  child: Transform.translate(
-                    offset: Offset(_dragOffset, 0),
+                Transform.translate(
+                  offset: Offset(_dragOffset, 0),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: _dragOffset.abs() > 10 ? () => _animateTo(0.0) : null,
+                    onHorizontalDragStart: (_) => _controller.stop(),
+                    onHorizontalDragUpdate: (details) {
+                      final minDrag = -maxWidth;
+                      final maxDrag = widget.onSwipeRight != null ? maxWidth : 0.0;
+                      setState(() {
+                        _dragOffset =
+                            (_dragOffset + details.delta.dx).clamp(minDrag, maxDrag);
+                      });
+                    },
+                    onHorizontalDragEnd: (details) {
+                      final vx = details.primaryVelocity ?? 0.0;
+                      if (_dragOffset <= -maxWidth * (widget.allowPartialReveal ? 0.35 : 0.25) ||
+                          vx < (widget.allowPartialReveal ? -550 : -350)) {
+                        _animateTo(-maxWidth);
+                        _triggerDelete();
+                      } else if (widget.allowPartialReveal &&
+                          (_dragOffset <= -36 || (vx < -200 && _dragOffset < 0))) {
+                        _animateTo(-_revealWidth);
+                      } else if (widget.onSwipeRight != null &&
+                          (_dragOffset >= 80 || vx > 300)) {
+                        _animateTo(0.0);
+                        widget.onSwipeRight!();
+                      } else if (widget.onSwipeRight != null &&
+                          (_dragOffset >= 36 || (vx > 200 && _dragOffset > 0))) {
+                        _animateTo(_revealWidth);
+                      } else {
+                        _animateTo(0.0);
+                      }
+                    },
+                    onHorizontalDragCancel: () => _animateTo(0.0),
                     child: widget.child,
                   ),
                 ),

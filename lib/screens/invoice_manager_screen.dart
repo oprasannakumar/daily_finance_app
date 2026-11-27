@@ -1365,50 +1365,6 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
             ),
             const SizedBox(height: 12),
           ],
-          if (_extractedPreviewPages.isNotEmpty || _lastOcrText.isNotEmpty) ...[
-            Row(
-              children: [
-                if (_extractedPreviewPages.isNotEmpty)
-                  Expanded(
-                    child: SizedBox(
-                      height: 60,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _extractedPreviewPages.length,
-                        separatorBuilder: (_, _) => const SizedBox(width: 8),
-                        itemBuilder: (_, idx) => Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.memory(_extractedPreviewPages[idx], width: 48, height: 60, fit: BoxFit.cover),
-                            ),
-                            Positioned(
-                              bottom: 2,
-                              right: 2,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.65),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text('P${idx + 1}', style: const TextStyle(color: Colors.white, fontSize: 9)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                if (_lastOcrText.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: () => _showOcrPreviewDialog(_lastOcrText),
-                    icon: const Icon(Icons.text_snippet_outlined, size: 16),
-                    label: const Text('View OCR', style: TextStyle(fontSize: 11.5)),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-          ],
 
           // Row 1: Date & Invoice No
           Row(
@@ -1562,6 +1518,120 @@ class _InvoiceManagerScreenState extends State<InvoiceManagerScreen> with Single
               elevation: 3,
             ),
           ),
+          if (_extractedPreviewPages.isNotEmpty || _lastOcrText.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            GlassContainer(
+              padding: const EdgeInsets.all(14),
+              borderRadius: BorderRadius.circular(18),
+              borderColor: primary.withValues(alpha: 0.25),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.attach_file_rounded, size: 16, color: primary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Imported Scan (${_extractedPreviewPages.length} page${_extractedPreviewPages.length == 1 ? '' : 's'})',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: textMain,
+                          ),
+                        ),
+                      ),
+                      if (_lastOcrText.isNotEmpty)
+                        TextButton.icon(
+                          onPressed: () => _showOcrPreviewDialog(_lastOcrText),
+                          icon: const Icon(Icons.text_snippet_outlined, size: 15),
+                          label: const Text('View OCR', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                          style: TextButton.styleFrom(
+                            foregroundColor: primary,
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            backgroundColor: primary.withValues(alpha: 0.1),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (_extractedPreviewPages.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 66,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _extractedPreviewPages.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 10),
+                        itemBuilder: (_, idx) => InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (dCtx) => Dialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            'Imported Page ${idx + 1}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                          ),
+                                          const Spacer(),
+                                          IconButton(
+                                            icon: const Icon(Icons.close),
+                                            onPressed: () => Navigator.pop(dCtx),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxHeight: MediaQuery.sizeOf(context).height * 0.65,
+                                      ),
+                                      child: InteractiveViewer(
+                                        child: Image.memory(_extractedPreviewPages[idx], fit: BoxFit.contain),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.memory(_extractedPreviewPages[idx], width: 52, height: 66, fit: BoxFit.cover),
+                              ),
+                              Positioned(
+                                bottom: 3,
+                                right: 3,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.68),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Text('P${idx + 1}', style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
         ],
       ),

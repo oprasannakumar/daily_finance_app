@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/account_balance_model.dart';
 import '../models/emi_plan_model.dart';
 import '../models/transaction_model.dart';
+import '../services/quick_nav_controller.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme_colors.dart';
 import '../utils/currency_formatter.dart';
@@ -23,6 +24,7 @@ class TransactionHistoryScreen extends StatefulWidget {
   final DateTime? initialStartDate;
   final DateTime? initialEndDate;
   final double bottomContentPadding;
+  final bool returnResultOnEdit;
 
   const TransactionHistoryScreen({
     super.key,
@@ -34,6 +36,7 @@ class TransactionHistoryScreen extends StatefulWidget {
     this.initialStartDate,
     this.initialEndDate,
     this.bottomContentPadding = 0.0,
+    this.returnResultOnEdit = false,
   });
 
   @override
@@ -772,7 +775,7 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     label: const Text('Edit', style: TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: () {
                       Navigator.pop(ctx);
-                      Navigator.pop(context, [tx]);
+                      _editTransactions([tx]);
                     },
                   ),
                 ),
@@ -783,6 +786,18 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         ),
       ),
     );
+  }
+
+  void _editTransactions(List<FinanceTransaction> txs) {
+    if (txs.isEmpty) return;
+    if (widget.returnResultOnEdit && mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(txs);
+      return;
+    }
+    if (mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+    QuickNavController.instance.requestEditTransactions(txs);
   }
 
   Widget _buildBreakdownRow(PaymentBreakdown b) {
@@ -991,7 +1006,8 @@ class TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               onPressed: () {
                 final selected = _transactions.where((t) => _selectedIds.contains(t.id)).toList();
                 if (selected.isEmpty) return;
-                Navigator.of(context).pop(selected);
+                _clearSelection();
+                _editTransactions(selected);
               },
             ),
             IconButton(

@@ -138,12 +138,26 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
     StorageService.instance.balanceConfigNotifier.addListener(_loadBalancesSummary);
     StorageService.instance.transactionsNotifier.addListener(_refreshFloatingStats);
     QuickNavController.instance.pendingEntryDraft.addListener(_onPendingEntryDraft);
+    QuickNavController.instance.pendingEditTransactions.addListener(_onPendingEditTransactions);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _handleStartupFlow();
       _checkDueEmiInstallmentsOnStartup();
       _checkUpcomingDueReminders();
       _onPendingEntryDraft();
+      _onPendingEditTransactions();
     });
+  }
+
+  void _onPendingEditTransactions() {
+    final txs = QuickNavController.instance.pendingEditTransactions.value;
+    if (txs == null || txs.isEmpty || !mounted) return;
+    QuickNavController.instance.pendingEditTransactions.value = null;
+
+    if (txs.length == 1) {
+      _loadTransactionForEditing(txs[0]);
+    } else {
+      _loadMultipleTransactionsForEditing(txs);
+    }
   }
 
   void _onPendingEntryDraft() {
@@ -656,6 +670,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
     StorageService.instance.balanceConfigNotifier.removeListener(_loadBalancesSummary);
     StorageService.instance.transactionsNotifier.removeListener(_refreshFloatingStats);
     QuickNavController.instance.pendingEntryDraft.removeListener(_onPendingEntryDraft);
+    QuickNavController.instance.pendingEditTransactions.removeListener(_onPendingEditTransactions);
     _referenceIdController.dispose();
     _narrationController.removeListener(_onNarrationChanged);
     _narrationController.dispose();
@@ -1010,7 +1025,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
     final result = await Navigator.of(context).push(
       PageRouteBuilder(
         settings: const RouteSettings(name: 'History'),
-        pageBuilder: (context, animation, secondaryAnimation) => const TransactionHistoryScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) => const TransactionHistoryScreen(
+          returnResultOnEdit: true,
+        ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           const begin = Offset(1.0, 0.0);
           const end = Offset.zero;
@@ -3500,7 +3517,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                             key: ValueKey('recurring_${r.id}'),
                             borderRadius: BorderRadius.circular(12),
                             margin: const EdgeInsets.symmetric(vertical: 4),
-                            border: recBorder,
+                            backgroundBorder: recBorder,
                             rightLabel: 'EDIT',
                             onSwipeRight: () {
                               Navigator.of(ctx).pop();
@@ -3534,7 +3551,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                 decoration: BoxDecoration(
                                   color: isDarkInner
                                       ? (isDue ? const Color(0xFF262C54) : const Color(0xFF1E2442))
-                                      : (isDue ? const Color(0xFFFEF3C7).withValues(alpha: 0.5) : Colors.white),
+                                      : (isDue ? const Color(0xFFFEF3C7) : Colors.white),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Row(
@@ -4770,66 +4787,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
     );
   }
 
-  Widget _buildIntentPill({
-    required String label,
-    required IconData icon,
-    required bool isSelected,
-    required List<Color> gradientColors,
-    required VoidCallback onTap,
-  }) {
-    final themeColors = AppThemeColors.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            gradient: isSelected
-                ? LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: gradientColors)
-                : null,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: gradientColors.first.withValues(alpha: 0.28),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 14,
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? themeColors.textSecondary : const Color(0xFF64748B)),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected
-                      ? Colors.white
-                      : (isDark ? themeColors.textSecondary : const Color(0xFF475569)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildFieldLabel(String label, {Color? color}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -4886,12 +4843,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
         .length;
     final dueBillsCount = _liveBalancesSummary?.totalDueBillsCount ?? 0;
     final totalDueCount = dueRecurringCount + dueBillsCount;
-    final heroAmount = _isSelfTransferMode ? _totalFromAmount : _totalAmount;
-    final liquidBalance = _liveBalancesSummary != null
-        ? (_liveBalancesSummary!.totalBankBalance +
-            _liveBalancesSummary!.totalCashBalance +
-            _liveBalancesSummary!.totalWalletBalance)
-        : null;
 
     return GlassBackdrop(
       child: Scaffold(
@@ -5083,7 +5034,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                             padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
                             children: [
-                              // BENTO CARD 1: Hero Amount Pulse, 3-Way Intent Switcher & Labeled Modes
+                              // BENTO CARD 1: Tap to Auto-Fill & Labeled 5-Mode Quick Strip
                               GlassContainer(
                                 padding: const EdgeInsets.all(14),
                                 borderRadius: BorderRadius.circular(24),
@@ -5100,111 +5051,132 @@ class _TransactionFormScreenState extends State<TransactionFormScreen>
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              _isSelfTransferMode
-                                                  ? 'TRANSFER AMOUNT'
-                                                  : (_flow == 'Deposit' ? 'INFLOW AMOUNT' : 'TRANSACTION TOTAL'),
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: 0.9,
-                                                color: textSecondary,
-                                              ),
+                                    Material(
+                                      color: Colors.transparent,
+                                      borderRadius: BorderRadius.circular(18),
+                                      child: InkWell(
+                                        onTap: _isAiProcessing ? null : _handleAutoFill,
+                                        borderRadius: BorderRadius.circular(18),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 220),
+                                          curve: Curves.easeOutCubic,
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: isDark
+                                                  ? [
+                                                      purpleAccent.withValues(alpha: 0.24),
+                                                      coralAccent.withValues(alpha: 0.16),
+                                                    ]
+                                                  : [
+                                                      purpleAccent.withValues(alpha: 0.11),
+                                                      coralAccent.withValues(alpha: 0.09),
+                                                    ],
                                             ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              '₹${IndianCurrency.format(heroAmount)}',
-                                              style: TextStyle(
-                                                fontSize: 27,
-                                                fontWeight: FontWeight.w900,
-                                                letterSpacing: -0.6,
-                                                color: _isSelfTransferMode
-                                                    ? purpleAccent
-                                                    : (_flow == 'Deposit'
-                                                        ? const Color(0xFF10B981)
-                                                        : textPrimary),
-                                              ),
+                                            borderRadius: BorderRadius.circular(18),
+                                            border: Border.all(
+                                              color: purpleAccent.withValues(alpha: isDark ? 0.42 : 0.28),
+                                              width: 1.2,
                                             ),
-                                          ],
-                                        ),
-                                        if (liquidBalance != null)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                            decoration: BoxDecoration(
-                                              color: colors.inputBg,
-                                              borderRadius: BorderRadius.circular(14),
-                                              border: Border.all(color: colors.inputBorder, width: 1),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  Icons.account_balance_wallet_rounded,
-                                                  size: 13,
-                                                  color: colors.secondaryGradStart,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 36,
+                                                height: 36,
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: [purpleAccent, coralAccent],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  ),
+                                                  borderRadius: BorderRadius.circular(11),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: purpleAccent.withValues(alpha: 0.28),
+                                                      blurRadius: 8,
+                                                      offset: const Offset(0, 3),
+                                                    ),
+                                                  ],
                                                 ),
-                                                const SizedBox(width: 5),
-                                                Text(
-                                                  '₹${IndianCurrency.formatSmart(liquidBalance)}',
-                                                  style: TextStyle(
-                                                    fontSize: 11.5,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: textPrimary,
+                                                alignment: Alignment.center,
+                                                child: _isAiProcessing
+                                                    ? const SizedBox(
+                                                        width: 17,
+                                                        height: 17,
+                                                        child: CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          color: Colors.white,
+                                                        ),
+                                                      )
+                                                    : const Icon(
+                                                        Icons.auto_awesome_rounded,
+                                                        color: Colors.white,
+                                                        size: 18,
+                                                      ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      _isAiProcessing ? 'Parsing with AI...' : 'Tap to Auto-Fill',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: textPrimary,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 1),
+                                                    Text(
+                                                      'Paste SMS / UPI alert or use narration',
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w500,
+                                                        color: textSecondary,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                                decoration: BoxDecoration(
+                                                  color: colors.inputBg,
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  border: Border.all(
+                                                    color: purpleAccent.withValues(alpha: 0.3),
                                                   ),
                                                 ),
-                                              ],
-                                            ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.content_paste_go_rounded,
+                                                      size: 13,
+                                                      color: purpleAccent,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      'Fill',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: purpleAccent,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-
-                                    // 3-Way Segmented Intent Switcher
-                                    Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: isDark
-                                            ? Colors.black.withValues(alpha: 0.25)
-                                            : const Color(0xFFF1F5F9).withValues(alpha: 0.85),
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          _buildIntentPill(
-                                            label: 'Expense',
-                                            icon: Icons.north_east_rounded,
-                                            isSelected: !_isSelfTransferMode && _flow == 'Withdraw',
-                                            gradientColors: [colors.primaryGradStart, colors.primaryGradEnd],
-                                            onTap: () {
-                                              if (_isSelfTransferMode) _toggleSelfTransferMode(false);
-                                              _onFlowSelected('Withdraw');
-                                            },
-                                          ),
-                                          _buildIntentPill(
-                                            label: 'Income',
-                                            icon: Icons.south_west_rounded,
-                                            isSelected: !_isSelfTransferMode && _flow == 'Deposit',
-                                            gradientColors: [colors.secondaryGradStart, colors.secondaryGradEnd],
-                                            onTap: () {
-                                              if (_isSelfTransferMode) _toggleSelfTransferMode(false);
-                                              _onFlowSelected('Deposit');
-                                            },
-                                          ),
-                                          _buildIntentPill(
-                                            label: 'Transfer',
-                                            icon: Icons.swap_horiz_rounded,
-                                            isSelected: _isSelfTransferMode,
-                                            gradientColors: [purpleAccent, colors.heroGradEnd],
-                                            onTap: () => _toggleSelfTransferMode(!_isSelfTransferMode),
-                                          ),
-                                        ],
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(height: 10),
