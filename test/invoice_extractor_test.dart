@@ -233,6 +233,13 @@ void main() {
       await tester.tap(find.text('Remap'));
       await tester.pumpAndSettle();
 
+      // Verify dropdown and Qty input align horizontally at identical 46px height
+      final recipRect = tester.getRect(find.byKey(const ValueKey('split_alloc_recip_0_Self')));
+      final qtyRect = tester.getRect(find.byKey(const ValueKey('split_alloc_qty_0')));
+      expect(recipRect.top, closeTo(qtyRect.top, 0.1));
+      expect(recipRect.bottom, closeTo(qtyRect.bottom, 0.1));
+      expect(recipRect.height, closeTo(46.0, 0.1));
+
       // User changes 1 -> 0.5
       final qtyField = find.byType(TextField).first;
       await tester.enterText(qtyField, '0.5');

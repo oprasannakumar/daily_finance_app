@@ -2237,9 +2237,15 @@ class _RemapItemSplitDialogState extends State<RemapItemSplitDialog> {
     final rem = _remainingQty;
     final isExactMatch = rem.abs() < 0.005;
     final hasRemaining = rem >= 0.005;
+    final colors = AppThemeColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      backgroundColor: isDark ? const Color(0xFF141A36) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colors.inputBorder.withValues(alpha: 0.7), width: 1.1),
+      ),
       title: Row(
         children: [
           const Icon(Icons.call_split_rounded, color: Color(0xFFFF7A5C), size: 22),
@@ -2322,6 +2328,7 @@ class _RemapItemSplitDialogState extends State<RemapItemSplitDialog> {
                   final rowTotal = alloc.quantity * widget.unitPrice;
                   return Row(
                     key: ObjectKey(alloc),
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         flex: 5,
@@ -2337,28 +2344,84 @@ class _RemapItemSplitDialogState extends State<RemapItemSplitDialog> {
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 3,
-                        child: TextField(
-                          controller: _qtyCtrls[idx],
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                          decoration: InputDecoration(
-                            labelText: 'Qty',
-                            helperText: '₹${rowTotal.toStringAsFixed(0)}',
-                            helperStyle: const TextStyle(fontSize: 10),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onChanged: (v) {
-                            setState(() {
-                              alloc.quantity = double.tryParse(v.trim()) ?? 0.0;
-                            });
-                          },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Container(
+                              key: ValueKey('split_alloc_qty_$idx'),
+                              height: 46,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: colors.inputBg,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: colors.inputBorder,
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'Qty',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _qtyCtrls[idx],
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      textAlign: TextAlign.right,
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: colors.textPrimary,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText: '0',
+                                        hintStyle: TextStyle(
+                                          fontSize: 13,
+                                          color: colors.textSecondary.withValues(alpha: 0.6),
+                                        ),
+                                        isDense: true,
+                                        filled: false,
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                      onChanged: (v) {
+                                        setState(() {
+                                          alloc.quantity = double.tryParse(v.trim()) ?? 0.0;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 3, right: 4),
+                              child: Text(
+                                '₹${rowTotal.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       if (_allocs.length > 1)
                         SizedBox(
                           width: 28,
+                          height: 46,
                           child: IconButton(
                             padding: EdgeInsets.zero,
                             tooltip: 'Remove share',
